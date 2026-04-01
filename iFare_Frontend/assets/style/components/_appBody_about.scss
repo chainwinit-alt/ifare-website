@@ -1,0 +1,414 @@
+.app-body[name="about"] {
+    max-width: 932px;
+    .part-top {
+      .title-component {
+        margin-left: 0;
+        height: 102px;
+      }
+      .comp-shadow {
+        left: 4px;
+      }
+    }
+  
+    .section-about-what {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 84px;
+
+      &::before, &::after, .part-what-top::before {
+        content: '';
+        display: block;
+        position: absolute;
+        z-index: 48;
+      }
+      &::before {
+        top: -375px;
+        bottom: unset;
+        right: unset;
+        left: -750px;
+        width: 750px;
+        height: 750px;
+        border-radius: 750px;
+        background: radial-gradient(50% 50% at 50% 50%, rgba($color-pink, 0.12) 0%, rgba($color-pink, 0.00) 100%);
+      }
+      &::after {
+        top: unset;
+        bottom: -328px;
+        right: -656px;
+        left: unset;
+        width: 656px;
+        height: 656px;
+        border-radius: 656px;
+        background: radial-gradient(50% 50% at 50% 50%, rgba($color-primary, 0.15) 0%, rgba($color-primary, 0.00) 100%);
+      }
+
+      .part-what-top {
+        position: relative;
+        &::before {
+          top: unset;
+          bottom: -500px;
+          right: 0;
+          left: 0;
+          width: 656px;
+          height: 656px;
+          border-radius: 656px;
+          background: radial-gradient(50% 50% at 50% 50%, rgba($color-orange, 0.15) 0%, rgba($color-orange, 0.00) 100%);
+        }
+      }
+    }
+    .card {
+      border-radius: 12px;
+    }
+    .card-what {
+      max-width: 384px;
+      padding: 32px 60px 52px 44px;
+      border: 2px solid $color-white;
+      background: rgba($color-white, 0.88);
+      box-shadow: 0px 24px 44px -18px rgba($color-black, 0.10);
+      backdrop-filter: blur(8px);
+  
+      .info-what {
+        color: rgba($color-black, .7);
+        margin-top: 16px;
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 28px;
+        padding: 0 20px;
+        text-align: justify;
+      }
+    }
+  
+    .part-what-top, .part-what-bottom {
+      display: flex;
+      position: relative;
+    }
+  
+    .part-what-top {
+      .card-what {
+        z-index: 101;
+      }
+      .card-what-img {
+        z-index: 100;
+      }
+    }
+  
+    .part-what-bottom {
+      .card-what {
+        z-index: 99;
+      }
+  
+      .ic-img-about-2 {
+        z-index: 97;
+      }
+      .ic-img-about-3 {
+        z-index: 98;
+      }
+    }
+  
+    .part-what-bottom {
+      justify-content: right;
+      .card-what {
+        background: rgba($color-white, 0.5);
+      }
+  
+      .info-what {
+        padding: 0 32px;
+      }
+    }
+  
+    .card-what-img {
+      position: absolute;
+      box-shadow: 0px 11px 30px -8px rgba($color-black, 0.12);
+  
+      &.ic-img-about-1 {
+        width: 732px;
+        height: 456px;
+        right: -200px;
+        bottom: -92px;
+        flex-shrink: 0;
+        background-size: 115%;
+      }
+      &.ic-img-about-2 {
+        width: 488px;
+        height: 292px;
+        left: -242px;
+        top: 0;
+        flex-shrink: 0;
+        background-size: 120%;
+      }
+      &.ic-img-about-3 {
+        width: 236px;
+        height: 236px;
+        left: 128px;
+        bottom: 36px;
+        flex-shrink: 0;
+        background-size: 132%;
+      }
+    }
+  
+    .section-about-how {
+      .part-how-top {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 130px;
+      }
+  
+      .part-how-body {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        gap: 48px;
+      }
+  
+      .how-content {
+        display: inline-flex;
+        flex-direction: column;
+        min-width: 264px;
+        width: 264px;
+        gap: 24px;
+      }
+  
+      .how-top{
+        display: flex;
+        align-items: center;
+      }
+  
+      .how-logo {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+      }
+  
+      .how-title{
+        margin: 0;
+        color: $color-black;
+        font-size: 22px;
+        font-weight: 500;
+        line-height: 34px;
+      }
+      .how-info {
+        color: rgba($color-black, .7);
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 28px;
+      }
+    }
+  
+    .section-about-member {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+
+      &::before {
+        content: '';
+        display: block;
+        position: absolute;
+        z-index: 48;
+      }
+      &::before {
+        top: -300px;
+        bottom: unset;
+        right: unset;
+        left: -750px;
+        width: 1497.985px;
+        height: 1497.985px;
+        border-radius: 1497.985px;
+        background: radial-gradient(50% 50% at 50% 50%, rgba($color-orange, 0.15) 0%, rgba($color-orange, 0.00) 100%);
+      }
+
+      .part-member-top {
+        display: flex;
+        justify-content: center;
+      }
+  
+      .part-member-body {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        gap: 118px;
+        
+      }
+  
+      .member-content {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+  
+      .member-info {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        max-width: 194px;
+        padding: 18px 20px;
+        border-radius: 4px;
+        background: rgba($color-orange, 0.80);
+        box-shadow: 0px 11px 30px -8px rgba($color-orange, 0.50);
+        backdrop-filter: blur(3px);
+        z-index: 101;
+  
+        .member-intros {
+          color: rgba($color-white, .7);
+          font-size: 14px;
+          font-weight: 400;
+          line-height: 20px;
+        }
+        .member-name {
+          margin: 0;
+          font-size: 18px;
+          font-weight: 500;
+          line-height: 28px;
+          color: $color-white;
+        }
+  
+        &::before {
+          position: absolute;
+          left: 0;
+          color: $color-orange;
+          font-size: 16px;
+          font-weight: 500;
+          line-height: 28px;
+        }
+  
+        &[name="boss_E"] {
+          &::before{
+            content: '創辦人';
+            bottom: 110px;
+          }
+        }
+  
+        &[name="boss_P"] {
+          padding: 18px 28px;
+          &::before{
+            content: '董事長';
+            bottom: 70px;
+          }
+        }
+  
+        &[name="boss_C"] {
+          padding: 18px 28px;
+          &::before{
+            content: '執行長';
+            bottom: 70px;
+          }
+        }
+      }
+  
+      .bg-mask {
+        display: inline-block;
+        border-radius: 8px;
+        border: 2px solid $color-white;
+        background: rgba($color-white, 0.40);
+        box-shadow: 0px 11px 30px -8px rgba($color-black, 0.12);
+        width: 215px;
+        height: 194px;
+        position: absolute;
+        bottom: 0;
+        right: 34px;
+        z-index: 99;
+      }
+  
+      .member-photo {
+        position: relative;
+        display: inline-flex;
+        width: 234px;
+        height: 324px;
+        margin-left: 80px;
+        z-index: 100;
+      }
+  
+      .part-member-bottom {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        gap: 101px;
+        margin-top: 92px;
+  
+        .member-content {
+          width: 143px;
+          height: 1px;
+  
+          .member-info {
+            position: relative;
+          }
+        }
+  
+        .purpose-content {
+          max-width: 502px;
+  
+          .purpose-title {
+            margin: 0;
+            font-size: 18px;
+            color: $color-black;
+            font-weight: 500;
+            line-height: 28px;
+          }
+          .purpose-info {
+            margin-top: 20px;
+            font-size: 16px;
+            color: rgba($color-black, .7);
+            font-weight: 400;
+            line-height: 28px;
+          }
+        }
+      }
+    }
+  
+    .section-about-bottom {
+        display: flex;
+        justify-content: center;
+      
+        .card-advance {
+            display: inline-flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 56px;
+            padding: 48px 44px 44px 44px;
+            border-radius: 8px;
+            border: 2px solid $color-white;
+            background: linear-gradient(95deg, rgba($color-white, 0.05) 0%, rgba($color-orange, 0.05) 100%), $color-white;
+            box-shadow: 0px 11px 30px -8px rgba($color-black, 0.12);
+
+            & > * {
+                display: inline-flex;
+                flex-direction: column;
+                gap: 60px;
+                max-width: 220px;
+                width: 220px;
+            }
+        }
+
+        .advance-info {
+            color: $color-black;
+            font-size: 18px;
+            font-weight: 500;
+            line-height: 28px;
+            min-height: 56px;
+        }
+
+        .advance-enter {
+            .advance-link {
+                display: flex;
+                justify-content: space-between;
+                padding: 14px 0;
+                border-bottom: 1px solid $color-primary-dark;
+                text-decoration: none;
+                color: $color-primary;
+            }
+        }
+        .advance-search {
+            .advance-link {
+                display: flex;
+                justify-content: space-between;
+                padding: 14px 0;
+                border-bottom: 1px solid $color-orange;
+                text-decoration: none;
+                color: $color-orange;
+            }
+        }
+    }
+  }

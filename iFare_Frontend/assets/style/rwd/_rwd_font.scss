@@ -1,0 +1,469 @@
+/*Phone style*/
+@media (max-width: $MAX_WIDTH_MOBILE){
+    body {
+        
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 28px;
+    }
+    
+    .app-header {
+        
+    }
+
+    .mobile-menu {
+        .menu-list {
+            li {
+                .mobileNav-link {
+                    font-size: 20px;
+                    font-weight: 500;
+                    line-height: 32px;
+                    color: $color-black;
+                    text-decoration: none;
+                }
+
+                &.active .mobileNav-link {
+                    color: $color-orange;
+                }
+            }
+        }
+    }
+    
+    .app-footer {
+        
+    
+        .footer-info-items {
+            
+    
+            &::before{
+                
+            }
+        }
+    
+        .link-track {
+            
+        }
+    }
+    
+    
+    
+    //------ Page
+    // About
+    .app-body[name="about"] {
+        .info-what {
+            
+        }
+    
+        .how-content {
+            
+        }
+    
+        .member-info{
+            
+        }
+    
+        .purpose-content {
+            
+        }
+    }
+    
+    // Articles
+    .section-welfare {
+        .article-list {
+            .article-item {
+                .btn-tag {
+                    font-size: 14px;
+                    line-height: 20px;
+                }
+            
+                .article-title {
+                    font-size: 20px;
+                    line-height: 32px;
+                }
+            
+                .tags-list li {
+                    line-height: 20px;
+                }
+                .item-info {
+                font-size: 14px;
+                line-height: 20px;
+                @include textLineClamp(2);
+                }
+            }
+        }
+    }
+    .section-lazy {
+        .item-title {
+            
+        }
+    }
+    
+    // News/Info | Articles/welfare | Articles/lazy
+    .app-body-child{
+        &[name="news-info"], &[name="articles-welfare"], &[name="articles-lazy"] {
+            
+            .article-title {
+                font-size: 28px;
+                line-height: 40px;
+            }
+            .article-date {
+                font-size: 12px;
+                line-height: 20px;
+            }
+        }
+    }
+    
+    // iFare
+    .app-body-child {
+        // iFare/result
+        &[name="ifare-result"]{
+            .card-filter-mobile {
+                .component-select {
+                    .comp-placeholder, .comp-name {
+                        font-family: Noto Sans TC;
+                        font-size: 12px;
+                        font-style: normal;
+                        font-weight: 400;
+                        line-height: 20px;
+                    }
+                }
+            }
+            .result-total {
+              
+                &::before, &::after{
+                
+                }
+            }
+            .result-title {
+           
+            }
+            .result-filter {
+         
+        
+                & > *::before {
+             
+                }
+            }
+        }
+    
+        // iFare/info
+        &[name="ifare-info"]{
+            .info-title {
+                font-size: 28px;
+                line-height: 40px;
+            }
+            .date-release, .date-update {
+                font-size: 12px;
+                line-height: 20px;
+            }
+    
+            .card-info {
+                
+                .comp-title {
+                    
+                }
+            }
+        }
+    
+        // iFare/contact
+        &[name="ifare-contact"] {
+            .date-release, .date-update {
+                
+                &::before {
+                    
+                }
+            }
+            .area-list {
+                
+            }
+            .detail-list {
+                .detail-name {
+                    &::after {
+                        content: '單位 / 聯絡電話 / 聯絡地址';
+                        font-family: Roboto;
+                        font-size: 12px;
+                        font-weight: 400;
+                        line-height: 20px; 
+                        color: rgba($color-black, .5);
+                    }
+                }
+                .detail-title {
+                    
+                }
+                .detail-content {
+                    
+                    .content-value {
+                        &[name="unit"] {
+                            font-size: 18px;
+                            line-height: 28px;
+                        }
+                        &[name="tel"] {
+                            font-size: 16px;
+                            line-height: 24px;
+                            color: $color-orange;
+                        }
+                        &[name="address"] {
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    //------ Component
+    // button
+    .btn {
+        
+    }
+    .btn-ifare {
+        
+    }
+    .btn-ifare-start {
+        & > span {
+            font-size: 16px;
+            font-weight: 400;
+        }
+
+        .txt-ifare {
+            line-height: 24px;
+        }
+    
+        .txt-end {
+            
+        }
+    }
+    .btn-more {
+        
+    }
+    .btn-tag {
+        &.active {
+            
+        }
+    }
+    .btn-line {
+        
+    }
+    .btn-filter {
+        
+    }
+    .btn-search {
+        &::before {
+            content: '搜尋';
+            font-family: Noto Sans TC;
+            font-size: 16px;
+            font-weight: 400;
+            line-height: 28px;
+            color: $color-white;
+        }
+    }
+    .btn-reset {
+        color: $color-white;
+        font-size: 12px;
+    }
+    
+    // else
+    .index-title {
+        &.main-title {
+            font-size: 32px;
+            line-height: 44px;
+        }
+        &.sub-title {
+            font-size: 20px;
+            line-height: 28px;
+            letter-spacing: 1px;
+        }
+    }
+    
+    .ifare-title, .ifare-subtitle {
+        
+    }
+    .ifare-title {
+        .mini-title {
+            font-size: 20px;
+            line-height: 32px;
+        }
+    }
+    .ifare-subtitle {
+        font-size: 14px;
+        line-height: 20px;
+    }
+    
+    .txt-copyright {
+    
+    }
+    
+    .title-component {
+        
+        .comp-title {
+            font-size: 28px;
+            line-height: 40px; 
+        }
+        .comp-shadow {
+            font-size: 48px;
+            line-height: 36px;
+        }
+    }
+    
+    .news-item, .article-item {
+        .item-title {
+            & > * {
+                font-size: 20px;
+                line-height: 32px;
+            }
+        }
+    
+        .item-date {
+            font-size: 14px;
+            line-height: 20px;
+        }
+        
+        .item-body {
+            font-size: 14px;
+            line-height: 20px;
+        }
+    
+        
+    }
+    
+    .card-article {
+        .card-title {
+            font-size: 20px;
+            line-height: 32px;
+        }
+        .card-date {
+            font-size: 14px;
+            line-height: 20px; 
+        }
+        .card-body {
+            
+            .card-info {
+                font-size: 14px;
+                line-height: 20px; 
+            }
+        }
+    }
+    
+    .card-more {
+        .title-more {
+            font-size: 20px;
+            font-weight: 500;
+            line-height: 32px
+        }
+        .info-more {
+            font-size: 14px;
+            font-weight: 400;
+            line-height: 20px;
+        }
+    }
+    
+    .card-advance {
+        
+    }
+    
+    .card-partner {
+        .partner-title {
+            font-size: 18px;
+            line-height: 28px;
+        }
+    
+        .card-infos {
+            li {
+                
+                &::before {
+                  
+                }
+            }
+        }
+    }
+    
+    .card-ifare-filter {
+        .filter-name {
+    
+        }
+    }
+    
+    .pages-list {
+       
+    }
+    
+    .page-navs {
+        
+    }
+    
+    .tags-list {
+        
+    }
+    
+    .agency-list {
+        .agency-item {
+            .agency-name {
+                font-size: 18px;
+                line-height: 28px;
+            }
+        }
+    }
+    
+    .faq-list {
+        .faq-item {
+            .faq-comp {
+                .faq-title {
+                    font-size: 18px;
+                    line-height: 28px;
+                }
+            }
+            &.active{
+                .faq-title {
+                }
+            }
+    
+            .faq-info {
+            }
+        }
+    }
+    
+    .component-select {
+        .comp-placeholder, .comp-name {
+            line-height: 28px;
+        }
+    
+        .comp-name {
+        }
+    
+        .comp-placeholder {
+        }
+    }
+    
+    .relation-links {
+        .relation-title {
+        }
+        .relation-item {
+            .link-date {
+            }
+            .link-title {
+            }
+        }
+        
+        .filter-list {
+        }
+    }
+
+    .select-content {
+        
+        .select-title {
+            font-family: Noto Sans TC;
+            font-size: 20px;
+            font-weight: 500;
+            line-height: 32px;
+        }
+
+        .select-list {
+
+            .select-item {
+                color: $color-black;
+                font-size: 16px;
+                font-weight: 400;
+                line-height: 28px; 
+            }
+        }
+    }
+}
