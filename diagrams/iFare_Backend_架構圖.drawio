@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="backend-arch" name="後台架構圖">
-        <mxGraphModel dx="2132" dy="1198" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1700" background="#FFFFFF" math="0" shadow="0">
+        <mxGraphModel dx="1713" dy="1408" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1700" background="#FFFFFF" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -11,7 +11,7 @@
                     <mxGeometry x="861" y="90" width="118" height="118" as="geometry"/>
                 </mxCell>
                 <mxCell id="vue-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;opacity=30;" parent="1" vertex="1">
-                    <mxGeometry x="40" y="225" width="1720" height="945" as="geometry"/>
+                    <mxGeometry x="40" y="225" width="1720" height="985" as="geometry"/>
                 </mxCell>
                 <mxCell id="vue-label" value="&lt;b style=&#39;font-size:16px&#39;&gt;Vue 3 Application&lt;/b&gt;  &lt;font color=&#39;#666&#39;&gt;— Vite / localhost:5173 / TypeScript&lt;/font&gt;" style="text;html=1;fontSize=14;fontStyle=0;fontColor=#333;align=left;" parent="1" vertex="1">
                     <mxGeometry x="160" y="255" width="500" height="25" as="geometry"/>
@@ -80,7 +80,7 @@
                     <mxGeometry x="1102.5" y="740" width="535" height="55" as="geometry"/>
                 </mxCell>
                 <mxCell id="plugin-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;strokeWidth=2;dashed=1;" parent="1" vertex="1">
-                    <mxGeometry x="170" y="890" width="900" height="270" as="geometry"/>
+                    <mxGeometry x="170" y="890" width="900" height="310" as="geometry"/>
                 </mxCell>
                 <mxCell id="plugin-label" value="&lt;b style=&#39;font-size:13px&#39;&gt;plugins/ — API 通訊層&lt;/b&gt;" style="text;html=1;fontSize=12;fontColor=#333;align=left;" parent="1" vertex="1">
                     <mxGeometry x="195" y="895" width="200" height="20" as="geometry"/>
@@ -88,8 +88,8 @@
                 <mxCell id="plugin-ajax" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;AjaxRef.ts&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;HTTP 請求設定類別&lt;/font&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;baseUrl: 112.121.114.177/ifare_bdapi&lt;br&gt;middleUrl: /api/services/app&lt;br&gt;&lt;br&gt;設定 method / headers / params / data&lt;br&gt;Authorization: &#39;Bearer &#39; + token&lt;br&gt;contentType: application/json&lt;br&gt;responseType: json&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=11;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
                     <mxGeometry x="180" y="920" width="280" height="225" as="geometry"/>
                 </mxCell>
-                <mxCell id="plugin-webapi" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;WebAPI.ts（$WebAPI）&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;全域 API 端點定義 500+ 行&lt;/font&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b style=&quot;&quot;&gt;認證：&lt;/b&gt;Auth / Login&lt;br&gt;&lt;b style=&quot;&quot;&gt;新聞：&lt;/b&gt;Get/Insert/Update/Delete News&lt;br&gt;&lt;b style=&quot;&quot;&gt;文章：&lt;/b&gt;Welfare / Lazy CRUD&lt;br&gt;&lt;b style=&quot;&quot;&gt;福利：&lt;/b&gt;Policy / QA / OfficeUnit CRUD&lt;br&gt;&lt;b style=&quot;&quot;&gt;夥伴：&lt;/b&gt;Collaborator CRUD&lt;br&gt;&lt;b style=&quot;&quot;&gt;代碼：&lt;/b&gt;Code×6 Get/Insert/Update&lt;br&gt;&lt;b style=&quot;&quot;&gt;帳號：&lt;/b&gt;Account CRUD&lt;br&gt;&lt;b style=&quot;&quot;&gt;圖片：&lt;/b&gt;UpdateImageFile&lt;br&gt;&lt;b style=&quot;&quot;&gt;分析：&lt;/b&gt;Visitor Summary/Chart&lt;br&gt;Callback 模式（非 Promise）&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=11;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
-                    <mxGeometry x="480" y="920" width="280" height="225" as="geometry"/>
+                <mxCell id="plugin-webapi" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;WebAPI.ts（$WebAPI）&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;全域 API 端點定義 500+ 行&lt;/font&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b style=&quot;&quot;&gt;認證：&lt;/b&gt;Auth / Login&lt;br&gt;&lt;b style=&quot;&quot;&gt;新聞：&lt;/b&gt;Get/Insert/Update/Delete News&lt;br&gt;&lt;b style=&quot;&quot;&gt;文章：&lt;/b&gt;Welfare / Lazy CRUD&lt;br&gt;&lt;b style=&quot;&quot;&gt;福利：&lt;/b&gt;Policy / QA / OfficeUnit CRUD&lt;br&gt;&lt;b style=&quot;&quot;&gt;夥伴：&lt;/b&gt;Collaborator CRUD&lt;br&gt;&lt;b style=&quot;&quot;&gt;代碼：&lt;/b&gt;Code×6 Get/Insert/Update&lt;br&gt;&lt;b style=&quot;&quot;&gt;帳號：&lt;/b&gt;Account CRUD&lt;br&gt;&lt;b style=&quot;&quot;&gt;個人：&lt;/b&gt;GetPersonalInfo / Update / UpdatePwd&lt;br&gt;&lt;b style=&quot;&quot;&gt;圖片：&lt;/b&gt;GetImgManagerList / Insert / Edit / Delete&lt;br&gt;&lt;b style=&quot;&quot;&gt;分析：&lt;/b&gt;Visitor Summary/Chart&lt;br&gt;Callback 模式（非 Promise）｜65+ 方法&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=11;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="910" width="280" height="275" as="geometry"/>
                 </mxCell>
                 <mxCell id="plugin-common" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;CommonLib.ts（$CommonLib）&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;工具函式庫&lt;/font&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Date.GetDateNow() — 日期格式化&lt;br&gt;Date.GetFormatDateString()&lt;br&gt;ResetObjRef() — 物件重設&lt;br&gt;CheckValueType() — 型別檢查&lt;br&gt;CopyArrayObj() — 深拷貝&lt;br&gt;GuideToPage() — 路由跳轉&lt;br&gt;GetImgBase64() — 圖片轉 Base64&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=11;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
                     <mxGeometry x="780" y="920" width="280" height="225" as="geometry"/>
@@ -101,19 +101,19 @@
                     <mxGeometry x="1090" y="1050" width="280" height="110" as="geometry"/>
                 </mxCell>
                 <mxCell id="api-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;dashed=1;" parent="1" vertex="1">
-                    <mxGeometry x="140" y="1230" width="1520" height="250" as="geometry"/>
+                    <mxGeometry x="140" y="1260" width="1520" height="250" as="geometry"/>
                 </mxCell>
                 <mxCell id="api-label" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;b style=&quot;&quot;&gt;iFare_Backend_API&lt;/b&gt;  &lt;font color=&quot;#666&quot;&gt;— ASP.NET Core + ABP 7.3 | JWT 開啟（需登入）&lt;/font&gt;&lt;/font&gt;" style="text;html=1;fontSize=12;fontColor=#333;align=left;" parent="1" vertex="1">
-                    <mxGeometry x="160" y="1235" width="600" height="25" as="geometry"/>
+                    <mxGeometry x="160" y="1265" width="600" height="25" as="geometry"/>
                 </mxCell>
                 <mxCell id="api-auth" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;認證端點&lt;/font&gt;&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;POST /TokenAuth/Authenticate&lt;br&gt;POST /Main/Login&lt;br&gt;&lt;br&gt;所有其他端點需&lt;br&gt;Header: Bearer Token&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#b85450;fontSize=11;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
-                    <mxGeometry x="160" y="1265" width="380" height="195" as="geometry"/>
+                    <mxGeometry x="160" y="1295" width="380" height="195" as="geometry"/>
                 </mxCell>
                 <mxCell id="api-crud" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;CRUD 端點（需 JWT）&lt;/font&gt;&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;GET+POST /News/* (CRUD)&lt;br&gt;GET+POST /ArticlesWelfare/* (CRUD)&lt;br&gt;GET+POST /ArticlesLazy/* (CRUD)&lt;br&gt;GET+POST /FarePolicy/* (CRUD)&lt;br&gt;GET+POST /FareQA/* (CRUD)&lt;br&gt;GET+POST /FareOfficeUnit/* (CRUD)&lt;br&gt;GET+POST /Collaborator/* (CRUD)&lt;br&gt;GET+POST /Code[Type]/* (CRUD ×6)&lt;br&gt;GET+POST /Account/* (CRUD)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#b85450;fontSize=11;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
-                    <mxGeometry x="580" y="1265" width="560" height="195" as="geometry"/>
+                    <mxGeometry x="580" y="1295" width="560" height="195" as="geometry"/>
                 </mxCell>
                 <mxCell id="api-info" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;伺服器資訊&lt;/font&gt;&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;URL: 112.121.114.177/ifare_bdapi&lt;br&gt;架構: DDD (領域驅動)&lt;br&gt;ORM: Entity Framework Core&lt;br&gt;部署: Kestrel + IIS 反向代理&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#b85450;fontSize=11;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
-                    <mxGeometry x="1190" y="1265" width="365" height="195" as="geometry"/>
+                    <mxGeometry x="1190" y="1295" width="365" height="195" as="geometry"/>
                 </mxCell>
                 <mxCell id="db" value="&lt;font style=&quot;font-size: 20px;&quot;&gt;&lt;b style=&quot;&quot;&gt;SQL Server (Express)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;IFare 主資料庫（共用）+ IFare_BDAPIDb（後台 API 專用：AbpUsers/Roles/Permissions）&lt;/font&gt;&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;verticalAlign=top;spacingTop=10;strokeWidth=2;" parent="1" vertex="1">
                     <mxGeometry x="660" y="1550" width="480" height="130" as="geometry"/>
@@ -138,12 +138,17 @@
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="a-plugin-api" value="&lt;b&gt;HTTPS&lt;/b&gt; + JWT Token" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#b85450;endArrow=block;endFill=1;fontSize=14;labelBackgroundColor=#FFFFFF;" parent="1" source="plugin-box" target="api-box" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="620" y="1230"/>
+                            <mxPoint x="900" y="1230"/>
+                        </Array>
+                    </mxGeometry>
                 </mxCell>
                 <mxCell id="a-api-db" value="EF Core" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#666;endArrow=block;endFill=1;fontSize=16;labelBackgroundColor=#FFFFFF;" parent="1" source="api-box" target="db" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="2" value="&lt;b style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251);&quot;&gt;管理員&lt;/b&gt;&lt;br style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251);&quot;&gt;&lt;font style=&quot;scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 11px; color: rgb(102, 102, 102);&quot;&gt;管理者 / 編輯者 / 檢視者&lt;/font&gt;" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                <mxCell id="2" value="&lt;b style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251);&quot;&gt;管理員&lt;/b&gt;&lt;br style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251);&quot;&gt;&lt;font style=&quot;scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 11px; color: rgb(102, 102, 102);&quot;&gt;管理者 / 編輯者 / 檢視者&lt;/font&gt;" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
                     <mxGeometry x="859" y="160" width="120" height="30" as="geometry"/>
                 </mxCell>
             </root>
