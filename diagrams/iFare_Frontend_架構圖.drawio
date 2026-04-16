@@ -1,0 +1,180 @@
+<mxfile host="65bd71144e">
+    <diagram id="frontend-arch" name="前台架構圖">
+        <mxGraphModel dx="2772" dy="1558" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1300" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;iFare_Frontend — 前台系統架構圖（Nuxt 3 SSR）&lt;/font&gt;" style="text;html=1;fontSize=14;fontStyle=1;align=center;verticalAlign=middle;fontColor=#333333;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="15" width="600" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="L1-label" value="使用者層" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#999999;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="65" width="80" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="user" value="" style="shape=actor;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="660" y="50" width="120" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="nuxt-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;opacity=30;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="180" width="1520" height="720" as="geometry"/>
+                </mxCell>
+                <mxCell id="nuxt-label" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;Nuxt 3 Application&lt;/b&gt;  &lt;font color=&quot;#666&quot;&gt;— SSR / localhost:3000&lt;/font&gt;&lt;/font&gt;" style="text;html=1;fontSize=14;fontStyle=0;fontColor=#333;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="185" width="500" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="layout-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;strokeWidth=1;dashed=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="220" width="340" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="app-vue" value="&lt;b&gt;app.vue&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;根元件&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="230" width="300" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="layout" value="&lt;b&gt;layouts/default.vue&lt;/b&gt;&lt;hr&gt;&lt;font&gt;AppHeader&lt;br&gt; ← 頁面內容&lt;br&gt;AppFooter&lt;br&gt;管理 isMenuOpen 狀態&lt;br&gt;overflow-disabled 控制&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="285" width="300" height="125" as="geometry"/>
+                </mxCell>
+                <mxCell id="nuxt-config" value="&lt;b&gt;nuxt.config.ts&lt;/b&gt;&lt;hr&gt;&lt;font&gt;模組：nuxt-gtag, sitemap&lt;br&gt;CSS：normalize + SCSS&lt;br&gt;Nitro：IIS preset&lt;br&gt;routeRules: SEO 設定&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#999;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="430" width="340" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="pages-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;strokeWidth=1;dashed=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="500" y="220" width="550" height="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="pages-label" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;pages/ — 自動路由&lt;/font&gt;&lt;/b&gt;" style="text;html=1;fontSize=14;fontColor=#333;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="540" y="190" width="200" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="page-index" value="&lt;b&gt;index.vue&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;/ — 首頁 Hero輪播 + 最新消息 + 福利入口&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="519" y="236" width="510" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="page-ifare" value="&lt;b&gt;ifare.vue 系列（核心）&lt;/b&gt;&lt;div&gt;&lt;font&gt;/ifare — 福利查詢篩選、/ifare/result — 查詢結果、/ifare/info — 福利詳情、/ifare/contact — 洽辦單位&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=14;verticalAlign=top;spacingTop=4;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="519" y="476" width="510" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="page-news" value="&lt;b&gt;news.vue 系列&lt;/b&gt;&lt;div&gt;&lt;font&gt;/news — 最新消息列表、/news/info — 消息內頁&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="519" y="296" width="510" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="page-articles" value="&lt;b&gt;articles.vue 系列&lt;/b&gt;&lt;div&gt;&lt;font&gt;/articles — 福利專欄入口、/articles/welfare — 福利文章、/articles/lazy — 懶人包&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="519" y="356" width="510" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="page-other" value="&lt;b&gt;其他頁面&lt;/b&gt;&lt;div&gt;&lt;font&gt;/about — 關於長穩、/collaborator — 公益夥伴&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="519" y="416" width="510" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="page-count" value="&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;共 12 個頁面路由&lt;/font&gt;" style="text;html=1;fontSize=14;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="930" y="190" width="150" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="comp-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;strokeWidth=1;dashed=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1105" y="225" width="435" height="330" as="geometry"/>
+                </mxCell>
+                <mxCell id="comp-label" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;components/ — 共用元件&lt;/font&gt;&lt;/b&gt;" style="text;html=1;fontSize=14;fontColor=#333;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="200" width="220" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="comp-layout" value="&lt;b&gt;版面元件&lt;/b&gt;&lt;hr&gt;&lt;font&gt;AppHeader.vue — 導覽列、　桌面選單 + 手機漢堡、路由 active 高亮&lt;br&gt;AppFooter.vue — 頁尾、聯絡資訊 / LINE / FB、CompBreadCrumb.vue — 空元件&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="241" width="410" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="comp-select" value="&lt;b&gt;篩選元件&lt;/b&gt;&lt;hr&gt;&lt;font&gt;CompSelect.vue — 下拉單選、CompSelectElse.vue — 多選&lt;br&gt;CompSelectRecipient.vue— 受助對象選擇&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="366" width="410" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="comp-page" value="&lt;b&gt;分頁元件&lt;/b&gt;&lt;hr&gt;&lt;font&gt;CompPage.vue — 數字型&lt;br&gt;CompPageNum.vue — 簡潔型&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="460" width="210" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="comp-pattern" value="&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;Composition API + Auto Import&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;Props 傳入 / Events 傳出&lt;br&gt;無全域狀態管理&lt;/font&gt;&lt;/div&gt;" style="text;html=1;fontSize=14;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="1340" y="475" width="190" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="middleware" value="&lt;b&gt;middleware/route.global.ts&lt;/b&gt;&lt;hr&gt;&lt;font&gt;每次路由切換執行：&lt;br&gt;1. 記錄訪客路徑 (SetVisitorRecord)&lt;br&gt;2. 處理 reload 參數&lt;br&gt;3. 捲動至頂部&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#0288D1;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="550" width="340" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="plugin" value="&lt;b&gt;plugins/WebAPI.ts&lt;/b&gt;&lt;hr&gt;&lt;font&gt;提供 $WebApiGet / $WebApiPost&lt;br&gt;封裝 $fetch (Nuxt 內建)&lt;br&gt;.catch → console.error&lt;br&gt;&lt;b&gt;Base URL：&lt;/b&gt;&lt;br&gt;i-fare.org.tw/ifare_api&lt;br&gt;/api/services/app/*&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=14;verticalAlign=top;spacingTop=5;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="685" width="340" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="assets-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;strokeWidth=1;dashed=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="510" y="570" width="540" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="assets-label" value="&lt;b&gt;assets/ — 靜態資源&lt;/b&gt;" style="text;html=1;fontSize=14;fontColor=#333;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="525" y="560" width="200" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="assets-style" value="&lt;b&gt;style/ — SCSS 樣式系統&lt;/b&gt;&lt;hr&gt;&lt;font&gt;入口：styleIFare.scss&lt;br&gt;&lt;b&gt;核心：&lt;/b&gt;&lt;br&gt;_color.scss — 色彩變數&lt;br&gt;_font.scss — 字型(839行)&lt;br&gt;_mixin.scss — 共用 mixin&lt;br&gt;_animation.scss — 動畫&lt;br&gt;_transition.scss — 過場&lt;br&gt;_icon.scss — 圖示 class&lt;br&gt;&lt;b&gt;元件：&lt;/b&gt;components/*.scss&lt;br&gt;_app / _appBody / _appHeader&lt;br&gt;_appFooter / _button / _compSelect&lt;br&gt;&lt;b&gt;響應式：&lt;/b&gt;rwd/*.scss&lt;br&gt;10+ 個 RWD 樣式檔（主用 1024px）&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="525" y="585" width="275" height="275" as="geometry"/>
+                </mxCell>
+                <mxCell id="assets-img" value="&lt;b&gt;img/ — 圖片資源&lt;/b&gt;&lt;hr&gt;&lt;font&gt;SVG 圖示 (40+)&lt;br&gt;　Arrow / Filter / Logo&lt;br&gt;　Menu / Search / Social&lt;br&gt;PNG 圖片、Hero 背景 ×5&lt;br&gt;　About 區塊圖、Partner 範例&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="810" y="590" width="230" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="assets-fonts" value="&lt;b&gt;fonts/&lt;/b&gt;&lt;hr&gt;&lt;font&gt;Noto Sans TC、Noto Serif TC&lt;br&gt;Roboto、+ Google Fonts&lt;br&gt;(display=swap)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="810" y="737.5" width="230" height="112.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="modules-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;strokeWidth=1;dashed=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1107.5" y="585" width="435" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="modules-label" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;Nuxt Modules&lt;/font&gt;&lt;/b&gt;" style="text;html=1;fontSize=14;fontColor=#333;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="1115" y="560" width="150" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="mod-gtag" value="&lt;b&gt;nuxt-gtag&lt;/b&gt;&lt;hr&gt;&lt;font&gt;Google Analytics&lt;br&gt;ID: G-QCT2XVFX2L&lt;br&gt;流量追蹤&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="1125" y="600" width="130" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="mod-sitemap" value="&lt;b&gt;nuxt-simple-sitemap&lt;/b&gt;&lt;hr&gt;&lt;font&gt;XML Sitemap 產生&lt;br&gt;SEO 優化&lt;br&gt;各路由 priority/freq&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="1265" y="600" width="140" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="mod-normalize" value="&lt;b&gt;normalize.css&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;CSS Reset&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1420" y="600" width="100" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="deploy" value="&lt;b&gt;部署方式&lt;/b&gt;&lt;hr&gt;&lt;font&gt;Nitro + IIS Node&lt;br&gt;SSR 伺服器端渲染&lt;br&gt;正式站：i-fare.org.tw&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#999;fontSize=14;verticalAlign=top;spacingTop=4;" parent="1" vertex="1">
+                    <mxGeometry x="1110" y="750" width="430" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="api-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;strokeWidth=2;dashed=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="920" width="1520" height="240" as="geometry"/>
+                </mxCell>
+                <mxCell id="api-label" value="&lt;b&gt;iFare_Frontend_API&lt;/b&gt;  &lt;font color=&quot;#666&quot;&gt;— ASP.NET Core + ABP 7.3 | JWT 關閉（公開）&lt;/font&gt;" style="text;html=1;fontSize=14;fontColor=#333;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="925" width="600" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="api-endpoints" value="&lt;b&gt;公開 API 端點（不需 Token）&lt;/b&gt;&lt;hr&gt;&lt;font&gt;GET /News/GetNewsList&lt;br&gt;GET /ArticlesWelfare/GetArticlesWelfareList&lt;br&gt;GET /ArticlesLazy/GetArticlesLazyList&lt;br&gt;GET /FarePolicy/GetFarePolicyList&lt;br&gt;GET /FareQA/GetFareQAList&lt;br&gt;GET /FareOfficeUnit/GetFareOfficeUnitList&lt;br&gt;GET /Collaborator/GetCollaboratorList&lt;br&gt;GET /Code/GetCode[Type]List&lt;br&gt;POST /Visitor/SetVisitorRecord&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="950" width="560" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="api-response" value="&lt;b&gt;回應格式（ABP 標準）&lt;/b&gt;&lt;hr&gt;&lt;font&gt;{&lt;br&gt;  result: {&lt;br&gt;    result: [...],&lt;br&gt;    errCode: 0,&lt;br&gt;    errMsg: &#39;&#39;&lt;br&gt;  },&lt;br&gt;  success: true&lt;br&gt;}&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontSize=14;verticalAlign=top;spacingTop=5;fontFamily=Consolas;" parent="1" vertex="1">
+                    <mxGeometry x="670" y="950" width="400" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="api-info" value="&lt;b&gt;伺服器資訊&lt;/b&gt;&lt;hr&gt;&lt;font&gt;URL: i-fare.org.tw/ifare_api&lt;br&gt;架構: DDD (領域驅動)&lt;br&gt;ORM: Entity Framework Core&lt;br&gt;部署: Kestrel + IIS 反向代理&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="1100" y="950" width="430" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="db" value="" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;verticalAlign=top;spacingTop=10;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="1190" width="480" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-user-layout" value="瀏覽" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#6c8ebf;endArrow=block;endFill=1;fontSize=14;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="user" target="layout-box" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="720" y="150"/>
+                            <mxPoint x="290" y="150"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a-layout-pages" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=1;strokeColor=#6c8ebf;dashed=1;fontSize=14;" parent="1" source="layout" target="pages-box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-pages-comp" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=1;strokeColor=#6c8ebf;dashed=1;fontSize=14;" parent="1" source="pages-box" target="comp-box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-pages-plugin" value="$WebApiGet / $WebApiPost" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#388E3C;endArrow=block;endFill=1;fontSize=14;labelBackgroundColor=#FFFFFF;" parent="1" source="pages-box" target="plugin" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="490" y="380"/>
+                            <mxPoint x="490" y="740"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a-plugin-api" value="&lt;b&gt;HTTPS&lt;/b&gt; GET / POST" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#388E3C;endArrow=block;endFill=1;fontSize=16;labelBackgroundColor=#FFFFFF;" parent="1" source="plugin" target="api-box" edge="1">
+                    <mxGeometry x="-0.3559" y="10" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a-api-db" value="EF Core" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#666;endArrow=block;endFill=1;fontSize=14;labelBackgroundColor=#FFFFFF;" parent="1" source="api-box" target="db" edge="1">
+                    <mxGeometry y="40" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a-middleware-plugin" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=1;strokeColor=#0288D1;dashed=1;endArrow=block;endFill=1;fontSize=14;" parent="1" source="middleware" target="plugin" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-label" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;資料流：&lt;/b&gt;&lt;font&gt;使用者操作 → Vue 元件 → $WebApiGet/Post → $fetch → 外部 API → JSON 回應 → 元件渲染&lt;/font&gt;&lt;/font&gt;" style="text;html=1;fontSize=14;fontColor=#666;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="890" width="700" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="&lt;b style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px;&quot;&gt;一般民眾&lt;/b&gt;&lt;br style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px;&quot;&gt;&lt;font style=&quot;scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px; color: rgb(102, 102, 102);&quot;&gt;桌面 / 手機 / 平板&lt;/font&gt;" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="110" width="120" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="&lt;b style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px;&quot;&gt;SQL Server (Express)&lt;/b&gt;&lt;br style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px;&quot;&gt;&lt;font style=&quot;scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px; color: rgb(102, 102, 102);&quot;&gt;IFare 主資料庫（共用）+ IFare_FDAPIDb（前台 API 專用）&lt;/font&gt;" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="1240" width="400" height="30" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
