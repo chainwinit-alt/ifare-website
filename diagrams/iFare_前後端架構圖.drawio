@@ -1,0 +1,194 @@
+<mxfile host="65bd71144e">
+    <diagram id="iFare-architecture" name="系統架構總覽">
+        <mxGraphModel dx="2310" dy="1298" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1600" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="iFare 基金會網站 — 前後端系統架構圖" style="text;html=1;fontSize=14;fontStyle=1;align=center;verticalAlign=middle;fontColor=#333333;" parent="1" vertex="1">
+                    <mxGeometry x="655" y="20" width="520" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="layer1-label" value="使用者層" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#999999;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="65" width="80" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="user-public" value="" style="shape=actor;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="485" y="70" width="120" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="user-admin" value="" style="shape=actor;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1340" y="65" width="120" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="layer2-label" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;前端應用層&lt;/font&gt;" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#999999;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="205" width="100" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="fe-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;opacity=40;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="230" width="870" height="410" as="geometry"/>
+                </mxCell>
+                <mxCell id="frontend" value="&lt;b&gt;iFare_Frontend&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666&quot;&gt;前台官方網站&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font&gt;框架：Nuxt 3 (SSR)&lt;br&gt;語言：TypeScript&lt;br&gt;樣式：SCSS + Normalize.css&lt;br&gt;HTTP：$fetch (Nuxt 內建)&lt;br&gt;模組：nuxt-gtag, nuxt-simple-sitemap&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=8;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="245" width="240" height="360" as="geometry"/>
+                </mxCell>
+                <mxCell id="fe-pages" value="&lt;b&gt;頁面 (pages/)&lt;/b&gt;&lt;hr&gt;&lt;font&gt;首頁 (index.vue)&lt;br&gt;關於長穩 (about.vue)&lt;br&gt;最新消息 (news.vue)&lt;br&gt;福利專欄 (articles.vue)&lt;br&gt;懶人包 (articles/lazy.vue)&lt;br&gt;i-Fare 福利查詢 (ifare.vue)&lt;br&gt;查詢結果 / 福利詳情 / 洽辦單位&lt;br&gt;公益夥伴 (collaborator.vue)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="320" width="210" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="fe-comp" value="&lt;b&gt;共用元件 (components/)&lt;/b&gt;&lt;hr&gt;&lt;font&gt;AppHeader.vue — 導覽列&lt;br&gt;AppFooter.vue — 頁尾&lt;br&gt;CompSelect.vue — 下拉選單&lt;br&gt;CompSelectElse.vue — 特殊篩選&lt;br&gt;CompSelectRecipient.vue — 受助對象&lt;br&gt;CompPage.vue — 分頁 (數字型)&lt;br&gt;CompPageNum.vue — 分頁 (簡潔型)&lt;br&gt;CompBreadCrumb.vue — 麵包屑 (空)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="640" y="400" width="300" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="fe-style" value="&lt;b&gt;樣式系統 (assets/style/)&lt;/b&gt;&lt;hr&gt;&lt;font&gt;_color.scss — 色彩變數&lt;br&gt;_font.scss — 字型定義&lt;br&gt;_mixin.scss — 共用 mixin&lt;br&gt;_animation.scss — 動畫&lt;br&gt;rwd/ — 響應式斷點&lt;br&gt;components/ — 元件樣式&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="640" y="240" width="300" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="be-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;opacity=40;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="1100" y="230" width="570" height="410" as="geometry"/>
+                </mxCell>
+                <mxCell id="backend" value="&lt;b&gt;iFare_Backend&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666&quot;&gt;後台管理系統&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font&gt;框架：Vue 3 + Vite&lt;br&gt;語言：TypeScript&lt;br&gt;UI：Element Plus&lt;br&gt;狀態：Pinia (持久化)&lt;br&gt;HTTP：Axios&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;verticalAlign=top;spacingTop=8;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="250" width="240" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="be-modules" value="&lt;b&gt;管理模組 (views/) — CRUD&lt;/b&gt;&lt;hr&gt;&lt;font&gt;最新消息 (News/)&lt;br&gt;福利文章 (Articles/Welfare/)&lt;br&gt;懶人包 (Articles/Lazy/)&lt;br&gt;福利政策 (IFare/Policy/)&lt;br&gt;常見問題 (IFare/QA/)&lt;br&gt;洽辦單位 (IFare/OfficeUnit/)&lt;br&gt;公益夥伴 (Collaborator/)&lt;br&gt;代碼維護 (Code/) ×6 種&lt;br&gt;帳號管理 / 個人設定 / 圖片管理&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#d6b656;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="1385" y="245" width="275" height="195" as="geometry"/>
+                </mxCell>
+                <mxCell id="be-features" value="&lt;b&gt;功能元件&lt;/b&gt;&lt;hr&gt;&lt;font&gt;CompHtmlEditor — TinyMCE 富文本&lt;br&gt;CardTable — 資料表格&lt;br&gt;CardSearchParam — 搜尋面板&lt;br&gt;AppAside — 側邊導覽 (依權限)&lt;br&gt;ApexCharts — 數據分析儀表板&lt;br&gt;DialogAlert / DialogErrorInfo&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#d6b656;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="1390" y="460" width="260" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="be-auth" value="&lt;b&gt;認證 &amp;amp; 權限&lt;/b&gt;&lt;hr&gt;&lt;font&gt;JWT Bearer Token 認證&lt;br&gt;Pinia 持久化 Token 儲存&lt;br&gt;Router Guard 路由守衛&lt;br&gt;&lt;br&gt;&lt;b&gt;三種角色：&lt;/b&gt;&lt;br&gt;🔴 管理者 — 全功能+帳號管理&lt;br&gt;🟡 編輯者 — 內容+代碼維護&lt;br&gt;🟢 檢視者 — 僅瀏覽(唯讀)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#d6b656;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="1125" y="425" width="240" height="185" as="geometry"/>
+                </mxCell>
+                <mxCell id="be-port" value="localhost:5173" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#d6b656;align=center;verticalAlign=middle;fillColor=#FFF8E1;rounded=1;" parent="1" vertex="1">
+                    <mxGeometry x="1250" y="405" width="100" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="server-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F9F9F9;strokeColor=#999999;strokeWidth=2;dashed=1;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="820" width="1590" height="630" as="geometry"/>
+                </mxCell>
+                <mxCell id="server-label" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;正式伺服器  112.121.114.177  (IIS + SQL Server)&lt;/font&gt;" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#666666;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="788" width="500" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="layer3-label" value="API 服務層" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#999999;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="170" y="900" width="80" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="fe-api" value="&lt;b&gt;iFare_Frontend_API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666&quot;&gt;前台 API 服務&lt;/font&gt;&lt;hr&gt;&lt;font&gt;框架：ASP.NET Core + ABP 7.3&lt;br&gt;架構：DDD (Domain-Driven Design)&lt;br&gt;ORM：Entity Framework Core&lt;br&gt;認證：JWT 關閉（公開讀取）&lt;br&gt;部署：Kestrel + IIS 反向代理&lt;br&gt;&lt;br&gt;&lt;b&gt;URL：&lt;/b&gt;i-fare.org.tw/ifare_api&lt;br&gt;&lt;b&gt;端點：&lt;/b&gt;/api/services/app/*&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;verticalAlign=top;spacingTop=8;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="950" width="280" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="be-api" value="&lt;b&gt;iFare_Backend_API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666&quot;&gt;後台 API 服務&lt;/font&gt;&lt;hr&gt;&lt;font&gt;框架：ASP.NET Core + ABP 7.3&lt;br&gt;架構：DDD (Domain-Driven Design)&lt;br&gt;ORM：Entity Framework Core&lt;br&gt;認證：JWT 開啟（需登入 Token）&lt;br&gt;部署：Kestrel + IIS 反向代理&lt;br&gt;&lt;br&gt;&lt;b&gt;URL：&lt;/b&gt;112.121.114.177/ifare_bdapi&lt;br&gt;&lt;b&gt;端點：&lt;/b&gt;/api/services/app/*&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;verticalAlign=top;spacingTop=8;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="1390" y="865" width="280" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="fe-endpoints" value="&lt;b&gt;公開端點 (GET/POST)&lt;/b&gt;&lt;hr&gt;&lt;font&gt;GET /News/GetNewsList&lt;br&gt;GET /ArticlesWelfare/GetArticlesWelfareList&lt;br&gt;GET /ArticlesLazy/GetArticlesLazyList&lt;br&gt;GET /FarePolicy/GetFarePolicyList&lt;br&gt;GET /FareQA/GetFareQAList&lt;br&gt;GET /FareOfficeUnit/GetFareOfficeUnitList&lt;br&gt;GET /Collaborator/GetCollaboratorList&lt;br&gt;GET /Code/GetCode[Type]List&lt;br&gt;POST /Visitor/SetVisitorRecord&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#82b366;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="850" width="310" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="be-endpoints" value="&lt;b&gt;受保護端點 (需 JWT)&lt;/b&gt;&lt;hr&gt;&lt;font&gt;POST /TokenAuth/Authenticate&lt;br&gt;GET+POST /News/* (CRUD)&lt;br&gt;GET+POST /ArticlesWelfare/* (CRUD)&lt;br&gt;GET+POST /ArticlesLazy/* (CRUD)&lt;br&gt;GET+POST /FarePolicy/* (CRUD)&lt;br&gt;GET+POST /FareQA/* (CRUD)&lt;br&gt;GET+POST /FareOfficeUnit/* (CRUD)&lt;br&gt;GET+POST /Collaborator/* (CRUD)&lt;br&gt;GET+POST /Code[Type]/* (CRUD ×6)&lt;br&gt;GET+POST /Account/* (CRUD)&lt;br&gt;GET /Visitor/GetVisitorSummary&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#b85450;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="1050" y="850" width="260" height="230" as="geometry"/>
+                </mxCell>
+                <mxCell id="layer4-label" value="資料庫層" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#999999;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="170" y="1120" width="80" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="db" value="&lt;b&gt;SQL Server (Express)&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666&quot;&gt;CHAINWIN-CHAINW\SQLEXPRESS&lt;br&gt;Windows 驗證 (Trusted_Connection)&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;verticalAlign=top;spacingTop=10;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="1095" width="520" height="135" as="geometry"/>
+                </mxCell>
+                <mxCell id="db1" value="&lt;b&gt;IFare&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;主資料庫（共用）&lt;/font&gt;&lt;hr&gt;&lt;font&gt;News / ArticleWelfare&lt;br&gt;ArticleLazy / IfarePolicy&lt;br&gt;IfareQA / IfareOfficeUnit&lt;br&gt;Collaborator / ImgManage&lt;br&gt;VisitorRecord&lt;br&gt;Code×6 (Policy/Recipient/&lt;br&gt;Keyword/Income/Identity/Domicile)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="1200" width="260" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="db2" value="&lt;b&gt;IFare_FDAPIDb&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;前台 API 專用&lt;/font&gt;&lt;hr&gt;&lt;font&gt;ABP Framework 系統表&lt;br&gt;(Audit/Settings/Roles 等)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="870" y="1310" width="180" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="db3" value="&lt;b&gt;IFare_BDAPIDb&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;color: rgb(102, 102, 102);&quot;&gt;後台 API 專用&lt;/font&gt;&lt;hr&gt;&lt;font&gt;ABP Framework 系統表&lt;br&gt;AbpUsers（帳號/密碼/權限）&lt;br&gt;AbpRoles / AbpPermissions&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;verticalAlign=top;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="1340" y="1310" width="290" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="a1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#6c8ebf;endArrow=block;endFill=1;fontSize=14;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="user-public" target="frontend" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#d6b656;endArrow=block;endFill=1;fontSize=14;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="user-admin" target="backend" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1740" y="160" as="sourcePoint"/>
+                        <Array as="points">
+                            <mxPoint x="1400" y="210"/>
+                            <mxPoint x="1240" y="210"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a3" value="&lt;b&gt;HTTPS&lt;/b&gt;&lt;br&gt;GET / POST" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#82b366;fontSize=16;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="fe-port" target="fe-api" edge="1">
+                    <mxGeometry x="-0.4576" y="70" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="130" y="620"/>
+                            <mxPoint x="130" y="1055"/>
+                        </Array>
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a4" value="&lt;b&gt;HTTPS&lt;/b&gt;&lt;br&gt;JWT Token" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#b85450;fontSize=14;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;" parent="1" source="backend" target="be-api" edge="1">
+                    <mxGeometry x="0.4194" y="20" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1040" y="338"/>
+                            <mxPoint x="1040" y="770"/>
+                            <mxPoint x="1500" y="770"/>
+                        </Array>
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a5" value="EF Core" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#82b366;fontSize=16;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;" parent="1" source="fe-api" target="db" edge="1">
+                    <mxGeometry x="0.0244" y="-20" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points">
+                            <mxPoint x="630" y="1040"/>
+                            <mxPoint x="630" y="1150"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a6" value="EF Core" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#b85450;fontSize=16;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;" parent="1" source="be-api" target="db" edge="1">
+                    <mxGeometry x="0.0732" y="20" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points">
+                            <mxPoint x="1500" y="1140"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=1;strokeColor=#999999;dashed=1;endArrow=block;endFill=1;fontSize=14;exitX=0.145;exitY=1;exitDx=0;exitDy=-4.35;exitPerimeter=0;" parent="1" source="db" target="db1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="775" y="1305"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=1;strokeColor=#999999;dashed=1;endArrow=block;endFill=1;fontSize=14;" parent="1" source="db" target="db2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=1;strokeColor=#999999;dashed=1;endArrow=block;endFill=1;fontSize=14;exitX=0.855;exitY=1;exitDx=0;exitDy=-4.35;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="db" target="db3" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1145" y="1270"/>
+                            <mxPoint x="1485" y="1270"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=1;strokeColor=#6c8ebf;dashed=1;fontSize=14;" parent="1" source="frontend" target="fe-pages" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=1;strokeColor=#d6b656;dashed=1;fontSize=14;" parent="1" source="backend" target="be-modules" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=1;strokeColor=#82b366;dashed=1;fontSize=14;" parent="1" source="fe-api" target="fe-endpoints" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="630" y="1040"/>
+                            <mxPoint x="630" y="958"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=1;strokeColor=#b85450;dashed=1;fontSize=14;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="be-api" target="be-endpoints" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#82b366;fontSize=14;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="frontend" target="fe-port">
+                    <mxGeometry x="0.0968" relative="1" as="geometry">
+                        <Array as="points"/>
+                        <mxPoint as="offset"/>
+                        <mxPoint x="240" y="605" as="sourcePoint"/>
+                        <mxPoint x="520" y="980" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="fe-port" value="localhost:3000" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#6c8ebf;align=center;verticalAlign=middle;fillColor=#EEF;rounded=1;arcSize=0;" parent="1" vertex="1">
+                    <mxGeometry x="190" y="610" width="100" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="&lt;b style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px;&quot;&gt;一般民眾&lt;/b&gt;&lt;br style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px;&quot;&gt;&lt;font style=&quot;scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px; color: rgb(102, 102, 102);&quot;&gt;瀏覽福利資訊&lt;br style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251);&quot;&gt;查詢福利政策&lt;/font&gt;" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="490" y="140" width="110" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="&lt;b style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px;&quot;&gt;管理員&lt;/b&gt;&lt;br style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px;&quot;&gt;&lt;font style=&quot;scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251); font-size: 14px; color: rgb(102, 102, 102);&quot;&gt;內容管理&lt;br style=&quot;color: rgb(63, 63, 63); scrollbar-color: rgb(226, 226, 226) rgb(251, 251, 251);&quot;&gt;資料維護&lt;/font&gt;" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="1370" y="130" width="60" height="30" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
