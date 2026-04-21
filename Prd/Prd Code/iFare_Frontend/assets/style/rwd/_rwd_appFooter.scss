@@ -1,0 +1,81 @@
+/*Phone style*/
+@media (max-width: $MAX_WIDTH_MOBILE){
+    footer{
+        &.app-footer {
+            .row {
+                .card-more{
+                    flex-direction: column;
+                    padding: 36px 40px;
+                    margin: -28px auto 0;
+                    max-width: 400px;
+                    gap: 24px;
+
+                    .title-more {
+                        margin: 0;
+                    }
+
+                    .btn-line {
+                        margin-top: 8px;
+                    }
+                }
+
+                .part-info {
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 44px;
+
+                    .ic-footer-logo {
+                        background: url("../img/Footer-Logo-white.svg") $bg-init;
+                    }
+                }
+
+                .part-info, .part-middle, .part-bottom {
+                    margin-top: 40px;
+                }
+
+                .txt-copyright {
+                    margin: 39px 0;
+                }
+
+                .footer-info-items {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 32px;
+
+                    & > * {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 8px;
+
+                        &::before{
+                            text-align: center!important;
+                        }
+                    }
+
+                    [name]::before{
+                        padding-right: 0;
+                    }
+
+                    .datetime {
+                        flex-direction: column;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@media (max-width: $STANDARD_WIDTH_PHONE) {
+    footer{
+        &.app-footer {
+            .row {
+                .card-more{
+                    margin: -28px 16px 0;
+                    min-width: calc(100% - 32px - 80px);
+                }
+            }
+        }
+    }
+}

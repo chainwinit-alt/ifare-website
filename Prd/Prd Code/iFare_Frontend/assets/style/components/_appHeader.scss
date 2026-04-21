@@ -1,0 +1,156 @@
+.app-header{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 999;
+}
+
+.app-header {
+    &[name="index"] {
+        border-bottom: 1px solid rgba($color-white, .1);
+        background: rgba($color-black, .6);  
+        backdrop-filter: blur(4px);
+    }
+
+    &[name="ifare"], &[name="indexIFare"]{
+        border-bottom: 1px solid rgba($color-white, .1);
+        background: rgba($color-black, .6);  
+        backdrop-filter: blur(8px);
+    }
+
+    &[name="ifare-contact"] {
+        border-bottom: 1px solid rgba($color-white, .1);
+        background: rgba($color-black, .01);  
+        backdrop-filter: blur(4px);
+    }
+
+    &[name="other"]{
+        border-bottom: 1px solid rgba($color-black, .05);
+        background-color: rgba($color-header, .86);
+        backdrop-filter: blur(4px);
+    }
+    
+
+    .app-icon{
+        display: inline-block;
+        width: 32px;
+        height: 32px;
+    }
+
+    .app-icon-title{
+        display: inline-block;
+        width: 170px;
+        height: 18px;
+    }
+
+    .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px 0 28px;
+        position: relative;
+
+        .part{
+            display: inline-flex;
+
+            &.part-icon {
+                a {
+                    display: flex;
+                    align-items: center;
+                }
+            }
+
+            &.part-nav{
+                ul {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 40px;
+
+                    &[name="index"], &[name="ifare"], &[name="indexIFare"]{
+                        li, a {
+                            color: $color-white;
+                        }
+                        li:after {
+                            background-color: $color-white;
+                        }
+                    }
+
+                    &[name="other"]{
+                        li, a {
+                            color: $color-black;
+                            transition: all 0.1s ease-out;
+                        }
+                        li {
+                            &:hover{
+                                a:not(.btn) {
+                                    color: $color-orange;
+                                }
+                            }
+
+                            &:after {
+                                background-color: $color-orange;
+                            }
+
+                            .btn {
+                                border-color: rgba($color-black, .2);
+                            }
+
+                            &.active {
+                                a:not(.btn) {
+                                    color: $color-orange;
+                                }
+
+                                &:after {
+                                    height: 4px;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                li {
+                    position: relative;
+                    line-height: 60px;
+                    &:last-child:after{
+                        height: 0!important;
+                    }
+                    
+                    &:after{
+                        content: '';
+                        display: block;
+                        position: absolute;
+                        bottom: 0;
+                        width: 100%;
+                        height: 0px;
+                        background-color: $color-white;
+                        @include transitionGeneral(.1s);
+                    }
+                    &:hover{
+                        &:after{
+                            height: 4px;
+                        }
+                        a:not(.btn) {
+                            font-weight: 600;
+                        }
+                    }
+
+
+                    a {
+                        font-weight: 400;
+                        text-decoration: none;
+                    }
+                }
+            }
+
+            &.part-menu {
+                display: none;
+            }
+        }
+    }
+}
+
+.mobile-menu {
+    display: none;
+}
