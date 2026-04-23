@@ -1,58 +1,18 @@
-/**
- * WebAPI.ts
- * 後台管理端的 API 呼叫封裝外掛。
- *
- * 此檔案把所有後台可用的 API 端點集中在同一個全域物件 `$WebAPI` 下，
- * 讓各個畫面只需要呼叫語意化的方法名稱，例如 `GetNewsList`、
- * `InsertAccount`、`UpdatePersonalInfo`，而不必重複撰寫 Axios 設定。
- *
- * 每個方法大致都遵循相同流程：
- * 1. 建立 `AjaxRef`，描述本次請求的 URL 與 HTTP 方法
- * 2. 視需求塞入 Bearer Token、查詢參數或本文資料
- * 3. 統一交給底部的 `ajax()` 方法送出
- * 4. 成功與失敗都透過 callback 回傳，讓呼叫端自行處理畫面邏輯
- *
- * 實際串接路徑可概略理解為：
- * Vue 畫面 / 元件
- *   -> 呼叫 `$WebAPI.某方法(...)`
- *   -> 建立 `AjaxRef`
- *   -> 交由 `ajax()` 組成 Axios 請求
- *   -> 後端 `iFare_Backend_API`
- *   -> `/api/services/app/<AppService>/<Method>` 或 `/api/TokenAuth/*`
- *   -> AppService -> TaskManager -> Repository -> SQL Server
- */
 import axios from "axios"
 import { AjaxRef } from "./AjaxRef"
 import { useUserStore } from "@/stores/user";
 
 export default {
     install(app: any, options: any) {
-        // 取得 Vue 全域屬性，讓 plugin 可以註冊 $WebAPI 供整個應用共用
         let _global = app.config.globalProperties
 
         _global.$WebAPI = {
-            /**
-             * 向後端驗證帳號密碼，取得初始 JWT Token。
-             * 此方法走的是 TokenAuth 路徑，而不是一般 app service 路徑。
-             *
-             * 原因是登入驗證屬於「先取得身分」的特殊流程，
-             * 尚未能使用 `/api/services/app` 內需要授權的應用服務，
-             * 因此必須改走 `TokenAuthController` 暴露的獨立入口。
-             */
             Auth(act: string, pwd: string, callback: any){
                 const ajaxRef = new AjaxRef("/Authenticate", "post")
                 ajaxRef.setMiddleUrl("/api/TokenAuth")
                 ajaxRef.setData({"userNameOrEmailAddress": act, "password": pwd})
                 this.ajax(ajaxRef, callback)
             },
-            /**
-             * 以已取得的 JWT Token 呼叫後台登入流程，
-             * 讓系統載入更多屬於後台使用者的登入資料。
-             *
-             * 這是後台目前採用的雙階段登入：
-             * 1. `Auth()` 先驗證帳密並換到 JWT
-             * 2. `Login()` 再透過授權後的 AppService 取得後台使用者資料
-             */
             Login(token: string, act: string, pwd: string, callback: any){
                 const ajaxRef = new AjaxRef("/Main/Login", "post")
                 ajaxRef.setHeaders({ Authorization: "Bearer " + token })
@@ -804,15 +764,7 @@ export default {
             },
             //#endregion
             ajax(ajaxRef: AjaxRef, callback: any) {
-                // 統一在這裡把 AjaxRef 轉成真正的 Axios 請求。
-                // 各個 API 方法只要負責描述需求，不必重複處理底層傳輸細節。
-                //
-                // 這裡同時是「前端與後端 API 串接」真正落地的地方：
-                // - `baseURL` 決定要打到哪一台 API 主機
-                // - `url` 決定要呼叫哪個 Controller / AppService 方法
-                // - `headers` 通常帶 Bearer Token
-                // - `params` 會被組成 query string
-                // - `data` 會成為 request body
+                
                 axios({
                     method: ajaxRef.getMethod(),
                     baseURL: ajaxRef.getBaseUrl(),
@@ -824,7 +776,6 @@ export default {
                     responseType: ajaxRef.getAxiosReqConfig().responseType
                 })
                 .then((res) => {
-                    // 成功時原樣把 Axios 回應物件交回呼叫端
                     console.log(res)
                     callback(res)
                 })
@@ -832,15 +783,13 @@ export default {
                     console.error(error)
                     
                     if (error.response){
-                        // 若 Token 已失效或無權限，統一強制登出並導回登入頁
-                        // 這代表後端 JWT 驗證或授權規則沒有通過。
+
                         if (error.response.status == 401){
                             useUserStore().logout()
                             _global.$router.push({ name: 'Login'})
                             return false;
                         }
                     }
-                    // 其餘錯誤交由各頁面自行決定如何顯示提示或錯誤訊息
                     callback(error)
                 })
                 

@@ -24,39 +24,21 @@ using Newtonsoft.Json;
 
 namespace IFare_API.Web.Host.Startup
 {
-    /// <summary>
-    /// IFare_API Web Host 啟動類別。
-    ///
-    /// 這裡負責前台 API 站台的服務註冊與 Middleware 管線建立，
-    /// 包含 MVC、驗證授權、CORS、SignalR、Swagger 與 ABP Framework 啟動。
-    /// </summary>
     public class Startup
     {
-        // 預設 CORS Policy 名稱
         private const string _defaultCorsPolicyName = "localhost";
 
-        // 前台 API 的固定版本號
         private const string _apiVersion = "v1";
 
-        // 站台組態根物件
         private readonly IConfigurationRoot _appConfiguration;
-        // 目前執行環境資訊
         private readonly IWebHostEnvironment _hostingEnvironment;
 
-        /// <summary>
-        /// 建構子，初始化環境與組態。
-        /// </summary>
-        /// <param name="env">目前執行中的 Web Host 環境</param>
         public Startup(IWebHostEnvironment env)
         {
             _hostingEnvironment = env;
             _appConfiguration = env.GetAppConfiguration();
         }
 
-        /// <summary>
-        /// 註冊站台執行所需服務。
-        /// </summary>
-        /// <param name="services">DI 容器服務集合</param>
         public void ConfigureServices(IServiceCollection services)
         {
             // Rollout
@@ -112,12 +94,6 @@ namespace IFare_API.Web.Host.Startup
             );
         }
 
-        /// <summary>
-        /// 建立 HTTP Middleware 管線。
-        /// </summary>
-        /// <param name="app">應用程式建置器</param>
-        /// <param name="env">目前執行環境</param>
-        /// <param name="loggerFactory">Logger 工廠</param>
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
         {
             app.UseAbp(options => { options.UseAbpRequestLocalization = false; }); // Initializes ABP framework.
@@ -156,10 +132,6 @@ namespace IFare_API.Web.Host.Startup
             }); // URL: /swagger
         }
         
-        /// <summary>
-        /// 設定 Swagger / OpenAPI 文件。
-        /// </summary>
-        /// <param name="services">DI 容器服務集合</param>
         private void ConfigureSwagger(IServiceCollection services)
         {
             services.AddSwaggerGen(options =>
@@ -198,7 +170,6 @@ namespace IFare_API.Web.Host.Startup
                 bool canShowSummaries = _appConfiguration.GetValue<bool>("Swagger:ShowSummaries");
                 if (canShowSummaries)
                 {
-                    // 匯入多個專案輸出的 XML 註解，讓 Swagger 能顯示方法摘要
                     var hostXmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                     var hostXmlPath = Path.Combine(AppContext.BaseDirectory, hostXmlFile);
                     options.IncludeXmlComments(hostXmlPath);

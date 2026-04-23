@@ -35,6 +35,7 @@
       "IFare_BDAPI.Web.Host/1.0.0": {
         "dependencies": {
           "Abp.Castle.Log4Net": "7.3.0",
+          "AspNetCore.SwaggerUI.Themes": "2.0.0",
           "IFare_BDAPI.Web.Core": "1.0.0",
           "Microsoft.EntityFrameworkCore.Design": "6.0.4",
           "Microsoft.AspNetCore.Antiforgery": "6.0.0.0",
@@ -515,6 +516,25 @@
         },
         "compile": {
           "lib/net6.0/Abp.ZeroCore.EntityFrameworkCore.dll": {}
+        }
+      },
+      "AspNetCore.SwaggerUI.Themes/2.0.0": {
+        "dependencies": {
+          "Swashbuckle.AspNetCore.SwaggerUI": "7.0.0"
+        },
+        "runtime": {
+          "lib/net6.0/AspNetCore.Swagger.Themes.Common.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          },
+          "lib/net6.0/AspNetCore.SwaggerUI.Themes.dll": {
+            "assemblyVersion": "2.0.0.0",
+            "fileVersion": "2.0.0.0"
+          }
+        },
+        "compile": {
+          "lib/net6.0/AspNetCore.Swagger.Themes.Common.dll": {},
+          "lib/net6.0/AspNetCore.SwaggerUI.Themes.dll": {}
         }
       },
       "AutoMapper/10.1.1": {
@@ -1427,7 +1447,7 @@
           "Microsoft.Extensions.ApiDescription.Server": "3.0.0",
           "Swashbuckle.AspNetCore.Swagger": "6.3.1",
           "Swashbuckle.AspNetCore.SwaggerGen": "6.3.1",
-          "Swashbuckle.AspNetCore.SwaggerUI": "6.3.1"
+          "Swashbuckle.AspNetCore.SwaggerUI": "7.0.0"
         }
       },
       "Swashbuckle.AspNetCore.Swagger/6.3.1": {
@@ -1458,11 +1478,11 @@
           "lib/net6.0/Swashbuckle.AspNetCore.SwaggerGen.dll": {}
         }
       },
-      "Swashbuckle.AspNetCore.SwaggerUI/6.3.1": {
+      "Swashbuckle.AspNetCore.SwaggerUI/7.0.0": {
         "runtime": {
           "lib/net6.0/Swashbuckle.AspNetCore.SwaggerUI.dll": {
-            "assemblyVersion": "6.3.1.0",
-            "fileVersion": "6.3.1.0"
+            "assemblyVersion": "7.0.0.0",
+            "fileVersion": "7.0.0.854"
           }
         },
         "compile": {
@@ -4238,6 +4258,13 @@
       "path": "abp.zerocore.entityframeworkcore/7.3.0",
       "hashPath": "abp.zerocore.entityframeworkcore.7.3.0.nupkg.sha512"
     },
+    "AspNetCore.SwaggerUI.Themes/2.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-KnFAwUVk7IwVk8X9T5oD4CNZPgm6PEJzdEWl6M6FXAiGGjTKzZ07FqRMqQ1+zPM31v6aGfocLiP90QcOtQ/zAA==",
+      "path": "aspnetcore.swaggerui.themes/2.0.0",
+      "hashPath": "aspnetcore.swaggerui.themes.2.0.0.nupkg.sha512"
+    },
     "AutoMapper/10.1.1": {
       "type": "package",
       "serviceable": true,
@@ -4805,12 +4832,12 @@
       "path": "swashbuckle.aspnetcore.swaggergen/6.3.1",
       "hashPath": "swashbuckle.aspnetcore.swaggergen.6.3.1.nupkg.sha512"
     },
-    "Swashbuckle.AspNetCore.SwaggerUI/6.3.1": {
+    "Swashbuckle.AspNetCore.SwaggerUI/7.0.0": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-JLm9hN67jh7RHsX3H30+tb432Li8xm/qV5lRyMMkyHYMfWitIuKAAdrpo2ILcHOIeH7CLMuOO2hp/iLBmE+Bkw==",
-      "path": "swashbuckle.aspnetcore.swaggerui/6.3.1",
-      "hashPath": "swashbuckle.aspnetcore.swaggerui.6.3.1.nupkg.sha512"
+      "sha512": "sha512-rJJony+jsxvpfJM9ZGVxjp0DVpalZv8cAhiMSLW6L2hgUWb7k5qPVuzQHWXtkT8lrG1hQ8vWeR+HUwgCQm9J3A==",
+      "path": "swashbuckle.aspnetcore.swaggerui/7.0.0",
+      "hashPath": "swashbuckle.aspnetcore.swaggerui.7.0.0.nupkg.sha512"
     },
     "System.AppContext/4.3.0": {
       "type": "package",

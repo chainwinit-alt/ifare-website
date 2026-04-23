@@ -227,7 +227,8 @@ function getSelectValue(type: string, val: string) {
 // Code Policy
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
 
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
@@ -242,7 +243,8 @@ codePolicy.then((res: any) => {
 // Code area
 const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
 codeArea.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
 
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
@@ -257,7 +259,8 @@ codeArea.then((res: any) => {
 // Code recipient
 const codeRecipient = $WebApiGet("/Code/GetCodeRecipientList");
 codeRecipient.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
 
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
@@ -315,7 +318,8 @@ const PAGEITEMMAX_OFFICE = 6;
 
 const listOffice = $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
 listOffice.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
 
   let _newsList: Array<OfficeUnitItem> = _data
     .filter((p: any) => p.id != 1)
@@ -396,7 +400,8 @@ const PAGEITEMMAX_QA = 9;
 
 const listNews = $WebApiGet("/FareQA/GetIFareQAList");
 listNews.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
 
   let _newsList: Array<QAItem> = _data
     .filter((p: any) => p.id != 1)

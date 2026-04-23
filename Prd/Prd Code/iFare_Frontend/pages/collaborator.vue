@@ -67,7 +67,8 @@ const collaboratorList = reactive<Array<collaboratorItem>>([]);
 
 const listNews = $WebApiGet('/Collaborator/GetCollaboratorList')
 listNews.then((res:any) => {
-    const _data = res.result.result
+    const _data = res?.result?.result
+    if (!Array.isArray(_data)) return
     
     let _collaboratorList:Array<collaboratorItem> = _data.map((item:any, i:number) => {
         return {

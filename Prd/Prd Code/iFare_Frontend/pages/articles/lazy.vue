@@ -69,7 +69,8 @@ id: 0
 });
 const lazyDetailGet = $WebApiGet('/ArticlesLazy/GetArticlesLazyDetail', { articlesLazyID: _lazyID})
 lazyDetailGet.then((res:any) => {
-    const _data = res.result.result
+    const _data = res?.result?.result
+    if (!_data) return
     const _releaseTime = _data.releaseTime.indexOf('T') >= 0 ? _data.releaseTime.split('T')[0].replaceAll('-', '.') : _data.releaseTime
     
     _lazyItem.id = _data.id
@@ -84,7 +85,8 @@ lazyDetailGet.then((res:any) => {
 const _lazyRelation = reactive<Array<lazyItem>>([]);
 const lazyRelationGet = $WebApiGet('/ArticlesLazy/GetArticlesLazyRelation', { articlesLazyID: _lazyID})
 lazyRelationGet.then((res:any) => {
-    const _data = res.result.result
+    const _data = res?.result?.result
+    if (!Array.isArray(_data)) return
     
     let _list:Array<lazyItem> = _data.map((item:any, i:number) => {
         return {

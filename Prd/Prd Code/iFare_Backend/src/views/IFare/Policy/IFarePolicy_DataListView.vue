@@ -164,10 +164,10 @@ watch(searchParams, (newVal, oldVal) => {
   let releaseDate = newVal.datepicker.release || [];
   let discontinuedDate = newVal.datepicker.discontinued || [];
   let _codeDomicile = newVal.itemSelect.domicile
-  let _codeKeywords = newVal.itemSelect.keyword
+  let _codeKeywords = Array.isArray(newVal.itemSelect.keyword) ? newVal.itemSelect.keyword : []
   let _codePolicy = newVal.itemSelect.policy
   let state_release = newVal.radioSelect.releaseState || "";
-  let _ids = newVal.searchInput.num != "" ? [newVal.searchInput.num] : [];
+  let _ids = newVal.searchInput.num != "" ? [parseInt(newVal.searchInput.num)] : [];
 
   WebAPI_GetDataList(
     createDate.length >= 2 ? createDate[0] : undefined,
@@ -180,9 +180,9 @@ watch(searchParams, (newVal, oldVal) => {
     discontinuedDate.length >= 2 ? discontinuedDate[1] : undefined,
     _codeDomicile != "" ? _codeDomicile : undefined,
     _codePolicy != "" ? _codePolicy : undefined,
-    _codeKeywords.length >= 0 ? _codeKeywords : undefined,
+    _codeKeywords.length > 0 ? _codeKeywords : undefined,
     state != "" ? state : undefined,
-    _ids.length >= 0 ? _ids : undefined,
+    _ids.length > 0 ? _ids : undefined,
     state_release != "" ? state_release : undefined
   );
 });

@@ -84,7 +84,8 @@ const pageNums = reactive<Array<pageNum>>([])
 
 const listNews = $WebApiGet('/News/GetNewsList')
 listNews.then((res:any) => {
-    const _data = res.result.result
+    const _data = res?.result?.result
+    if (!Array.isArray(_data)) return
     
     let _newsList:Array<newsItem> = _data.map((item:any, i:number) => {
         return {
