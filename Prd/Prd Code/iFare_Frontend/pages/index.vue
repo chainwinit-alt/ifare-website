@@ -149,7 +149,8 @@ const selectPolicy = ref(1);
 
 const topNews = $WebApiGet("/News/GetTopsNewsList");
 topNews.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
 
   let _newsList: Array<newsItem> = _data.map((item: any, i: number) => {
     return {
@@ -168,7 +169,8 @@ function SetWelfareData() {
     policyId: selectPolicy.value,
   });
   topWelfare.then((res: any) => {
-    const _data = res.result.result;
+    const _data = res?.result?.result;
+    if (!Array.isArray(_data)) return;
 
     let _list: Array<welfareItem> = _data
       .slice(0, 3)
@@ -192,7 +194,8 @@ SetWelfareData();
 
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
 
   let _list: Array<codeItem> = _data.map((item: any, i: number) => {
     return {

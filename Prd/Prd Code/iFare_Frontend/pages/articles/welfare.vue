@@ -75,7 +75,8 @@ id: 0
 });
 const welfareGet = $WebApiGet('/ArticlesWelfare/GetArticlesWelfareDetail', { articleWelfareID: _welfareID})
 welfareGet.then((res:any) => {
-    const _data = res.result.result
+    const _data = res?.result?.result
+    if (!_data) return
     
     _welfareItem.id = _data.id
     _welfareItem.title = _data.title
@@ -89,7 +90,8 @@ welfareGet.then((res:any) => {
 const _welfareRelation = reactive<Array<welfareItem>>([]);
 const topWelfareGet = $WebApiGet('/ArticlesWelfare/GetArticlesWelfareRelation', { articleWelfareID: _welfareID})
 topWelfareGet.then((res:any) => {
-    const _data = res.result.result
+    const _data = res?.result?.result
+    if (!Array.isArray(_data)) return
     
     let _newsList:Array<welfareItem> = _data.map((item:any, i:number) => {
         return {

@@ -41,7 +41,8 @@ releaseTime: ''
 });
 const listNews = $WebApiGet('/News/GetNewsDetail', { newsID: _newsID})
 listNews.then((res:any) => {
-    const _data = res.result.result
+    const _data = res?.result?.result
+    if (!Array.isArray(_data) || _data.length <= 0) return
     
     let _newsList:Array<newsItem> = _data.map((item:any, i:number) => {
         return {

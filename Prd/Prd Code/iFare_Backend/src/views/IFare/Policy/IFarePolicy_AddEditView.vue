@@ -247,7 +247,7 @@
           <el-input
             v-model="input_remark"
             rows="5"
-            maxlength="100"
+            maxlength="5000"
             show-word-limit
             type="textarea"
             resize="none"

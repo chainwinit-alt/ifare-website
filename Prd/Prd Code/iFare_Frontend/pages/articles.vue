@@ -265,7 +265,8 @@ interface pageNum {
 const policySelectList = reactive<Array<selectItem>>([]);
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       val: item.id,
@@ -284,7 +285,8 @@ codePolicy.then((res: any) => {
 const keywordSelectList = reactive<Array<selectItem>>([]);
 const codeKeyword = $WebApiGet("/Code/GetCodeKeywordList");
 codeKeyword.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       val: item.id,
@@ -308,7 +310,8 @@ const pageNums_welfare = reactive<Array<pageNum>>([]);
 const GetListWelfare = $WebApiGet("/ArticlesWelfare/GetArticlesWelfareList");
 
 GetListWelfare.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
   let _list: Array<welfareItem> = _data.map((item: any, i: number) => {
     return {
       id: item.id,
@@ -443,7 +446,8 @@ const pageNums_lazy = reactive<Array<pageNum>>([]);
 const listLazy = $WebApiGet("/ArticlesLazy/GetArticlesLazyList");
 
 listLazy.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
   let _list: Array<lazyItem> = _data.map((item: any, i: number) => {
     return {
       id: item.id,

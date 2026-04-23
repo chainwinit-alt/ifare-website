@@ -258,7 +258,8 @@ function getSelectItems(type: string, items: any) {
 // Code Policy
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
@@ -271,7 +272,8 @@ codePolicy.then((res: any) => {
 // Code area
 const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
 codeArea.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
@@ -284,7 +286,8 @@ codeArea.then((res: any) => {
 // Code recipient
 const codeRecipient = $WebApiGet("/Code/GetCodeRecipientList");
 codeRecipient.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName,
@@ -317,7 +320,8 @@ function SwitchRecipient(codeVal: any) {
 // Code income
 const codeIncome = $WebApiGet("/Code/GetCodeIncomeList");
 codeIncome.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName,
@@ -352,7 +356,8 @@ function SwitchIncome(codeVal: any) {
 // Code identity
 const codeIdentity = $WebApiGet("/Code/GetCodeIdentityList");
 codeIdentity.then((res: any) => {
-  const _data = res.result.result;
+  const _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName == '全選' ? '不限' : item.codeName,
@@ -448,7 +453,8 @@ SetDataInit(_query);
 function SetDataInit(_q: any) {
   const listNews = $WebApiGet("/FarePolicy/GetIFarePolicyList", _q);
   listNews.then((res: any) => {
-    const _data = res.result.result;
+    const _data = res?.result?.result;
+    if (!Array.isArray(_data)) return;
     let _newsList: Array<iFarePolicyItem> = _data.map(
       (item: any, i: number) => {
         return {

@@ -1,17 +1,4 @@
-/**
- * router/index.ts
- * iFare 後台管理系統路由設定
- *
- * 採用 Vue Router 的巢狀路由結構，各功能模組皆有 Index（父）/ DataList / Add / Edit / Detail 子路由。
- * 路由 meta 說明：
- *   - requiresAuth：是否需要登入才能存取（true = 需登入）
- *   - indexKey：對應側邊欄選單的高亮識別鍵
- *   - title：頁面標題（顯示於 document.title）
- *   - title_parent / urlName_parent：麵包屑導航所需的上層標題與路由名稱
- *   - isTitleHide：詳細檢視頁面是否隱藏頁面標題列
- */
-
-//#region 基礎引入
+//#region Else
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import HomeView from '../views/HomeView.vue'
@@ -19,119 +6,99 @@ import LoginView from '../views/LoginView.vue'
 import Analysis_DashboardViewVue from '@/views/Analysis/Analysis_DashboardView.vue'
 import NoPermission from '@/views/NoPermission.vue'
 //#endregion
-
-//#region [View.vue] 最新消息
+//#region [View.vue] News
 import News_IndexViewVue from '@/views/News/News_IndexView.vue'
 import News_DataListViewVue from '@/views/News/News_DataListView.vue'
 import News_AddEditViewVue from '@/views/News/News_AddEditView.vue'
 import News_ItemDetailViewVue from '@/views/News/News_ItemDetailView.vue'
 //#endregion
-
-//#region [View.vue] 福利文章
+//#region [View.vue] Articles_Welfare
 import ArticlesWelfare_IndexViewVue from '@/views/Articles/Welfare/ArticlesWelfare_IndexView.vue'
 import ArticlesWelfare_DataListViewVue from '@/views/Articles/Welfare/ArticlesWelfare_DataListView.vue'
 import ArticlesWelfare_AddEditViewVue from '@/views/Articles/Welfare/ArticlesWelfare_AddEditView.vue'
 import ArticlesWelfare_ItemDetailViewVue from '@/views/Articles/Welfare/ArticlesWelfare_ItemDetailView.vue'
 //#endregion
-
-//#region [View.vue] 懶人包文章
+//#region [View.vue] Articles_Lazy
 import ArticlesLazy_IndexViewVue from '@/views/Articles/Lazy/ArticlesLazy_IndexView.vue'
 import ArticlesLazy_DataListViewVue from '@/views/Articles/Lazy/ArticlesLazy_DataListView.vue'
 import ArticlesLazy_AddEditViewVue from '@/views/Articles/Lazy/ArticlesLazy_AddEditView.vue'
 import ArticlesLazy_ItemDetailViewVue from '@/views/Articles/Lazy/ArticlesLazy_ItemDetailView.vue'
 //#endregion
-
-//#region [View.vue] iFare 福利政策
+//#region [View.vue] IFare_Policy
 import IFarePolicy_IndexViewVue from '@/views/IFare/Policy/IFarePolicy_IndexView.vue'
 import IFarePolicy_DataListViewVue from '@/views/IFare/Policy/IFarePolicy_DataListView.vue'
 import IFarePolicy_AddEditViewVue from '@/views/IFare/Policy/IFarePolicy_AddEditView.vue'
 import IFarePolicy_ItemDetailViewVue from '@/views/IFare/Policy/IFarePolicy_ItemDetailView.vue'
 //#endregion
-
-//#region [View.vue] iFare 常見問題
+//#region [View.vue] IFare_QA
 import IFareQA_IndexViewVue from '@/views/IFare/QA/IFareQA_IndexView.vue'
 import IFareQA_DataListViewVue from '@/views/IFare/QA/IFareQA_DataListView.vue'
 import IFareQA_AddEditViewVue from '@/views/IFare/QA/IFareQA_AddEditView.vue'
 import IFareQA_ItemDetailViewVue from '@/views/IFare/QA/IFareQA_ItemDetailView.vue'
 //#endregion
-
-//#region [View.vue] iFare 洽辦單位
+//#region [View.vue] IFare_OfficeUnit
 import IFareOfficeUnit_IndexViewVue from '@/views/IFare/OfficeUnit/IFareOfficeUnit_IndexView.vue'
 import IFareOfficeUnit_DataListViewVue from '@/views/IFare/OfficeUnit/IFareOfficeUnit_DataListView.vue'
 import IFareOfficeUnit_AddEditViewVue from '@/views/IFare/OfficeUnit/IFareOfficeUnit_AddEditView.vue'
 import IFareOfficeUnit_ItemDetailViewVue from '@/views/IFare/OfficeUnit/IFareOfficeUnit_ItemDetailView.vue'
 //#endregion
-
-//#region [View.vue] 公益夥伴
+//#region [View.vue] Collaborator
 import Collaborator_IndexViewVue from '@/views/Collaborator/Collaborator_IndexView.vue'
 import Collaborator_DataListViewVue from '@/views/Collaborator/Collaborator_DataListView.vue'
 import Collaborator_AddEditViewVue from '@/views/Collaborator/Collaborator_AddEditView.vue'
 import Collaborator_ItemDetailViewVue from '@/views/Collaborator/Collaborator_ItemDetailView.vue'
 //#endregion
-
-//#region [View.vue] 代碼維護 - 政策類別
+//#region [View.vue] Code_Policy
 import CodePolicy_IndexViewVue from '@/views/Code/Policy/CodePolicy_IndexView.vue'
 import CodePolicy_DataListViewVue from '@/views/Code/Policy/CodePolicy_DataListView.vue'
 import CodePolicy_AddEditViewVue from '@/views/Code/Policy/CodePolicy_AddEditView.vue'
 //#endregion
-
-//#region [View.vue] 代碼維護 - 受助者
+//#region [View.vue] Code_Recipient
 import CodeRecipient_IndexViewVue from '@/views/Code/Recipient/CodeRecipient_IndexView.vue'
 import CodeRecipient_DataListViewVue from '@/views/Code/Recipient/CodeRecipient_DataListView.vue'
 import CodeRecipient_AddEditViewVue from '@/views/Code/Recipient/CodeRecipient_AddEditView.vue'
 //#endregion
-
-//#region [View.vue] 代碼維護 - 關鍵字
+//#region [View.vue] Code_Keyword
 import CodeKeyword_IndexViewVue from '@/views/Code/Keyword/CodeKeyword_IndexView.vue'
 import CodeKeyword_DataListViewVue from '@/views/Code/Keyword/CodeKeyword_DataListView.vue'
 import CodeKeyword_AddEditViewVue from '@/views/Code/Keyword/CodeKeyword_AddEditView.vue'
 //#endregion
-
-//#region [View.vue] 代碼維護 - 經濟條件
+//#region [View.vue] Code_Income
 import CodeIncome_IndexViewVue from '@/views/Code/Income/CodeIncome_IndexView.vue'
 import CodeIncome_DataListViewVue from '@/views/Code/Income/CodeIncome_DataListView.vue'
 import CodeIncome_AddEditViewVue from '@/views/Code/Income/CodeIncome_AddEditView.vue'
 //#endregion
-
-//#region [View.vue] 代碼維護 - 特殊身分
+//#region [View.vue] Code_Identity
 import CodeIdentity_IndexViewVue from '@/views/Code/Identity/CodeIdentity_IndexView.vue'
 import CodeIdentity_DataListViewVue from '@/views/Code/Identity/CodeIdentity_DataListView.vue'
 import CodeIdentity_AddEditViewVue from '@/views/Code/Identity/CodeIdentity_AddEditView.vue'
 //#endregion
-
-//#region [View.vue] 代碼維護 - 戶籍地
+//#region [View.vue] Code_Domicile
 import CodeDomicile_IndexViewVue from '@/views/Code/Domicile/CodeDomicile_IndexView.vue'
 import CodeDomicile_DataListViewVue from '@/views/Code/Domicile/CodeDomicile_DataListView.vue'
 import CodeDomicile_AddEditViewVue from '@/views/Code/Domicile/CodeDomicile_AddEditView.vue'
 //#endregion
-
-//#region [View.vue] 帳戶管理
+//#region [View.vue] Account
 import Account_IndexViewVue from '@/views/Account/Account_IndexView.vue'
 import Account_DataListViewVue from '@/views/Account/Account_DataListView.vue'
 import Account_AddEditViewVue from '@/views/Account/Account_AddEditView.vue'
 import Account_ItemDetailViewVue from '@/views/Account/Account_ItemDetailView.vue'
 //#endregion
-
-//#region [View.vue] 個人資料
+//#region [View.vue] Personal
 import Personal_IndexViewVue from '@/views/Personal/Personal_IndexView.vue'
 import Personal_DetailViewVue from '@/views/Personal/Personal_DetailView.vue'
 import Personal_EditViewVue from '@/views/Personal/Personal_EditView.vue'
 import Personal_ChangePwdViewVue from '@/views/Personal/Personal_ChangePwdView.vue'
 //#endregion
-
-//#region [View.vue] 圖片管理
+//#region [View.vue] Img Manager
 import ImgManager_DataListView from '@/views/ImgManager/ImgManager_DataListView.vue'
 //#endregion
-
-// 輸出基礎路徑（開發除錯用）
 console.log(import.meta.env.BASE_URL)
-
-// 建立路由實例，使用 HTML5 History 模式（無 # 號的 URL）
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      //#region 首頁
+      //#region Home
       path: '/',
       name: 'Home',
       component: HomeView,
@@ -143,19 +110,19 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 登入頁
+      //#region Login
       path: '/Login',
       name: 'Login',
       component: LoginView,
       meta: {
         indexKey: 'Login',
-        requiresAuth: false, // 登入頁不需驗證
+        requiresAuth: false,
         title: 'Login'
       }
       //#endregion
     },
     {
-      //#region 最新消息管理
+      //#region News
       path: '/News',
       name: 'News_Index',
       component: News_IndexViewVue,
@@ -200,14 +167,14 @@ const router = createRouter({
           meta: {
             requiresAuth: true,
             title: '最新消息瀏覽',
-            isTitleHide: true // 詳細頁隱藏頁面標題列
+            isTitleHide: true
           }
         }
       ]
       //#endregion
     },
     {
-      //#region 福利文章管理
+      //#region Articles-Welfare
       path: '/Articles-Welfare',
       name: 'Articles_Welfare_Index',
       component: ArticlesWelfare_IndexViewVue,
@@ -259,7 +226,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 懶人包文章管理
+      //#region Articles-Lazy
       path: '/Articles-Lazy',
       name: 'Articles_Lazy_Index',
       component: ArticlesLazy_IndexViewVue,
@@ -311,7 +278,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region iFare 福利政策管理
+      //#region IFare-Policy
       path: '/IFare-Policy',
       name: 'IFare_Policy_Index',
       component: IFarePolicy_IndexViewVue,
@@ -363,7 +330,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region iFare 常見問題管理
+      //#region IFare-QA
       path: '/IFare-QA',
       name: 'IFare_QA_Index',
       component: IFareQA_IndexViewVue,
@@ -415,7 +382,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region iFare 洽辦單位管理
+      //#region IFare-OfficeUnit
       path: '/IFare-OfficeUnit',
       name: 'IFare_OfficeUnit_Index',
       component: IFareOfficeUnit_IndexViewVue,
@@ -467,7 +434,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 公益夥伴管理
+      //#region Collaborator
       path: '/Collaborator',
       name: 'Collaborator_Index',
       component: Collaborator_IndexViewVue,
@@ -519,7 +486,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 代碼維護 - 政策類別
+      //#region Code_Policy
       path: '/Code-Policy',
       name: 'Code_Policy_Index',
       component: CodePolicy_IndexViewVue,
@@ -561,7 +528,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 代碼維護 - 受助者
+      //#region Code_Recipient
       path: '/Code-Recipient',
       name: 'Code_Recipient_Index',
       component: CodeRecipient_IndexViewVue,
@@ -603,7 +570,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 代碼維護 - 關鍵字
+      //#region Code_Keyword
       path: '/Code-Keyword',
       name: 'Code_Keyword_Index',
       component: CodeKeyword_IndexViewVue,
@@ -645,7 +612,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 代碼維護 - 經濟條件
+      //#region Code_Income
       path: '/Code-Income',
       name: 'Code_Income_Index',
       component: CodeIncome_IndexViewVue,
@@ -687,7 +654,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 代碼維護 - 特殊身分
+      //#region Code_Identity
       path: '/Code-Identity',
       name: 'Code_Identity_Index',
       component: CodeIdentity_IndexViewVue,
@@ -729,7 +696,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 代碼維護 - 戶籍地
+      //#region Code_Domicile
       path: '/Code-Domicile',
       name: 'Code_Domicile_Index',
       component: CodeDomicile_IndexViewVue,
@@ -771,7 +738,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 資料分析儀表板
+      //#region Analysis
       path: '/Analysis',
       name: 'Analysis',
       component: Analysis_DashboardViewVue,
@@ -783,7 +750,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 帳戶管理
+      //#region Account
       path: '/Account',
       name: 'Account_Index',
       component: Account_IndexViewVue,
@@ -822,7 +789,6 @@ const router = createRouter({
           }
         },
         {
-          // 管理者專用編輯路由，僅「管理者」角色可存取
           path: 'Edit_Manager',
           name: 'Account_Edit_Manager',
           component: Account_AddEditViewVue,
@@ -845,7 +811,7 @@ const router = createRouter({
       //#endregion
     },
     {
-      //#region 個人資料管理
+      //#region Personal
       path: '/Personal',
       name: 'Personal_Index',
       component: Personal_IndexViewVue,
@@ -887,7 +853,6 @@ const router = createRouter({
       //#endregion
     },
     {
-      // 無權限提示頁
       path: '/NoPermission',
       name: 'NoPermission',
       component: NoPermission,
@@ -898,7 +863,6 @@ const router = createRouter({
       }
     },
     {
-      // 圖片管理頁
       path: '/ImgManager',
       name: 'ImgManager',
       component: ImgManager_DataListView,
@@ -911,51 +875,36 @@ const router = createRouter({
   ]
 })
 
-/**
- * 路由以 Vue Plugin 形式匯出，安裝時同時掛載路由並設定導航守衛
- */
 export default {
   install(app: any, options: any) {
     router.install(app)
 
-    /**
-     * 全域前置守衛（beforeEach）
-     * 執行時機：每次路由跳轉前
-     * 功能：
-     *   1. 未登入時重導至登入頁
-     *   2. 「檢視者」角色僅能瀏覽特定頁面，其餘頁面導向無權限頁
-     *   3. Account_Edit_Manager 路由僅「管理者」可存取
-     */
     router.beforeEach((to, from) => {
       const userStore = useUserStore()
 
-      // 規則一：需要登入但尚未登入 → 重導至登入頁
       if (to.meta.requiresAuth && !userStore.isLogin) {
         return {
           path: '/Login'
         }
       }
-
-      // 規則二：「檢視者」角色的存取限制
-      // 以下頁面「檢視者」可正常存取，其餘均導向無權限頁
-      if (to.name != null &&
+      
+      if (to.name != null && 
           to.name.toString().indexOf('Login') < 0 &&
           to.name.toString().indexOf('Home') < 0 &&
           to.name.toString().indexOf('Articles_Welfare_DataList') < 0 &&
           to.name.toString().indexOf('Articles_Lazy_DataList') < 0 &&
-          to.name.toString().indexOf('IFare_Policy_DataList') < 0 &&
+          to.name.toString().indexOf('IFare_Policy_DataList') < 0 && 
           to.name.toString().indexOf('Articles_Welfare_Detail') < 0 &&
           to.name.toString().indexOf('Articles_Lazy_Detail') < 0 &&
-          to.name.toString().indexOf('IFare_Policy_Detail') < 0 &&
-          // to.name.toString().indexOf('Personal_Detail') < 0 &&
-          to.name.toString().indexOf('NoPermission') < 0 &&
+          to.name.toString().indexOf('IFare_Policy_Detail') < 0 && 
+          // to.name.toString().indexOf('Personal_Detail') < 0 && 
+          to.name.toString().indexOf('NoPermission') < 0 && 
           userStore.permission == "檢視者") {
         return {
           path: '/NoPermission'
         }
       }
 
-      // 規則三：Account_Edit_Manager 僅「管理者」可存取
       if (to.name != null && to.name.toString().indexOf('Account_Edit_Manager') >= 0 && userStore.permission != "管理者") {
         return {
           path: '/NoPermission'
@@ -963,11 +912,6 @@ export default {
       }
     })
 
-    /**
-     * 全域後置守衛（afterEach）
-     * 執行時機：每次路由跳轉完成後
-     * 功能：更新瀏覽器分頁標題為路由定義的 title
-     */
     router.afterEach((to, from) => {
       // @ts-ignore
       document.title = to.meta.title

@@ -152,14 +152,15 @@ const _contactItem = reactive<contactItem>({
 });
 const OfficeUnitListGet = $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
 OfficeUnitListGet.then((res: any) => {
-  let _data = res.result.result;
+  let _data = res?.result?.result;
+  if (!Array.isArray(_data)) return;
   _data = _data.find((item: any) => item.id == _contactID);
-  
+  if (!_data) return;
 
   _contactItem.title = _data.title;
   releaseTime.value = _data.releaseTime
   updateTime.value = _data.updateTime
-  _data.officeList.forEach((_officeItem: any, k: number) => {
+  (_data.officeList ?? []).forEach((_officeItem: any, k: number) => {
     console.log(_officeItem)
     areaList.push({
       isActive: k == 0,

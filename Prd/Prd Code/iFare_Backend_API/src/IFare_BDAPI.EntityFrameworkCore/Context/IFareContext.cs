@@ -626,7 +626,7 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.CodePolicyId).HasColumnName("CodePolicy_ID");
 
-                entity.Property(e => e.CompetentAuthority).HasMaxLength(50);
+                entity.Property(e => e.CompetentAuthority).HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.CreateTime)
                     .HasColumnType("datetime")
@@ -639,16 +639,16 @@ namespace IFare_BDAPI.Context
                 entity.Property(e => e.IfareOfficeUnitId).HasColumnName("IFareOfficeUnit_ID");
 
                 entity.Property(e => e.OfficeUnitInfo)
-                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(max)")
                     .HasColumnName("OfficeUnit_Info");
 
                 entity.Property(e => e.OfficeUnitTel)
-                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(max)")
                     .HasColumnName("OfficeUnit_Tel");
 
                 entity.Property(e => e.ReleaseTime).HasColumnType("datetime");
 
-                entity.Property(e => e.Remark).HasMaxLength(100);
+                entity.Property(e => e.Remark).HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.State)
                     .IsRequired()
