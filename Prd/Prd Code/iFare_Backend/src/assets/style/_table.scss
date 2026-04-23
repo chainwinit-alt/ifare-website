@@ -1,0 +1,21 @@
+.card-table {
+
+
+    .part-table {
+        thead th {
+            background-color: #F5F7FA;
+        }
+    }
+
+    .part-page {
+        display: flex;
+        justify-content: right;
+        margin-top: 16px;
+
+        .el-pagination {
+            & > *, & > * > * {
+                background: transparent; 
+            }
+        }
+    }
+}
