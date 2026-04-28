@@ -168,6 +168,38 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
 }
 
+// ---- Global hover & press affordance for list items and buttons ----
+.result-item.transition-general,
+.article-item.transition-general,
+.agency-item {
+  cursor: pointer;
+  transition: transform .25s ease-out, box-shadow .25s ease-out, background-color .25s ease-out;
+
+  &:hover {
+    transform: translateY(-3px);
+    background-color: rgba($color-white, 0.7);
+    box-shadow: 0 6px 18px -8px rgba($color-black, 0.18);
+  }
+
+  &:active {
+    transform: translateY(-1px);
+  }
+}
+
+.btn-filter,
+.btn-tag,
+.btn-retry {
+  transition: transform .15s ease-out, box-shadow .15s ease-out, background-color .25s ease-out;
+
+  &:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+
+  &:not(:disabled):active {
+    transform: scale(0.97);
+  }
+}
+
 .raw-html {
   
   &, *{

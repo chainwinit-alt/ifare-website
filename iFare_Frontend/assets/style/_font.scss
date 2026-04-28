@@ -20,34 +20,17 @@ body {
         font-weight: 400;
         line-height: 20px;
 
-        [name]::before{
+        .footer-info-label {
             font-family: Noto Sans TC;
-            color: rgba($color-white, .5);
+            color: rgba($color-white, .7);
         }
         [name="tel"]{
-            font-family: Roboto;
             color: $color-white;
             text-decoration: none;
-            &::before{
-                content: '聯絡電話';
-            }
-        }
-        [name="mail"]{
-            &::before{
-                content: '聯絡信箱';
-            }
-        }
-        [name="address"]{
-            &::before{
-                content: '地址';
-            }
         }
         [name="datetime"]{
-            &::before{
-                content: '服務時間';
-            }
             span {
-                &:nth-child(2), &:nth-child(3) {
+                &:nth-child(3), &:nth-child(4) {
                     font-family: Roboto;
                 }
             }
@@ -377,14 +360,14 @@ body {
         color: rgba($color-orange, 0.7);
     }
 }
-.btn-line {
+.btn-line, .btn-facebook, .btn-social {
     font-family: Noto Sans TC;
 
     span {
         color: $color-primary;
         font-size: 16px;
         font-weight: 400;
-        line-height: 28px; 
+        line-height: 28px;
         white-space: nowrap;
     }
 }
@@ -543,7 +526,8 @@ body {
         font-family: Noto Sans TC;
         font-size: 16px;
         font-weight: 400;
-        line-height: 28px; 
+        line-height: 28px;
+        max-width: 480px;
     }
 }
 

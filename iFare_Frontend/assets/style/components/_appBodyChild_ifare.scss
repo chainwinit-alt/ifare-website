@@ -179,6 +179,34 @@
             gap: 12px;
           }
 
+          .filter-group-keyword {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 12px;
+
+            .input-keyword {
+              width: 100%;
+              padding: 10px 14px;
+              border: 1px solid rgba($color-black, .15);
+              border-radius: 6px;
+              font-size: 15px;
+              line-height: 1.4;
+              background: $color-white;
+              transition: border-color .2s, box-shadow .2s;
+
+              &:focus {
+                outline: none;
+                border-color: rgba($color-primary, .6);
+                box-shadow: 0 0 0 3px rgba($color-primary, .12);
+              }
+
+              &::placeholder {
+                color: rgba($color-black, .35);
+              }
+            }
+          }
+
           .part-filter {
             display: inline-flex;
             flex-direction: row;
@@ -214,25 +242,28 @@
       }
 
       .section-result {
-        .result-total {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          color: $color-black;
+        .result-summary {
+          margin: 0;
+          padding: 16px 48px;
+          color: rgba($color-black, 0.6);
           font-size: 14px;
           font-weight: 400;
           line-height: 20px;
-          padding: 16px 48px;
-          &::before,
-          &::after {
-            color: rgba($color-black, 0.5);
-          }
-          &::before {
-            content: "找到";
-          }
-          &::after {
-            content: "筆福利政策";
-          }
+        }
+
+        .result-total {
+          display: inline;
+          color: $color-primary;
+          font-size: 22px;
+          font-weight: 600;
+          padding: 0 6px;
+        }
+
+        .result-summary-note {
+          display: block;
+          margin-top: 4px;
+          color: rgba($color-black, 0.45);
+          font-size: 12px;
         }
 
         .result-list {

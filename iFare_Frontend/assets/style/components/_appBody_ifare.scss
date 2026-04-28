@@ -265,10 +265,42 @@
         }
       }
   
+      .item-keyword {
+        .input-keyword {
+          width: 100%;
+          padding: 10px 14px;
+          border: 1px solid rgba($color-black, .15);
+          border-radius: 6px;
+          font-size: 16px;
+          line-height: 1.4;
+          background: $color-white;
+          transition: border-color .2s, box-shadow .2s;
+
+          &:focus {
+            outline: none;
+            border-color: rgba($color-primary, .6);
+            box-shadow: 0 0 0 3px rgba($color-primary, .12);
+          }
+
+          &::placeholder {
+            color: rgba($color-black, .35);
+          }
+        }
+      }
+
       .item-bottom {
         display: flex;
-        flex-direction: row;
+        flex-direction: column;
+        gap: 8px;
+        align-items: center;
         justify-content: center;
+      }
+
+      .filter-hint {
+        margin: 0;
+        font-size: 13px;
+        color: rgba($color-black, .5);
+        text-align: center;
       }
 
       .btn-tag-list {

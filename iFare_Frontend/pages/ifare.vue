@@ -71,8 +71,22 @@
               @is-opened="isSelectOpen"
             />
           </div>
+          <div class="item item-keyword">
+            <label class="filter-name">關鍵字（選填）</label>
+            <input
+              type="text"
+              class="input-keyword"
+              placeholder="輸入關鍵字搜尋（如：補助、津貼、長者…）"
+              v-model="keyword"
+              maxlength="30"
+              @keyup.enter="Search"
+            />
+          </div>
           <div class="item item-bottom">
-            <button class="btn-filter transition-general" @click="Search" :disabled="codeSelect_policy == '' || codeSelectRecipient == '' || codeSelect_area == ''">
+            <p class="filter-hint" v-show="!hasAnyCondition">
+              ＊未填條件將顯示最新福利，可單填任一項以縮小範圍
+            </p>
+            <button class="btn-filter transition-general" @click="Search">
               <span>搜尋</span>
               <i class="icon ic-search"></i>
             </button>
@@ -211,6 +225,13 @@ const codeSelect_area = ref("");
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient = ref("");
 const isVisibleRecipient = ref(true)
+const keyword = ref("");
+const hasAnyCondition = computed(() =>
+  codeSelect_policy.value !== ""
+  || codeSelectRecipient.value !== ""
+  || codeSelect_area.value !== ""
+  || keyword.value.trim() !== ""
+);
 
 function getSelectValue(type: string, val: string) {
   // console.log(`[${type}] val => ${val}`)
@@ -280,12 +301,11 @@ function SwitchRecipient(codeVal: any) {
 }
 
 function Search() {
-  if (codeSelect_policy.value == "" || codeSelectRecipient.value == "" || codeSelect_area.value == "") return false;
   let query: any = {};
   if (codeSelect_policy.value) query.policy = codeSelect_policy.value;
   if (codeSelectRecipient.value) query.recipient = codeSelectRecipient.value;
   if (codeSelect_area.value) query.area = codeSelect_area.value;
-  console.log(query)
+  if (keyword.value.trim()) query.keyword = keyword.value.trim();
   $router.push({ path: "/ifare/result", query: query });
   // Init value.
   codeSelect_policy.value = ""
@@ -294,6 +314,7 @@ function Search() {
     item.isActive = false;
   });
   codeSelect_area.value = ""
+  keyword.value = ""
 }
 
 // Office Unit

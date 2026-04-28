@@ -18,7 +18,20 @@
                 </div>
                 <div class="part-body">
                     <div class="part-articles">
-                        <ul class="list-unstyled article-list">
+                        <ul class="list-unstyled article-list" v-if="isLoading">
+                            <li class="article-item article-item-skeleton" v-for="n in 4" :key="`skeleton-${n}`">
+                                <div class="skeleton-line skeleton-line-title"></div>
+                                <div class="skeleton-line skeleton-line-info"></div>
+                            </li>
+                        </ul>
+                        <div class="part-empty part-error" v-else-if="hasError">
+                            <p>載入最新消息時發生錯誤</p>
+                            <button class="btn-retry transition-general" @click="LoadNews">重新載入</button>
+                        </div>
+                        <div class="part-empty" v-else-if="newsList.length === 0">
+                            <p>目前沒有最新消息</p>
+                        </div>
+                        <ul class="list-unstyled article-list" v-else>
                             <li class="article-item transition-general" v-for="_news in newsList" :key="_news.title">
                                 <NuxtLink class="item-page-link" :to="{path: '/news/info', query: {id: _news.id}}">
                                     <div class="item-title">
@@ -81,32 +94,48 @@ interface pageNum {
 const newsList = reactive<Array<newsItem>>([]);
 const storageNewsList = reactive<Array<newsItem>>([])
 const pageNums = reactive<Array<pageNum>>([])
+const isLoading = ref(true)
+const hasError = ref(false)
 
-const listNews = $WebApiGet('/News/GetNewsList')
-listNews.then((res:any) => {
-    const _data = res.result.result
-    
-    let _newsList:Array<newsItem> = _data.map((item:any, i:number) => {
-        return {
+function LoadNews() {
+    isLoading.value = true
+    hasError.value = false
+    storageNewsList.splice(0)
+    newsList.splice(0)
+    pageNums.splice(0)
+
+    $WebApiGet('/News/GetNewsList').then((res:any) => {
+        if (!res || !res.result || !res.result.result) {
+            hasError.value = true
+            isLoading.value = false
+            return
+        }
+        const _data = res.result.result
+        let _newsList:Array<newsItem> = _data.map((item:any) => ({
             id: item.id,
             title: item.title,
             releaseTime: item.releaseTime,
             content: item.content
+        }))
+
+        storageNewsList.push(..._newsList)
+        newsList.push(..._newsList.slice(0, _newsList.length > PAGEITEMMAX ? PAGEITEMMAX : _newsList.length))
+
+        for(let n = 0; n <= newsList.length/PAGEITEMMAX; n++){
+            pageNums.push({
+                num: n+1,
+                isActive: n == 0,
+                isHide: false
+            })
         }
+        isLoading.value = false
+    }).catch(() => {
+        hasError.value = true
+        isLoading.value = false
     })
+}
 
-    storageNewsList.push(..._newsList)
-    newsList.push(..._newsList.slice(0, _newsList.length > PAGEITEMMAX ? PAGEITEMMAX : _newsList.length))
-
-    // Num page init.
-    for(let n = 0; n <= newsList.length/PAGEITEMMAX; n++){
-        pageNums.push({
-            num: n+1,
-            isActive: n == 0,
-            isHide: false
-        })
-    }
-})
+LoadNews()
 
 function PageChange(pageNum:number) {
     newsList.splice(0)

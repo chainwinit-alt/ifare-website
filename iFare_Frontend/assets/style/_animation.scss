@@ -79,4 +79,88 @@
     }
 }
 
+// ---- Page transition (Nuxt default `<transition name="page">`) ----
+.page-enter-active,
+.page-leave-active {
+    transition: opacity .25s ease, transform .25s ease;
+}
+.page-enter-from,
+.page-leave-to {
+    opacity: 0;
+    transform: translateY(8px);
+}
+.page-enter-to,
+.page-leave-from {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+// Layout transition uses the same easing but slightly slower for the wrapper.
+.layout-enter-active,
+.layout-leave-active {
+    transition: opacity .3s ease;
+}
+.layout-enter-from,
+.layout-leave-to {
+    opacity: 0;
+}
+
+// ---- Skeleton loading shimmer ----
+@keyframes skeletonShimmer {
+    0% {
+        background-position: -240px 0;
+    }
+    100% {
+        background-position: 240px 0;
+    }
+}
+
+.skeleton-line {
+    display: block;
+    height: 14px;
+    width: 100%;
+    margin: 8px 0;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #ececec 0%, #f5f5f5 50%, #ececec 100%);
+    background-size: 480px 100%;
+    animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+.skeleton-line-title {
+    height: 18px;
+    width: 60%;
+}
+.skeleton-line-info {
+    height: 12px;
+    width: 90%;
+    margin-top: 12px;
+}
+.article-item-skeleton {
+    padding: 20px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+// ---- Empty / error state ----
+.part-empty {
+    padding: 48px 24px;
+    text-align: center;
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 15px;
+
+    p {
+        margin: 0 0 16px;
+    }
+}
+.part-error .btn-retry {
+    padding: 8px 20px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 14px;
+
+    &:hover {
+        border-color: rgba(0, 0, 0, 0.3);
+        background: rgba(0, 0, 0, 0.02);
+    }
+}
 

@@ -69,6 +69,17 @@
               </div>
             </div>
           </div>
+          <div class="filter-group filter-group-keyword">
+            <label class="filter-title">關鍵字（選填）</label>
+            <input
+              type="text"
+              class="input-keyword"
+              placeholder="輸入關鍵字搜尋"
+              v-model="keyword"
+              maxlength="30"
+              @keyup.enter="Search"
+            />
+          </div>
           <div class="part-filter">
             <button
               class="btn btn-advance"
@@ -80,7 +91,7 @@
               ></i>
               <span>篩選</span>
             </button>
-            <button class="btn btn-filter" @click="Search" :disabled="codeSelect_policy == '' || codeSelectRecipient == '' || codeSelect_area == ''">
+            <button class="btn btn-filter" @click="Search">
               <span>搜尋</span>
               <i class="icon ic-search"></i>
             </button>
@@ -129,7 +140,7 @@
                 @is-opened="isSelectOpen"
                 @update:select-items="getSelectItems"
                 />
-              <button class="btn-filter" @click="Search" :disabled="codeSelect_policy == '' || codeSelectRecipient == '' || codeSelect_area == ''">
+              <button class="btn-filter" @click="Search">
                 <span></span>
                 <i class="icon ic-search"></i>
               </button>
@@ -142,7 +153,14 @@
       </section>
       <section class="section-result">
         <div class="part-list">
-          <span class="result-total">{{ storageiFarePolicyList.length }}</span>
+          <p class="result-summary">
+            共找到
+            <span class="result-total">{{ totalCount }}</span>
+            項符合的福利政策
+            <span v-if="totalCount > storageiFarePolicyList.length" class="result-summary-note">
+              （顯示前 {{ storageiFarePolicyList.length }} 筆，請輸入更精確的條件查看其餘結果）
+            </span>
+          </p>
           <ul class="list-unstyled result-list">
             <li
               class="result-item transition-general"
@@ -218,6 +236,8 @@ const incomeSelectList = reactive<Array<selectItem>>([]);
 const codeSelectIncome = ref("");
 const identitySelectList = reactive<Array<selectItem>>([]);
 const codeSelectIdentity: any = ref([]);
+const keyword = ref("");
+const totalCount = ref(0);
 
 function getSelectValue(type: string, val: string) {
   console.log(`[${type}] val => ${val}`)
@@ -403,6 +423,7 @@ function Search() {
   if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
   if (codeSelectIdentity.value.length > 0)
     query.CodeIdentities = codeSelectIdentity.value;
+  if (keyword.value.trim()) query.Keyword = keyword.value.trim();
   SetDataInit(query);
 }
 
@@ -410,10 +431,12 @@ function Search() {
 const PAGEITEMMAX = 10;
 const $route = useRoute();
 
-// Init filter default value.
-codeSelect_policy.value = `${$route.query.policy}`
-codeSelect_area.value = `${$route.query.area}`
-codeSelectRecipient.value = `${$route.query.recipient}`
+// Init filter default value. Treat missing query keys as empty strings rather than the
+// literal "undefined" the template would otherwise display.
+codeSelect_policy.value = $route.query.policy ? `${$route.query.policy}` : ""
+codeSelect_area.value = $route.query.area ? `${$route.query.area}` : ""
+codeSelectRecipient.value = $route.query.recipient ? `${$route.query.recipient}` : ""
+keyword.value = $route.query.keyword ? `${$route.query.keyword}` : ""
 
 const _query: any = {};
 
@@ -421,6 +444,7 @@ if (Object.keys($route.query).length > 0) {
   if ($route.query.policy) _query.CodePolicy = $route.query.policy;
   if ($route.query.recipient) _query.CodeRecipient = $route.query.recipient;
   if ($route.query.area) _query.CodeDomicile = $route.query.area;
+  if ($route.query.keyword) _query.Keyword = $route.query.keyword;
 }
 
 interface iFarePolicyItem {
@@ -448,7 +472,8 @@ SetDataInit(_query);
 function SetDataInit(_q: any) {
   const listNews = $WebApiGet("/FarePolicy/GetIFarePolicyList", _q);
   listNews.then((res: any) => {
-    const _data = res.result.result;
+    const _result = res.result;
+    const _data = _result.result || [];
     let _newsList: Array<iFarePolicyItem> = _data.map(
       (item: any, i: number) => {
         return {
@@ -468,6 +493,7 @@ function SetDataInit(_q: any) {
     pageNums.splice(0);
 
     storageiFarePolicyList.push(..._newsList);
+    totalCount.value = typeof _result.totalCount === "number" ? _result.totalCount : _newsList.length;
     iFarePolicyList.push(
       ..._newsList.slice(
         0,
@@ -515,7 +541,6 @@ function isSelectOpen(type: string, val: boolean) {
 }
 
 function ResetParam() {
-  console.log('ResetParam')
   codeSelect_area.value = ""
   const _tempArea = JSON.parse(JSON.stringify(areaSelectList))
   areaSelectList.splice(0)
@@ -525,6 +550,8 @@ function ResetParam() {
   const _tempPolicy = JSON.parse(JSON.stringify(policySelectList))
   policySelectList.splice(0)
   policySelectList.push(..._tempPolicy)
+
+  keyword.value = ""
 
   SwitchRecipient("reset")
   SwitchIncome("reset")
