@@ -93,25 +93,46 @@ namespace IFare_API.TaskManager.Fare.Policy
 
             if (!paramChecker.IsCheckPass()) return new FarePolicyResult(_commonTools.GetErrorInfo_APIWithMsg(ErrAPI.Code_ParamFail, paramChecker.GetErrMsg()), null);
 
-            var query = _repositoryIFarePolicy.GetAll()
+            // Base filter — only released, non-disabled, non-deleted policies whose code references are still active.
+            var baseQuery = _repositoryIFarePolicy.GetAll()
                                     .Where(p => p.ReleaseTime != null && p.ReleaseTime <= DateTime.Now && (p.DiscontinuedTime == null || p.DiscontinuedTime > DateTime.Now))
-                                    .Include(p => p.CodePolicy)
+                                    .Where(p => p.State != DataState.Disabled && p.State != DataState.Delete)
                                     .Where(p => p.CodePolicy.State != DataState.Disabled)
-                                    .Include(p => p.CodeDomicile)
-                                    .Where(p => p.CodeDomicile.State != DataState.Disabled)
-                                    .Include(p => p.IfarePolicyCodeKeywords.Where(p2 => p2.CodeKeyword.State != DataState.Disabled))
-                                    .Include(p => p.IfarePolicyCodeIdentities.Where(p2 => p2.CodeIdentity.State != DataState.Disabled))
-                                    .Include(p => p.IfarePolicyCodeIncomes.Where(p2 => p2.CodeIncome.State != DataState.Disabled))
-                                    .Include(p => p.IfarePolicyCodeRecipients.Where(p2 => p2.CodeRecipient.State != DataState.Disabled))
-                                    .Where(p => p.State != DataState.Disabled && p.State != DataState.Delete);
+                                    .Where(p => p.CodeDomicile.State != DataState.Disabled);
 
-            if (param.IsCodeDomicileFiltered) query = query.Where(p => p.CodeDomicileId == param.CodeDomicile || p.CodeDomicileId == 1);    // ID = 1 (中央)
-            if (param.IsCodePolicyFiltered) query = query.Where(p => p.CodePolicyId == param.CodePolicy);
-            if (param.IsCodeIncomeFiltered) query = query.Where(p => p.IfarePolicyCodeIncomes.Where(p2 => p2.CodeIncomeId == param.CodeIncome || p2.CodeIncomeId == 1).Count() > 0);
-            if (param.IsCodeRecipientFiltered) query = query.Where(p => p.IfarePolicyCodeRecipients.Where(p2 => p2.CodeRecipientId == param.CodeRecipient || p2.CodeRecipientId == 1).Count() > 0);
-            if (param.IsCodeIdentitiesFiltered) query = query.Where(p => p.IfarePolicyCodeIdentities.Where(p2 => param.CodeIdentities.Contains(p2.CodeIdentityId) || p2.CodeIdentityId == 1).Count() > 0);
+            if (param.IsCodeDomicileFiltered) baseQuery = baseQuery.Where(p => p.CodeDomicileId == param.CodeDomicile || p.CodeDomicileId == 1);    // ID = 1 (中央)
+            if (param.IsCodePolicyFiltered) baseQuery = baseQuery.Where(p => p.CodePolicyId == param.CodePolicy);
+            if (param.IsCodeIncomeFiltered) baseQuery = baseQuery.Where(p => p.IfarePolicyCodeIncomes.Any(p2 => p2.CodeIncomeId == param.CodeIncome || p2.CodeIncomeId == 1));
+            if (param.IsCodeRecipientFiltered) baseQuery = baseQuery.Where(p => p.IfarePolicyCodeRecipients.Any(p2 => p2.CodeRecipientId == param.CodeRecipient || p2.CodeRecipientId == 1));
+            if (param.IsCodeIdentitiesFiltered) baseQuery = baseQuery.Where(p => p.IfarePolicyCodeIdentities.Any(p2 => param.CodeIdentities.Contains(p2.CodeIdentityId) || p2.CodeIdentityId == 1));
+            if (param.IsKeywordFiltered)
+            {
+                var keyword = param.Keyword.Trim();
+                baseQuery = baseQuery.Where(p =>
+                    EF.Functions.Like(p.Title, $"%{keyword}%")
+                    || EF.Functions.Like(p.Qualification, $"%{keyword}%")
+                    || EF.Functions.Like(p.WelfareInfo, $"%{keyword}%"));
+            }
 
-            list = query.Select(p => new FarePolicyData 
+            // Count before pagination so the client can show total hits.
+            var totalCount = baseQuery.Count();
+
+            // Apply pagination with server-enforced ceiling, then load child collections via split query
+            // to avoid Cartesian explosion across the four code-relation tables.
+            var pagedQuery = baseQuery
+                .OrderByDescending(p => p.ReleaseTime)
+                .ThenByDescending(p => p.CreateTime)
+                .Skip(param.GetEffectiveSkip())
+                .Take(param.GetEffectiveTake())
+                .Include(p => p.CodePolicy)
+                .Include(p => p.CodeDomicile)
+                .Include(p => p.IfarePolicyCodeKeywords.Where(p2 => p2.CodeKeyword.State != DataState.Disabled)).ThenInclude(p => p.CodeKeyword)
+                .Include(p => p.IfarePolicyCodeIdentities.Where(p2 => p2.CodeIdentity.State != DataState.Disabled)).ThenInclude(p => p.CodeIdentity)
+                .Include(p => p.IfarePolicyCodeIncomes.Where(p2 => p2.CodeIncome.State != DataState.Disabled)).ThenInclude(p => p.CodeIncome)
+                .Include(p => p.IfarePolicyCodeRecipients.Where(p2 => p2.CodeRecipient.State != DataState.Disabled)).ThenInclude(p => p.CodeRecipient)
+                .AsSplitQuery();
+
+            list = pagedQuery.Select(p => new FarePolicyData
                         {
                             ID = p.Id,
                             Title = p.Title,
@@ -120,25 +141,25 @@ namespace IFare_API.TaskManager.Fare.Policy
                             CodeDomicile_LabelName = p.CodeDomicile.LabelName,
                             CodePolicy_ID = p.CodePolicyId.Value,
                             CodePolicy_LabelName = p.CodePolicy.LabelName,
-                            CodeKeywordList = p.IfarePolicyCodeKeywords.Select(p2 => new CodeData 
+                            CodeKeywordList = p.IfarePolicyCodeKeywords.Select(p2 => new CodeData
                                                                         {
                                                                             ID = p2.CodeKeyword.Id,
                                                                             CodeName = p2.CodeKeyword.LabelName
                                                                         })
                                                                         .ToList(),
-                            CodeIncomeList = p.IfarePolicyCodeIncomes.Select(p2 => new CodeData 
+                            CodeIncomeList = p.IfarePolicyCodeIncomes.Select(p2 => new CodeData
                                                                         {
                                                                             ID = p2.CodeIncome.Id,
                                                                             CodeName = p2.CodeIncome.LabelName
                                                                         })
                                                                         .ToList(),
-                            CodeIdentityList = p.IfarePolicyCodeIdentities.Select(p2 => new CodeData 
+                            CodeIdentityList = p.IfarePolicyCodeIdentities.Select(p2 => new CodeData
                                                                         {
                                                                             ID = p2.CodeIdentity.Id,
                                                                             CodeName = p2.CodeIdentity.LabelName
                                                                         })
                                                                         .ToList(),
-                            CodeRecipientList = p.IfarePolicyCodeRecipients.Select(p2 => new CodeData 
+                            CodeRecipientList = p.IfarePolicyCodeRecipients.Select(p2 => new CodeData
                                                                         {
                                                                             ID = p2.CodeRecipient.Id,
                                                                             CodeName = p2.CodeRecipient.LabelName
@@ -148,10 +169,8 @@ namespace IFare_API.TaskManager.Fare.Policy
                             ReleaseTime = p.ReleaseTime.Value,
                             DiscontinuedTime = p.DiscontinuedTime.Value,
                         })
-                        .OrderByDescending(p => p.ReleaseTime)
-                        .ThenByDescending(p => p.CreateTime)
                         .ToList();
-            return new FarePolicyResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), list);
+            return new FarePolicyResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), list, totalCount);
         }
 
         private List<FarePolicyData> getArticlesWelfareDataList(IEnumerable<IfarePolicy> queryList, int takeNum = 0, List<FarePolicyData> currentList = null, bool isRandom = false)

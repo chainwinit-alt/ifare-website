@@ -28,7 +28,10 @@ namespace IFare_API.TaskManager.Fare.Policy.Common
             _param.IsCodeIncomeFiltered = _paramChecker.IsCodeIncomeFiltered(_param.CodeIncome);
 
             // Code Identities Filter check.
-            _param.IsCodeIdentitiesFiltered = _paramChecker.IsCodeIdentitiesFiltered(_param.CodeIdentities);
+            _param.IsCodeIdentitiesFiltered = _param.CodeIdentities != null && _paramChecker.IsCodeIdentitiesFiltered(_param.CodeIdentities);
+
+            // Keyword Filter check.
+            _param.IsKeywordFiltered = !string.IsNullOrWhiteSpace(_param.Keyword);
 
             return true;
         }

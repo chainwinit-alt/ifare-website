@@ -7,13 +7,15 @@ namespace IFare_API.TaskManager.Fare.Policy.ValueModel
 {
     public class FarePolicyResult : ErrorInfoBase
     {
-        public FarePolicyResult(ErrorInfoBase errorInfo, List<FarePolicyData> result)
+        public FarePolicyResult(ErrorInfoBase errorInfo, List<FarePolicyData> result, int totalCount = 0)
         {
             ErrCode = errorInfo.ErrCode;
             ErrMsg = errorInfo.ErrMsg;
             Result = result;
+            TotalCount = totalCount;
         }
         public List<FarePolicyData> Result { get; set; }
+        public int TotalCount { get; set; }
     }
 
     public class FarePolicyData

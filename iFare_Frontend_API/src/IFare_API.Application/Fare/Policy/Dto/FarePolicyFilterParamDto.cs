@@ -12,5 +12,8 @@ namespace IFare_API.Fare.Policy.Dto
         public long? CodePolicy {get; set; }
         public long? CodeIncome { get; set; }
         public List<long>? CodeIdentities {get; set; }
+        public string? Keyword { get; set; }
+        public int? SkipCount { get; set; }
+        public int? MaxResultCount { get; set; }
     }
 }

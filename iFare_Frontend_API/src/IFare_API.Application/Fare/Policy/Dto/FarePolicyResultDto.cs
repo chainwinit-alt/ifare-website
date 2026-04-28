@@ -15,6 +15,7 @@ namespace IFare_API.Fare.Policy.Dto
     public class FarePolicyResultDto : ErrorInfoBaseDto
     {
         public List<FarePolicyDataDto> Result { get; set; }
+        public int TotalCount { get; set; }
     }
 
     [AutoMapTo(typeof(FarePolicyData))]
