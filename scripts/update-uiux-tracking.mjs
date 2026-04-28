@@ -5,6 +5,9 @@
 //  Round 2 (Footer 整理 + RWD 修正):
 //    - marks 2 more existing issues (#17 / #71)
 //    - appends 2 new issues (#91 / #92)
+//  Round 3 (About 靈動島 + News 卡片升級 + 社群外連結):
+//    - marks 4 more existing issues (#23 / #24 / #26 / #44)
+//    - appends 5 new issues (#93 / #94 / #95 / #96 / #97)
 //  Syncs counts in 統計摘要 sheet.
 // Run from repo root: `node scripts/update-uiux-tracking.mjs`
 
@@ -91,6 +94,31 @@ const existingUpdates = [
     status: '部分修正',
     note:
       'footer .btn-social 高度從 40px 提升到 44px（LINE / Facebook 兩按鈕符合 iOS HIG 觸控標準）。CompPage 分頁箭頭、btn-reset、btn-advance、CompSelect 等其他元件尚未套用 44px 標準。',
+  },
+  // Round 3 (About 靈動島 + News 卡片升級):
+  {
+    row: 25,
+    status: '已修正',
+    note:
+      'pages/news.vue 的 .article-item .item-info 加 line-clamp: 2（桌面）/ line-clamp: 3（手機 ≤1024px），超過行數自動省略結尾。',
+  },
+  {
+    row: 26,
+    status: '已修正',
+    note:
+      'pages/news.vue 的 <i class="ic-arrow-right"> 加上 aria-label="閱讀全文"，符合無障礙語意要求。',
+  },
+  {
+    row: 28,
+    status: '已修正',
+    note:
+      'pages/news.vue 加 isNewItem(releaseTime) helper（7 天內判斷），對應消息右上角顯示橘色 NEW pill 標籤（_appBody.scss .badge-new）。',
+  },
+  {
+    row: 46,
+    status: '已修正',
+    note:
+      'icon SVG 本身仍為靜態，但已包入 Dynamic Island 互動卡片（.how-content）：hover/click toggle 觸發整體 morph 動畫（grid-template-rows 展開、translateY 浮起、background opacity overlay 漸層切換、border 露出青綠光暈）。視覺已不再死板。',
   },
 ];
 
@@ -208,6 +236,112 @@ const newRows = [
       '改版補登；同步修桌面 1025-1280px overflow（加 FB 後 .card-more 內容寬度 ~1300px 會爆）：.card-more 加 flex-wrap: wrap + max-width: calc(100% - 64px)；.info-more 加 max-width: 480px 讓長文字桌面換 2 行',
     ],
   },
+  // Round 3 (About 靈動島 + News 卡片升級 + 社群外連結):
+  {
+    row: 95,
+    data: [
+      93,
+      'V',
+      '關於長穩',
+      '',
+      '提升',
+      '互動',
+      '中',
+      'About 三大核心介紹缺乏互動性',
+      '環境保育/人才培育/社會關懷三張卡片原為靜態圖文，使用者掃過無視覺反應，缺乏吸引點擊探索的動機',
+      '改造為 iOS Dynamic Island 風格 morph 卡片：暖象牙白漸層底 + 圓角 28px + 預設只露 icon+標題 → hover/click toggle 平滑展開內文（grid-template-rows trick）+ translateY 浮起 + 邊框露出青綠光暈',
+      'pages/about.vue',
+      'iFare_Frontend/pages/about.vue\r\nassets/style/components/_appBody_about.scss\r\nassets/style/rwd/_rwd_about.scss',
+      '改版補登；HTML 重組（icon+title 合進 .how-top、info 包 .how-info-wrap）；script 加 activeHow ref + toggleHow handler；keyboard a11y (Enter/Space) 與 tabindex；GPU 優化（will-change + ::before opacity overlay 取代 gradient transition）；Apple spring easing cubic-bezier(0.32, 0.72, 0, 1)',
+      '已修正',
+      TODAY,
+      '改版補登；對應 #44 三大核心圖示靜態問題已連動修正',
+    ],
+  },
+  {
+    row: 96,
+    data: [
+      94,
+      'V',
+      '關於長穩',
+      '',
+      '提升',
+      '視覺',
+      '低',
+      'About 成員照片缺 hover 互動',
+      '陳進財/鄔筠軒/顏杏蓉三位成員區塊原無 hover 反饋，掃過時視覺無變化',
+      '陳進財/鄔筠軒整組 hover：照片 scale(1.06) + 白框 scale(1.03) + box-shadow 加深 + 橘色標牌 translateY(-4px)；顏杏蓉（無照片）標牌 hover translateY(-4px) + scale(1.04)',
+      'pages/about.vue',
+      'iFare_Frontend/assets/style/components/_appBody_about.scss',
+      '改版補登；同套 cubic-bezier(0.32, 0.72, 0, 1) easing；will-change: transform 給 .member-photo 預先建 GPU layer',
+      '已修正',
+      TODAY,
+      '改版補登',
+    ],
+  },
+  {
+    row: 97,
+    data: [
+      95,
+      'V',
+      '關於長穩',
+      '',
+      '提升',
+      '視覺',
+      '低',
+      'About 底部 CTA 連結缺 hover micro-animation',
+      '「前往 i-Fare」與「查看最新消息」兩個 advance-link 原為靜態，hover 無互動反饋，無法強化「點我前進」訊號',
+      '連結 hover 時 translateY(-2px) 上浮，箭頭 icon translateX(6px) 向右滑出，引導視線前進',
+      'pages/about.vue',
+      'iFare_Frontend/assets/style/components/_appBody_about.scss',
+      '改版補登；統一 cubic-bezier(0.32, 0.72, 0, 1) easing 0.22s',
+      '已修正',
+      TODAY,
+      '改版補登',
+    ],
+  },
+  {
+    row: 98,
+    data: [
+      96,
+      'V',
+      '最新消息',
+      '',
+      '提升',
+      '視覺',
+      '中',
+      'News 列表呈現升級為浮起卡片 + 入場動畫 + 日期 pill',
+      '原本最新消息為「底線分隔的清單列」，hover 只是淡白底 + 箭頭轉橘，視覺扁平、缺乏互動感、日期不醒目、長內文無截斷',
+      '列表整體升級：圓角 16px 浮起卡片（white .7 + shadow）+ stagger fade-up 入場動畫（@for 1~12 each +50ms）+ 日期變橘色 pill 標籤（border + 半透明橘底）+ hover translateY(-3px) + 背景變實白 + 箭頭橘色滑右 6px',
+      'pages/news.vue',
+      'iFare_Frontend/pages/news.vue\r\nassets/style/components/_appBody.scss\r\nassets/style/_animation.scss\r\nassets/style/rwd/_rwd.scss',
+      '改版補登；@keyframes newsItemEnter 放 _animation.scss；統一 cubic-bezier(0.32, 0.72, 0, 1) easing；配色全用既有 token 沒引入新色',
+      '已修正',
+      TODAY,
+      '改版補登；同次改動連帶解決 #23 (line-clamp 2)、#24 (aria-label)、#26 (NEW badge)',
+    ],
+  },
+  {
+    row: 99,
+    data: [
+      97,
+      'V',
+      '共用元件',
+      'AppFooter / AppHeader',
+      '修復',
+      '互動',
+      '低',
+      '社群外連結未開新分頁，可能丟失當前頁狀態',
+      'AppFooter LINE/Facebook 與 AppHeader 手機版社群 icon 連結原為一般 <a href>，點擊會在當前分頁導向，使用者離開站內後返回成本高',
+      '4 個社群連結都加 target="_blank" + rel="noopener noreferrer"：開新分頁、避免反向 tabnabbing、不洩漏 referrer',
+      'components/AppFooter.vue components/AppHeader.vue',
+      'iFare_Frontend/components/AppFooter.vue\r\niFare_Frontend/components/AppHeader.vue',
+      '改版補登；rel="noopener" 是 W3C 安全建議',
+      '已修正',
+      TODAY,
+      '改版補登',
+    ],
+  },
 ];
 
 for (const { row, data } of newRows) {
@@ -218,52 +352,60 @@ for (const { row, data } of newRows) {
   }
 }
 
-// Extend !ref to include all new rows (round 1: 90-92, round 2: 93-94)
-ws['!ref'] = 'A1:P94';
+// Extend !ref to include all new rows (round 1: 90-92, round 2: 93-94, round 3: 95-99)
+ws['!ref'] = 'A1:P99';
 
 // ---------- Step 2.5: paint colors based on status ----------
 // 已修正 → light green (Excel "Good" preset)
 // 部分修正 → light yellow (Excel "Neutral" preset)
 // Round 1: rows 18/24/61/90/91/92 fixed; 3/11/62/82 partial
 // Round 2: row 19 fixed; row 73 partial; new rows 93/94 fixed
-const fixedRows = [18, 19, 24, 61, 90, 91, 92, 93, 94];
+// Round 3: rows 25/26/28/46 fixed; new rows 95/96/97/98/99 fixed
+const fixedRows = [18, 19, 24, 25, 26, 28, 46, 61, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99];
 const partialRows = [3, 11, 62, 73, 82];
 for (const r of fixedRows) paintRow(ws, r, FILL_FIXED, FONT_FIXED);
 for (const r of partialRows) paintRow(ws, r, FILL_PARTIAL, FONT_PARTIAL);
 
 // ---------- Step 3: sync 統計摘要 ----------
-// 驗證結果統計: V 67→72, ~ 10, 合計 77→82 (round 1: +3 V; round 2: +2 V)
-wsStat['B3'] = { t: 'n', v: 72 };
-wsStat['C3'] = { t: 's', v: '87.8%' };
-wsStat['C4'] = { t: 's', v: '12.2%' };
-wsStat['B5'] = { t: 'n', v: 82 };
+// 驗證結果統計: V 67→77, ~ 10, 合計 77→87 (round 1: +3 V; round 2: +2 V; round 3: +5 V)
+wsStat['B3'] = { t: 'n', v: 77 };
+wsStat['C3'] = { t: 's', v: '88.5%' };
+wsStat['C4'] = { t: 's', v: '11.5%' };
+wsStat['B5'] = { t: 'n', v: 87 };
 wsStat['D5'] = {
   t: 's',
-  v: '已移除 8 項原始盤點中不正確的項目；2026-04-28 補登 5 項改版實作項目（#88/#89/#90/#91/#92）',
+  v: '已移除 8 項原始盤點中不正確的項目；2026-04-28 補登 10 項改版實作項目（#88-#97）',
 };
 
 // 各區塊問題統計:
 //   i-Fare 福利查詢 修復 8→10, 提升 6→7, 小計 14→17 (round 1)
-//   共用元件 修復 14, 提升 0→2, 小計 14→16 (round 2 #91/#92)
-//   合計 修復 52→54, 提升 25→28, 小計 77→82
+//   最新消息 修復 3, 提升 2→3, 小計 5→6 (round 3: +1 提升 #96)
+//   關於長穩 修復 2, 提升 3→6, 小計 5→8 (round 3: +3 提升 #93/#94/#95)
+//   共用元件 修復 14→15, 提升 0→2, 小計 14→17 (round 2: +2 提升; round 3: +1 修復 #97)
+//   合計 修復 52→55, 提升 25→32, 小計 77→87
 wsStat['B9'] = { t: 'n', v: 10 };
 wsStat['C9'] = { t: 'n', v: 7 };
 wsStat['D9'] = { t: 'n', v: 17 };
+wsStat['C11'] = { t: 'n', v: 3 };
+wsStat['D11'] = { t: 'n', v: 6 };
+wsStat['C14'] = { t: 'n', v: 6 };
+wsStat['D14'] = { t: 'n', v: 8 };
+wsStat['B15'] = { t: 'n', v: 15 };
 wsStat['C15'] = { t: 'n', v: 2 };
-wsStat['D15'] = { t: 'n', v: 16 };
-wsStat['B19'] = { t: 'n', v: 54 };
-wsStat['C19'] = { t: 'n', v: 28 };
-wsStat['D19'] = { t: 'n', v: 82 };
+wsStat['D15'] = { t: 'n', v: 17 };
+wsStat['B19'] = { t: 'n', v: 55 };
+wsStat['C19'] = { t: 'n', v: 32 };
+wsStat['D19'] = { t: 'n', v: 87 };
 
 // 優先級分布:
-//   中 修復 26→27, 提升 7→8→9, 小計 33→35→36 (round 1: +1修復+1提升; round 2: +1提升 #92)
-//   低 修復 21→22, 提升 17→18, 小計 38→39→40 (round 1: +1修復; round 2: +1提升 #91)
+//   中 修復 26→27, 提升 7→11, 小計 33→38 (round 1: +1修復+1提升; round 2: +1提升 #92; round 3: +2提升 #93/#96)
+//   低 修復 21→23, 提升 17→20, 小計 38→43 (round 1: +1修復; round 2: +1提升 #91; round 3: +1修復 #97 + 2提升 #94/#95)
 wsStat['B24'] = { t: 'n', v: 27 };
-wsStat['C24'] = { t: 'n', v: 9 };
-wsStat['D24'] = { t: 'n', v: 36 };
-wsStat['B25'] = { t: 'n', v: 22 };
-wsStat['C25'] = { t: 'n', v: 18 };
-wsStat['D25'] = { t: 'n', v: 40 };
+wsStat['C24'] = { t: 'n', v: 11 };
+wsStat['D24'] = { t: 'n', v: 38 };
+wsStat['B25'] = { t: 'n', v: 23 };
+wsStat['C25'] = { t: 'n', v: 20 };
+wsStat['D25'] = { t: 'n', v: 43 };
 
 // ---------- Step 4: write back ----------
 XLSX.writeFile(wb, FILE);
@@ -272,5 +414,5 @@ console.log('OK');
 console.log(`Updated ${existingUpdates.length} existing rows: ${existingUpdates.map((u) => `row ${u.row}`).join(', ')}`);
 console.log(`Appended ${newRows.length} new rows: ${newRows.map((n) => `row ${n.row} (#${n.data[0]})`).join(', ')}`);
 console.log(`Painted: ${fixedRows.length} 已修正 rows (light green) + ${partialRows.length} 部分修正 rows (light yellow)`);
-console.log('Synced 統計摘要 sheet (V 72 / ~ 10 / 合計 82)');
+console.log('Synced 統計摘要 sheet (V 77 / ~ 10 / 合計 87)');
 console.log(`File: ${FILE}`);
