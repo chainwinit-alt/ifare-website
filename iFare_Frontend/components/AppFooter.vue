@@ -5,11 +5,11 @@
         <h4 class="title-more">進一步瞭解更多</h4>
         <span class="info-more">歡迎加入 LINE 好友與我們聊聊，也可以進一步了解長穩以及更多福利政策。</span>
         <div class="card-more-socials">
-          <a href="https://lin.ee/eHw9VpL" class="btn btn-social btn-line">
+          <a href="https://lin.ee/eHw9VpL" class="btn btn-social btn-line" target="_blank" rel="noopener noreferrer">
             <i class="icon ic-line"></i>
             <span>聯絡我們</span>
           </a>
-          <a href="https://www.facebook.com/ccfIfare" class="btn btn-social btn-facebook">
+          <a href="https://www.facebook.com/ccfIfare" class="btn btn-social btn-facebook" target="_blank" rel="noopener noreferrer">
             <i class="icon ic-facebook"></i>
             <span>追蹤 Facebook</span>
           </a>

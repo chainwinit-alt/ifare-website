@@ -33,6 +33,7 @@
                         </div>
                         <ul class="list-unstyled article-list" v-else>
                             <li class="article-item transition-general" v-for="_news in newsList" :key="_news.title">
+                                <span class="badge-new" v-if="isNewItem(_news.releaseTime)">NEW</span>
                                 <NuxtLink class="item-page-link" :to="{path: '/news/info', query: {id: _news.id}}">
                                     <div class="item-title">
                                         <h2 class="article-title">{{ _news.title }}</h2>
@@ -42,7 +43,7 @@
                                         <div class="item-info">
                                             {{ _news.content }}
                                         </div>
-                                        <i class="ic-arrow-right link-url transition-general"></i>
+                                        <i class="ic-arrow-right link-url transition-general" aria-label="閱讀全文"></i>
                                     </div>
                                 </NuxtLink>
                             </li>
@@ -136,6 +137,12 @@ function LoadNews() {
 }
 
 LoadNews()
+
+function isNewItem(releaseTime: string): boolean {
+    const t = new Date(releaseTime).getTime()
+    if (Number.isNaN(t)) return false
+    return Date.now() - t < 7 * 24 * 60 * 60 * 1000
+}
 
 function PageChange(pageNum:number) {
     newsList.splice(0)

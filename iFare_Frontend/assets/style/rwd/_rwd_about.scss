@@ -96,6 +96,14 @@
                 flex-direction: column;
                 justify-content: center;
                 align-items: center;
+                gap: 16px;
+            }
+
+            // Mobile: 預設縮成 pill，tap 切換 .is-active 觸發 morph 動畫
+            .how-content {
+                width: 100%;
+                max-width: 360px;
+                min-width: 0;
             }
         }
 

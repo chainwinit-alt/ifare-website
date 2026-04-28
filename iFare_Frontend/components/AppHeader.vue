@@ -116,10 +116,10 @@
         <NuxtLink class="btn btn-icon" to="/" @click="MenuToggle">
           <i class="ic-mobile-menu-logo"></i>
         </NuxtLink>
-        <a class="btn btn-icon" href="https://www.facebook.com/ccfIfare">
+        <a class="btn btn-icon" href="https://www.facebook.com/ccfIfare" target="_blank" rel="noopener noreferrer">
           <i class="ic-mobile-share-facebook"></i>
         </a>
-        <a class="btn btn-icon" href="https://lin.ee/eHw9VpL">
+        <a class="btn btn-icon" href="https://lin.ee/eHw9VpL" target="_blank" rel="noopener noreferrer">
           <i class="ic-mobile-share-line"></i>
         </a>
       </div>
