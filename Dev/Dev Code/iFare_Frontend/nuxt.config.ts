@@ -4,15 +4,22 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     frontendApiServerBase:
-      process.env.NUXT_FRONTEND_API_SERVER_BASE || 'http://10.200.0.39/ifare_api/api/services/app',
+      process.env.NUXT_FRONTEND_API_SERVER_BASE || '/api/services/app',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'http://ifare.local',
       frontendApiBase:
-        process.env.NUXT_PUBLIC_FRONTEND_API_BASE || 'http://10.200.0.39/ifare_api/api/services/app'
+        process.env.NUXT_PUBLIC_FRONTEND_API_BASE || '/api/services/app'
     }
   },
 
   nitro: {
+    devProxy: {
+      '/api/services/app': {
+        target: 'https://localhost:44312/api/services/app',
+        changeOrigin: true,
+        secure: false
+      }
+    },
     iis: {
       mergeConfig: true,
       overrideConfig: false
