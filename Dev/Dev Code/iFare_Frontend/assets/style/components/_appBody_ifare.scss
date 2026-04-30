@@ -241,6 +241,24 @@
         z-index: 60;
       }
 
+      .input-query {
+        min-height: 40px;
+        padding: 2px 20px;
+        border-radius: 5px;
+        border: 1px solid rgba($color-black, 0.20);
+        background: $color-white;
+        color: $color-black;
+        outline: none;
+
+        &::placeholder {
+          color: rgba($color-black, 0.5);
+        }
+
+        &:focus {
+          border-color: rgba($color-primary-dark, 0.4);
+        }
+      }
+
       .item-recipient {
         opacity: 0;
         height: 0;
@@ -280,6 +298,12 @@
       .btn-filter {
         span {
             width: 138px;
+        }
+      }
+
+      .item-query {
+        .input-query {
+          width: 100%;
         }
       }
     }

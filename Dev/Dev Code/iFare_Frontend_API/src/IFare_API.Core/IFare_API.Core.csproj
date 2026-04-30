@@ -19,5 +19,7 @@
     <PackageReference Include="Abp.Castle.Log4Net" Version="7.3.0" />
     <PackageReference Include="Abp.ZeroCore.EntityFrameworkCore" Version="7.3.0" />
     <PackageReference Include="Castle.Windsor.MsDependencyInjection" Version="3.4.0" />
+    <PackageReference Include="jieba.NET" Version="0.42.2" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
   </ItemGroup>
 </Project>
