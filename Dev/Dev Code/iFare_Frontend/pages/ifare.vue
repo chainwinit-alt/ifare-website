@@ -180,7 +180,7 @@ useHead({
 })
 definePageMeta({
   title: "ifare",
-  toLinkName: "擐?",
+  toLinkName: "首頁",
   toLink: "/",
 });
 const { $WebApiGet } = useNuxtApp();
