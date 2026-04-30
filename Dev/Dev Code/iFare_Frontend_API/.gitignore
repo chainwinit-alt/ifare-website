@@ -257,3 +257,5 @@ src/IFare_API.Migrator/secrets.json
 
 # Logs
 src/IFare_BDAPI.Web.Host/App_Data/*
+src/IFare_API.Web.Host/App_Data/SearchMetrics/
+src/IFare_API.Web.Host/App_Data/Dblogs/

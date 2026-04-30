@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="app-body" :name="$route.name">
     <div class="bg-sector-bottom"></div>
     <div class="part-bg">
@@ -71,8 +71,12 @@
               @is-opened="isSelectOpen"
             />
           </div>
+          <div class="item item-query">
+            <label class="filter-name">關鍵字</label>
+            <input v-model="searchQuery" class="input-query" type="text" placeholder="輸入繁中關鍵字" />
+          </div>
           <div class="item item-bottom">
-            <button class="btn-filter transition-general" @click="Search" :disabled="codeSelect_policy == '' || codeSelectRecipient == '' || codeSelect_area == ''">
+            <button class="btn-filter transition-general" @click="Search" :disabled="!canSearch">
               <span>搜尋</span>
               <i class="icon ic-search"></i>
             </button>
@@ -176,7 +180,7 @@ useHead({
 })
 definePageMeta({
   title: "ifare",
-  toLinkName: "首頁",
+  toLinkName: "擐?",
   toLink: "/",
 });
 const { $WebApiGet } = useNuxtApp();
@@ -208,9 +212,18 @@ const policySelectList = reactive<Array<selectItem>>([]);
 const codeSelect_policy = ref("");
 const areaSelectList = reactive<Array<selectItem>>([]);
 const codeSelect_area = ref("");
+const searchQuery = ref("");
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient = ref("");
 const isVisibleRecipient = ref(true)
+const canSearch = computed(() => {
+  return Boolean(
+    codeSelect_policy.value ||
+    codeSelectRecipient.value ||
+    codeSelect_area.value ||
+    searchQuery.value.trim()
+  );
+});
 
 function getSelectValue(type: string, val: string) {
   // console.log(`[${type}] val => ${val}`)
@@ -227,6 +240,7 @@ function getSelectValue(type: string, val: string) {
 // Code Policy
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
+  if (!res?.result?.result) return;
   const _data = res.result.result;
 
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
@@ -242,6 +256,7 @@ codePolicy.then((res: any) => {
 // Code area
 const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
 codeArea.then((res: any) => {
+  if (!res?.result?.result) return;
   const _data = res.result.result;
 
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
@@ -257,6 +272,7 @@ codeArea.then((res: any) => {
 // Code recipient
 const codeRecipient = $WebApiGet("/Code/GetCodeRecipientList");
 codeRecipient.then((res: any) => {
+  if (!res?.result?.result) return;
   const _data = res.result.result;
 
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
@@ -280,11 +296,12 @@ function SwitchRecipient(codeVal: any) {
 }
 
 function Search() {
-  if (codeSelect_policy.value == "" || codeSelectRecipient.value == "" || codeSelect_area.value == "") return false;
+  if (!canSearch.value) return false;
   let query: any = {};
   if (codeSelect_policy.value) query.policy = codeSelect_policy.value;
   if (codeSelectRecipient.value) query.recipient = codeSelectRecipient.value;
   if (codeSelect_area.value) query.area = codeSelect_area.value;
+  if (searchQuery.value.trim()) query.query = searchQuery.value.trim();
   console.log(query)
   $router.push({ path: "/ifare/result", query: query });
   // Init value.
@@ -294,6 +311,7 @@ function Search() {
     item.isActive = false;
   });
   codeSelect_area.value = ""
+  searchQuery.value = ""
 }
 
 // Office Unit
@@ -315,6 +333,7 @@ const PAGEITEMMAX_OFFICE = 6;
 
 const listOffice = $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
 listOffice.then((res: any) => {
+  if (!res?.result?.result) return;
   const _data = res.result.result;
 
   let _newsList: Array<OfficeUnitItem> = _data
@@ -396,6 +415,7 @@ const PAGEITEMMAX_QA = 9;
 
 const listNews = $WebApiGet("/FareQA/GetIFareQAList");
 listNews.then((res: any) => {
+  if (!res?.result?.result) return;
   const _data = res.result.result;
 
   let _newsList: Array<QAItem> = _data

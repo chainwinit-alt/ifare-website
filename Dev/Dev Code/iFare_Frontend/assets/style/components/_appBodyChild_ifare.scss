@@ -127,7 +127,7 @@
           border-radius: 8px;
           background: $color-white;
           box-shadow: 0px 11px 30px -8px rgba($color-black, 0.16);
-          padding: 28px 234px 24px 36px;
+          padding: 28px 180px 88px 36px;
           position: relative;
 
           .part-top,
@@ -135,10 +135,27 @@
             display: flex;
             flex-direction: row;
             justify-content: left;
-            gap: 40px;
+            gap: 24px 32px;
+            flex-wrap: wrap;
           }
 
           .part-top {
+            align-items: flex-start;
+
+            .filter-group {
+              flex: 1 1 200px;
+              min-width: 200px;
+            }
+
+            .filter-group:nth-child(2) {
+              flex: 0 1 420px;
+              min-width: 420px;
+            }
+
+            .filter-group:nth-child(4) {
+              flex: 0 1 220px;
+            }
+
             .filter-title {
               // &::before {
               //   content: "*";
@@ -173,10 +190,34 @@
             }
           }
 
+          .part-top .filter-title::after {
+            content: none;
+          }
+
           .filter-group {
             display: inline-flex;
             flex-direction: column;
             gap: 12px;
+          }
+
+          .input-query {
+            width: 100%;
+            min-width: 220px;
+            min-height: 40px;
+            padding: 2px 20px;
+            border-radius: 5px;
+            border: 1px solid rgba($color-black, 0.20);
+            background: $color-white;
+            color: $color-black;
+            outline: none;
+
+            &::placeholder {
+              color: rgba($color-black, 0.5);
+            }
+
+            &:focus {
+              border-color: rgba($color-primary-dark, 0.4);
+            }
           }
 
           .part-filter {
@@ -193,6 +234,7 @@
             display: inline-flex;
             flex-direction: row;
             gap: 12px;
+            flex-wrap: nowrap;
           }
 
           .btn-filter {
