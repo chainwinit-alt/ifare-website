@@ -57,6 +57,9 @@
           <li :class="{ active: $route.name == 'collaborator' }">
             <NuxtLink to="/collaborator">公益夥伴</NuxtLink>
           </li>
+          <li :class="{ active: $route.name == 'future' }">
+            <NuxtLink to="/future">未來規劃</NuxtLink>
+          </li>
           <li>
             <NuxtLink
               to="/ifare"
@@ -108,6 +111,11 @@
       <li :class="{ active: $route.name == 'collaborator'}">
         <NuxtLink class="mobileNav-link" to="/collaborator" @click="MenuToggle"
           >公益夥伴</NuxtLink
+        >
+      </li>
+      <li :class="{ active: $route.name == 'future'}">
+        <NuxtLink class="mobileNav-link" to="/future" @click="MenuToggle"
+          >未來規劃</NuxtLink
         >
       </li>
     </ul>

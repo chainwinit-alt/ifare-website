@@ -7,6 +7,18 @@
         <label class="article-num">{{ newsItem.id }}</label>
       </div>
     </section>
+    <section v-if="embedUrl" class="section section-video">
+      <div class="video-wrap">
+        <iframe
+          :src="embedUrl"
+          title="YouTube video player"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        ></iframe>
+      </div>
+    </section>
     <section class="section section-info">
       <div class="article-info">
         <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
@@ -30,25 +42,36 @@ interface newsItem {
     id: number,
     title: string,
     releaseTime: string,
-    content: string
+    content: string,
+    videoUrl: string
 }
 
 const newsItem = reactive<newsItem>({
 id: 0,
 content: "",
 title: '',
-releaseTime: ''
+releaseTime: '',
+videoUrl: ''
 });
+
+function toYouTubeEmbed(url: string): string {
+    if (!url) return ''
+    const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/)
+    return m ? `https://www.youtube.com/embed/${m[1]}` : ''
+}
+const embedUrl = computed(() => toYouTubeEmbed(newsItem.videoUrl))
+
 const listNews = $WebApiGet('/News/GetNewsDetail', { newsID: _newsID})
 listNews.then((res:any) => {
     const _data = res.result.result
-    
+
     let _newsList:Array<newsItem> = _data.map((item:any, i:number) => {
         return {
             id: item.id,
             title: item.title,
             releaseTime: item.releaseTime,
-            content: decodeURIComponent(item.content).replaceAll("https://drive.google.com/uc?export=download&", "https://drive.google.com/thumbnail?sz=w800&")
+            content: decodeURIComponent(item.content).replaceAll("https://drive.google.com/uc?export=download&", "https://drive.google.com/thumbnail?sz=w800&"),
+            videoUrl: item.videoUrl || ''
         }
     })
 
@@ -56,6 +79,7 @@ listNews.then((res:any) => {
     newsItem.title = _newsList[0].title
     newsItem.releaseTime = _newsList[0].releaseTime
     newsItem.content = _newsList[0].content
+    newsItem.videoUrl = _newsList[0].videoUrl
 })
 
 const _url = useRequestURL()
@@ -69,3 +93,26 @@ async function ShareWebUrlToLine() {
 }
 
 </script>
+
+<style scoped lang="scss">
+.section-video {
+  margin: 24px 0;
+}
+.video-wrap {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.18);
+  background: #000;
+
+  iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+}
+</style>
