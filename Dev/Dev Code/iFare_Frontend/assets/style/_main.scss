@@ -208,3 +208,26 @@ h1, h2, h3, h4, h5, h6 {
     line-height: 28px;
   }
 }
+
+// === 全站 hover 靈動效果 (Apple spring easing) ===
+// .hover-lift utility 給任何想加效果的元素手動掛
+// 同時自動套到常見可點擊元素 (nav 連結、footer 按鈕、btn-icon、btn-social)
+// 既有自訂 hover (about morph 卡、news 浮起卡等) 不受影響
+.hover-lift,
+.app-header .part-nav ul li a,
+.app-footer .btn,
+.app-footer a:not(.no-userselect),
+.btn-social,
+.btn-icon {
+  transition:
+    transform 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}

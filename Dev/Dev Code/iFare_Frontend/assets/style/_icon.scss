@@ -27,6 +27,9 @@ $bg-init: no-repeat center/contain;
 .ic-facebook-before::before {
   background: url("../img/Facebook-Logo.svg") $bg-init;
 }
+.ic-facebook {
+  background: url("../img/Facebook-Logo-color.svg") $bg-init;
+}
 .ic-line {
   background: url("../img/Line-Logo.svg") $bg-init;
 }
