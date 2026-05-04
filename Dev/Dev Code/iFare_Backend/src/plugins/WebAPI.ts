@@ -73,7 +73,7 @@ export default {
                 })
                 this.ajax(ajaxRef, callback)
             },
-            InsertNews(token: string, title: string, detail: string, releaseTime: string, discontinuedTime: string, state: boolean, callback: any){
+            InsertNews(token: string, title: string, detail: string, releaseTime: string, discontinuedTime: string, state: boolean, videoUrl: string, callback: any){
                 const ajaxRef = new AjaxRef('/News/InsertNews', "post")
                 ajaxRef.setHeaders({ Authorization: "Bearer " + token})
                 ajaxRef.setData({
@@ -81,11 +81,12 @@ export default {
                     detail: detail,
                     releaseTime: releaseTime,
                     discontinuedTime: discontinuedTime,
-                    isEnabled: state
+                    isEnabled: state,
+                    videoUrl: videoUrl
                   })
                 this.ajax(ajaxRef, callback)
             },
-            UpdateNews(token: string, id: number, title: string, detail: string, releaseTime: string, discontinuedTime: string, state: boolean, callback: any){
+            UpdateNews(token: string, id: number, title: string, detail: string, releaseTime: string, discontinuedTime: string, state: boolean, videoUrl: string, callback: any){
                 const ajaxRef = new AjaxRef('/News/UpdateNews', "post")
                 ajaxRef.setHeaders({ Authorization: "Bearer " + token})
                 ajaxRef.setData({
@@ -94,7 +95,8 @@ export default {
                     detail: detail,
                     releaseTime: releaseTime,
                     discontinuedTime: discontinuedTime,
-                    isEnabled: state
+                    isEnabled: state,
+                    videoUrl: videoUrl
                   })
                 this.ajax(ajaxRef, callback)
             },
