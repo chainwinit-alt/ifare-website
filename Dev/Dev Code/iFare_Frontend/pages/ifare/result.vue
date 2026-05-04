@@ -42,7 +42,7 @@
             </div>
             <div class="filter-group">
               <label class="filter-title">關鍵字</label>
-              <input v-model="searchQuery" class="input-query" type="text" placeholder="輸入繁中關鍵字" />
+              <input v-model="searchQuery" class="input-query" type="text" placeholder="請輸入關鍵字" />
             </div>
           </div>
           <div class="part-bottom" v-show="isOpts">
@@ -84,7 +84,7 @@
               ></i>
               <span>篩選</span>
             </button>
-            <button class="btn btn-filter" @click="Search" :disabled="!canSearch">
+            <button class="btn btn-filter" @click="Search" :disabled="!canSearch || isLoading">
               <span>搜尋</span>
               <i class="icon ic-search"></i>
             </button>
@@ -133,7 +133,7 @@
                 @is-opened="isSelectOpen"
                 @update:select-items="getSelectItems"
                 />
-              <button class="btn-filter" @click="Search" :disabled="!canSearch">
+              <button class="btn-filter" @click="Search" :disabled="!canSearch || isLoading">
                 <span></span>
                 <i class="icon ic-search"></i>
               </button>
@@ -147,7 +147,8 @@
       <section class="section-result">
         <div class="part-list">
           <span class="result-total">{{ storageiFarePolicyList.length }}</span>
-          <ul class="list-unstyled result-list">
+          <div class="result-loading" v-if="isLoading">載入中...</div>
+          <ul class="list-unstyled result-list" v-else>
             <li
               class="result-item transition-general"
               v-for="_item in iFarePolicyList"
@@ -170,7 +171,7 @@
             </li>
           </ul>
         </div>
-        <div class="part-pages">
+        <div class="part-pages" v-show="!isLoading">
           <CompPage :page-list="pageNums" @change-page="PageChange"/>
         </div>
       </section>
@@ -212,6 +213,9 @@ interface selectItem {
   isActive: boolean;
 }
 
+const ALL_POLICY_VALUE = "__all_policy";
+const ALL_AREA_VALUE = "__all_area";
+
 const policySelectList = reactive<Array<selectItem>>([]);
 const codeSelect_policy:Ref<string> = ref("");
 const areaSelectList = reactive<Array<selectItem>>([]);
@@ -223,6 +227,7 @@ const incomeSelectList = reactive<Array<selectItem>>([]);
 const codeSelectIncome = ref("");
 const identitySelectList = reactive<Array<selectItem>>([]);
 const codeSelectIdentity: any = ref([]);
+const isLoading = ref(false);
 const canSearch = computed(() => {
   return Boolean(
     codeSelect_policy.value ||
@@ -273,13 +278,13 @@ const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
-  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
       val: item.id,
     };
   });
-  policySelectList.push(..._list);
+  policySelectList.push({ name: "全部", val: ALL_POLICY_VALUE, isActive: false }, ..._list);
 });
 
 // Code area
@@ -287,13 +292,13 @@ const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
 codeArea.then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
-  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
       val: item.id,
     };
   });
-  areaSelectList.push(..._list);
+  areaSelectList.push({ name: "全國", val: ALL_AREA_VALUE, isActive: false }, ..._list);
 });
 
 // Code recipient
@@ -315,19 +320,27 @@ codeRecipient.then((res: any) => {
 });
 
 function SwitchRecipient(codeVal: any) {
+  if (codeVal == "reset") {
+    codeSelectRecipient.value = ""
+    recipientSelectList.forEach((item) => {
+      item.isActive = false
+    })
+    return
+  }
+
+  const selectedItem = recipientSelectList.find((item) => item.val == codeVal);
+  if (selectedItem?.isActive) {
+    selectedItem.isActive = false;
+    codeSelectRecipient.value = "";
+    return;
+  }
+
   recipientSelectList.forEach((item, i) => {
     item.isActive = item.val == codeVal;
     if (item.isActive) {
       codeSelectRecipient.value = item.val;
     }
   });
-
-  if (codeVal == "reset") {
-    codeSelectRecipient.value = ""
-    const _tempRecipient = JSON.parse(JSON.stringify(recipientSelectList))
-    recipientSelectList.splice(0)
-    recipientSelectList.push(..._tempRecipient)
-  }
 }
 
 // Code income
@@ -415,10 +428,10 @@ function SwitchIdentity(codeVal: any) {
 function Search() {
   if (!canSearch.value) return false;
   let query: any = {};
-  if (codeSelect_policy.value) query.CodePolicy = codeSelect_policy.value;
+  if (codeSelect_policy.value && codeSelect_policy.value != ALL_POLICY_VALUE) query.CodePolicy = codeSelect_policy.value;
   if (codeSelectRecipient.value)
     query.CodeRecipient = codeSelectRecipient.value;
-  if (codeSelect_area.value) query.CodeDomicile = codeSelect_area.value;
+  if (codeSelect_area.value && codeSelect_area.value != ALL_AREA_VALUE) query.CodeDomicile = codeSelect_area.value;
   if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
   if (searchQuery.value.trim()) query.Query = searchQuery.value.trim();
   if (codeSelectIdentity.value.length > 0)
@@ -439,9 +452,9 @@ searchQuery.value = typeof $route.query.query == "string" ? $route.query.query :
 const _query: any = {};
 
 if (Object.keys($route.query).length > 0) {
-  if ($route.query.policy) _query.CodePolicy = $route.query.policy;
+  if ($route.query.policy && $route.query.policy != ALL_POLICY_VALUE) _query.CodePolicy = $route.query.policy;
   if ($route.query.recipient) _query.CodeRecipient = $route.query.recipient;
-  if ($route.query.area) _query.CodeDomicile = $route.query.area;
+  if ($route.query.area && $route.query.area != ALL_AREA_VALUE) _query.CodeDomicile = $route.query.area;
   if ($route.query.query) _query.Query = $route.query.query;
 }
 
@@ -468,8 +481,13 @@ const pageNums = reactive<Array<pageNum>>([]);
 SetDataInit(_query);
 
 function SetDataInit(_q: any) {
+  isLoading.value = true;
   const listNews = $WebApiGet("/FarePolicy/GetIFarePolicyList", _q);
   listNews.then((res: any) => {
+    storageiFarePolicyList.splice(0);
+    iFarePolicyList.splice(0);
+    pageNums.splice(0);
+
     if (!res?.result?.result) return;
     const _data = res.result.result;
     let _newsList: Array<iFarePolicyItem> = _data.map(
@@ -485,10 +503,6 @@ function SetDataInit(_q: any) {
         };
       }
     );
-
-    storageiFarePolicyList.splice(0);
-    iFarePolicyList.splice(0);
-    pageNums.splice(0);
 
     storageiFarePolicyList.push(..._newsList);
     iFarePolicyList.push(
@@ -508,6 +522,8 @@ function SetDataInit(_q: any) {
         isHide: false
       });
     }
+  }).finally(() => {
+    isLoading.value = false;
   });
 }
 
