@@ -15,6 +15,8 @@ namespace IFare_API.TaskManager.Fare.Policy.Common
 
         public bool IsCheckPass() 
         {
+            _param.IsQueryFiltered = !string.IsNullOrWhiteSpace(_param.Query);
+
             // Code Domicile Filter check.
             _param.IsCodeDomicileFiltered = _paramChecker.IsCodeDomicileFiltered(_param.CodeDomicile);
 

@@ -1,12 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using Abp.Domain.Repositories;
+using Castle.Core.Logging;
 using IFare_API.Common;
+using IFare_API.Configuration;
 using IFare_API.Constants;
+using IFare_API.TaskManager.Common;
 using IFare_API.TaskManager.Code.ValueModel;
 using IFare_API.TaskManager.Fare.Policy.Common;
 using IFare_API.TaskManager.Fare.Policy.ValueModel;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace IFare_API.TaskManager.Fare.Policy
@@ -15,11 +21,13 @@ namespace IFare_API.TaskManager.Fare.Policy
     {
         private readonly IRepository<IfarePolicy> _repositoryIFarePolicy;
         private readonly ICommonToolsManager _commonTools;
+        public ILogger Logger { get; set; }
         public FarePolicyTaskManager(IRepository<IfarePolicy> repositoryIFarePolicy,
                                 ICommonToolsManager commonTools)
         {
             _repositoryIFarePolicy = repositoryIFarePolicy;
             _commonTools = commonTools;
+            Logger = NullLogger.Instance;
         }
 
         public FarePolicyDetail GetIFarePolicyDetail(long farePolicyID)
@@ -88,6 +96,7 @@ namespace IFare_API.TaskManager.Fare.Policy
 
         public FarePolicyResult GetIFarePolicyList(FarePolicyFilterParam param)
         {
+            var stopwatch = Stopwatch.StartNew();
             var paramChecker = new FilterParamChecker(param);
             var list = new List<FarePolicyData>();
 
@@ -151,7 +160,240 @@ namespace IFare_API.TaskManager.Fare.Policy
                         .OrderByDescending(p => p.ReleaseTime)
                         .ThenByDescending(p => p.CreateTime)
                         .ToList();
+
+            if (param.IsQueryFiltered)
+            {
+                var normalizedQuery = TraditionalChineseFuzzyMatcher.Normalize(param.Query);
+                var queryTokens = TraditionalChineseFuzzyMatcher.TokenizeForBm25(param.Query);
+                var searchCorpus = list
+                    .Select(item =>
+                    {
+                        var searchText = BuildSearchDocument(item);
+                        var tokens = TraditionalChineseFuzzyMatcher.TokenizeForBm25(searchText);
+                        return new
+                        {
+                            Item = item,
+                            Tokens = tokens,
+                            TermFrequencies = TraditionalChineseFuzzyMatcher.BuildTermFrequencyMap(tokens),
+                            DocumentLength = tokens.Count
+                        };
+                    })
+                    .ToList();
+
+                var averageDocumentLength = searchCorpus.Count > 0
+                    ? searchCorpus.Average(item => item.DocumentLength)
+                    : 0d;
+                var documentFrequencies = TraditionalChineseFuzzyMatcher.BuildDocumentFrequencyMap(
+                    searchCorpus.Select(item => (IReadOnlyCollection<string>)item.Tokens));
+                var queryTokenWeights = TraditionalChineseFuzzyMatcher.BuildQueryTokenWeights(
+                    queryTokens,
+                    documentFrequencies,
+                    searchCorpus.Count);
+
+                var maxBm25Score = 0d;
+                var searchScores = searchCorpus
+                    .Select(item =>
+                    {
+                        var fuzzyScore = GetSearchScore(normalizedQuery, item.Item);
+                        var bm25Score = TraditionalChineseFuzzyMatcher.ComputeBm25Score(
+                            queryTokens,
+                            item.TermFrequencies,
+                            item.DocumentLength,
+                            documentFrequencies,
+                            searchCorpus.Count,
+                            averageDocumentLength,
+                            queryTokenWeights);
+
+                        if (bm25Score > maxBm25Score)
+                        {
+                            maxBm25Score = bm25Score;
+                        }
+
+                        return new
+                        {
+                            Item = item.Item,
+                            FuzzyScore = fuzzyScore,
+                            Bm25Score = bm25Score
+                        };
+                    })
+                    .ToList();
+
+                list = searchScores
+                    .Select(result => new
+                    {
+                        result.Item,
+                        Score = GetHybridSearchScore(result.FuzzyScore, result.Bm25Score, maxBm25Score)
+                    })
+                    .Where(result => result.Score > 0.08d)
+                    .OrderByDescending(result => result.Score)
+                    .ThenByDescending(result => result.Item.ReleaseTime)
+                    .ThenByDescending(result => result.Item.CreateTime)
+                    .Select(result => result.Item)
+                    .ToList();
+            }
+
+            stopwatch.Stop();
+            WriteSearchMetricsLog(param, stopwatch.ElapsedMilliseconds, list.Count);
+
             return new FarePolicyResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), list);
+        }
+
+        private static double GetSearchScore(string normalizedQuery, FarePolicyData item)
+        {
+            if (string.IsNullOrEmpty(normalizedQuery))
+            {
+                return 0d;
+            }
+
+            var titleScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, item.Title);
+            var qualificationScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, item.Qualification);
+            var keywordScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, string.Join(" ", item.CodeKeywordList.Select(p => p.CodeName)));
+            var policyScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, item.CodePolicy_LabelName);
+            var domicileScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, item.CodeDomicile_LabelName);
+            var recipientScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, string.Join(" ", item.CodeRecipientList.Select(p => p.CodeName)));
+            var identityScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, string.Join(" ", item.CodeIdentityList.Select(p => p.CodeName)));
+            var incomeScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, string.Join(" ", item.CodeIncomeList.Select(p => p.CodeName)));
+
+            return (titleScore * 0.5d) +
+                   (qualificationScore * 0.12d) +
+                   (keywordScore * 0.16d) +
+                   (policyScore * 0.08d) +
+                   (domicileScore * 0.04d) +
+                   (recipientScore * 0.05d) +
+                   (identityScore * 0.03d) +
+                   (incomeScore * 0.02d);
+        }
+
+        private static double GetHybridSearchScore(double fuzzyScore, double bm25Score, double maxBm25Score)
+        {
+            var normalizedBm25Score = maxBm25Score > 0d
+                ? Math.Min(1d, bm25Score / maxBm25Score)
+                : 0d;
+
+            return (fuzzyScore * 0.68d) + (normalizedBm25Score * 0.32d);
+        }
+
+        private static string BuildSearchDocument(FarePolicyData item)
+        {
+            return string.Join(" ", new[]
+            {
+                item.Title,
+                item.Qualification,
+                item.CodePolicy_LabelName,
+                item.CodeDomicile_LabelName,
+                string.Join(" ", item.CodeKeywordList.Select(p => p.CodeName)),
+                string.Join(" ", item.CodeRecipientList.Select(p => p.CodeName)),
+                string.Join(" ", item.CodeIdentityList.Select(p => p.CodeName)),
+                string.Join(" ", item.CodeIncomeList.Select(p => p.CodeName))
+            }.Where(text => !string.IsNullOrWhiteSpace(text)));
+        }
+
+        private void WriteSearchMetricsLog(FarePolicyFilterParam param, long elapsedMilliseconds, int resultCount)
+        {
+            try
+            {
+                var currentProcess = Process.GetCurrentProcess();
+                var sqlProcessMemory = TryGetSqlProcessMemorySnapshot();
+
+                var logLine =
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [FarePolicySearchMetrics] " +
+                    $"query=\"{param?.Query ?? string.Empty}\", " +
+                    $"elapsed_ms={elapsedMilliseconds}, " +
+                    $"result_count={resultCount}, " +
+                    $"api_working_set_mb={currentProcess.WorkingSet64 / 1024d / 1024d:F2}, " +
+                    $"api_private_memory_mb={currentProcess.PrivateMemorySize64 / 1024d / 1024d:F2}, " +
+                    $"sql_process_memory_mb={(sqlProcessMemory?.ProcessMemoryMb.ToString("F2") ?? "null")}, " +
+                    $"sql_memory_utilization_pct={(sqlProcessMemory?.MemoryUtilizationPercentage.ToString("F2") ?? "null")}, " +
+                    $"sql_memory_sample_ok={(sqlProcessMemory != null ? "true" : "false")}";
+
+                var searchMetricsDirectory = ResolveSearchMetricsDirectory();
+                Directory.CreateDirectory(searchMetricsDirectory);
+                var searchMetricsFilePath = Path.Combine(searchMetricsDirectory, "SearchMetrics.txt");
+                using var stream = new FileStream(
+                    searchMetricsFilePath,
+                    FileMode.Append,
+                    FileAccess.Write,
+                    FileShare.ReadWrite);
+                using var writer = new StreamWriter(stream);
+                writer.WriteLine(logLine);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"[FarePolicySearchMetrics] failed to write metrics log: {ex.Message}");
+            }
+        }
+
+        private static string ResolveSearchMetricsDirectory()
+        {
+            var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+
+            while (directory != null)
+            {
+                var projectFilePath = Path.Combine(directory.FullName, "IFare_API.Web.Host.csproj");
+                if (File.Exists(projectFilePath))
+                {
+                    return Path.Combine(directory.FullName, "App_Data", "SearchMetrics");
+                }
+
+                directory = directory.Parent;
+            }
+
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "SearchMetrics");
+        }
+
+        private SqlProcessMemorySnapshot TryGetSqlProcessMemorySnapshot()
+        {
+            try
+            {
+                var connectionString = ResolveMonitoringConnectionString();
+                if (string.IsNullOrWhiteSpace(connectionString))
+                {
+                    return null;
+                }
+
+                using var connection = new SqlConnection(connectionString);
+                connection.Open();
+
+                using var command = connection.CreateCommand();
+                command.CommandText = @"
+SELECT 
+    CAST(physical_memory_in_use_kb / 1024.0 AS float) AS process_memory_mb,
+    CAST(memory_utilization_percentage AS float) AS memory_utilization_pct
+FROM sys.dm_os_process_memory;";
+
+                using var reader = command.ExecuteReader();
+                if (!reader.Read())
+                {
+                    return null;
+                }
+
+                return new SqlProcessMemorySnapshot
+                {
+                    ProcessMemoryMb = reader.IsDBNull(0) ? 0d : reader.GetDouble(0),
+                    MemoryUtilizationPercentage = reader.IsDBNull(1) ? 0d : reader.GetDouble(1)
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"[FarePolicySearchMetrics] failed to read SQL Server memory: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static string ResolveMonitoringConnectionString()
+        {
+            var configuration = AppConfigurations.Get(Directory.GetCurrentDirectory());
+            var targetVersion = configuration["RolloutSetting:TargetVersion"];
+            var isLocal = string.Equals(targetVersion, "Local", StringComparison.OrdinalIgnoreCase);
+            var connectionStringName = isLocal ? "Local_Default" : "Default";
+
+            return configuration[$"ConnectionStrings:{connectionStringName}"];
+        }
+
+        private sealed class SqlProcessMemorySnapshot
+        {
+            public double ProcessMemoryMb { get; set; }
+            public double MemoryUtilizationPercentage { get; set; }
         }
 
         private List<FarePolicyData> getArticlesWelfareDataList(IEnumerable<IfarePolicy> queryList, int takeNum = 0, List<FarePolicyData> currentList = null, bool isRandom = false)

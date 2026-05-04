@@ -66,8 +66,13 @@ const emits = defineEmits(["update:selectValue", "isOpened"]);
 watch(props.selectList, (newList, oldList) => {
   if (props.selectDefault) {
     const _defaultItem = newList.find((p:any) => p.val == props.selectDefault)
-    selectName.value = _defaultItem.name
-    selectVal.value = _defaultItem.val
+    if (_defaultItem) {
+      selectName.value = _defaultItem.name
+      selectVal.value = _defaultItem.val
+    } else {
+      selectName.value = ""
+      selectVal.value = ""
+    }
   }
 
   if (props.selectDefault == "") {
