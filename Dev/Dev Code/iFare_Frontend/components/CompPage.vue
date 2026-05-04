@@ -71,14 +71,8 @@ function PageNext(e: any) {
   const lastPageItemWidth =
     (props.pageList.length - _currentPageNum + 2) * WIDTH_PAGEITEM; // Add current page and after empty tag.
 
-    console.log('props.pageList.length: ', props.pageList.length)
-    console.log('_widthPageContent.value: ', _widthPageContent.value)
-    console.log('lastPageItemWidth: ', lastPageItemWidth)
-
   if (_currentPageNum == props.pageList.length) {
-    console.log("ssssss")
     _currentPageNum = _currentPageNum - Math.floor(_widthPageContent.value / WIDTH_PAGEITEM) + 1
-    console.log(_currentPageNum)
     props.pageList.forEach((_item: any, i: number) => {
       _item.isHide = i + 1 < _currentPageNum;
     });

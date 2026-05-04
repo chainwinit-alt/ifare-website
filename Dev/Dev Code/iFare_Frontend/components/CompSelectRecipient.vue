@@ -1,5 +1,20 @@
 <template>
-    <div class="component-select no-userselect" :class="{ active: isShow}" :name="selectType" @click="ToggleSelectDialog">
+    <div
+      class="component-select no-userselect"
+      :class="{ active: isShow}"
+      :name="selectType"
+      tabindex="0"
+      role="combobox"
+      :aria-expanded="isShow"
+      aria-haspopup="listbox"
+      :aria-label="props.selectTitle || props.placeholder"
+      @click="ToggleSelectDialog"
+      @keydown.enter.prevent="onEnterSelect"
+      @keydown.space.prevent="onEnterSelect"
+      @keydown.esc.prevent="CloseDialog"
+      @keydown.down.prevent="onArrow(1)"
+      @keydown.up.prevent="onArrow(-1)"
+    >
       <div class="comp-group">
         <span class="comp-placeholder" v-show="selectName == ''">{{
           props.placeholder
@@ -12,12 +27,15 @@
           <div class="part-top">
             <h5 class="select-title">{{ props.selectTitle }}</h5>
           </div>
-          <div class="btn-tag-list">
+          <div class="btn-tag-list" role="listbox">
             <span
                 class="btn btn-tag"
-                :class="{ active: _item.name == selectName }"
-                v-for="_item in selectList"
+                :class="{ active: _item.name == selectName, focused: idx === focusedIndex }"
+                v-for="(_item, idx) in selectList"
                 :key="_item.val"
+                role="option"
+                :aria-selected="_item.name == selectName"
+                tabindex="-1"
                 @click.stop.prevent="ClickSelectItem(_item.name, _item.val)"
                 >{{ _item.name }}</span
             >
@@ -36,16 +54,55 @@
   const selectVal = ref("");
   const selectName = ref("");
   const isShow = ref(false);
-  
+  const focusedIndex = ref(-1);
+
   function ToggleSelectDialog() {
     isShow.value = !isShow.value;
+    if (isShow.value) {
+      const list = (props.selectList || []) as any[];
+      const cur = list.findIndex((p: any) => p.name === selectName.value);
+      focusedIndex.value = cur >= 0 ? cur : 0;
+    } else {
+      focusedIndex.value = -1;
+    }
     emits("isOpened", props.selectType, isShow.value)
   }
-  
+
+  function CloseDialog() {
+    if (isShow.value) {
+      isShow.value = false;
+      focusedIndex.value = -1;
+      emits("isOpened", props.selectType, false);
+    }
+  }
+
+  function onArrow(delta: number) {
+    if (!isShow.value) {
+      ToggleSelectDialog();
+      return;
+    }
+    const list = (props.selectList || []) as any[];
+    if (list.length === 0) return;
+    let next = focusedIndex.value + delta;
+    if (next < 0) next = list.length - 1;
+    if (next >= list.length) next = 0;
+    focusedIndex.value = next;
+  }
+
+  function onEnterSelect() {
+    if (isShow.value && focusedIndex.value >= 0) {
+      const list = (props.selectList || []) as any[];
+      const item = list[focusedIndex.value];
+      if (item) ClickSelectItem(item.name, item.val);
+    } else {
+      ToggleSelectDialog();
+    }
+  }
+
   function PreventClick(e:any) {
     return false;
   }
-  
+
   function ClickSelectItem(name: string, val: string) {
     selectName.value = name;
     selectVal.value = val;

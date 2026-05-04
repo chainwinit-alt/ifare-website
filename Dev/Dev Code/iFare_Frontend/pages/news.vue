@@ -195,6 +195,5 @@ function PageControl(target: string, controlType: string, currentPage: number) {
   }
 
   if (target == "News") PageSwitch(currentPage_News.value);
-  console.log(currentPage)
 }
 </script>

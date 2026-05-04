@@ -46,24 +46,25 @@
           "
         >
           <li :class="{ active: $route.name == 'about' }">
-            <NuxtLink to="/about">關於長穩</NuxtLink>
+            <NuxtLink to="/about" :aria-current="$route.name === 'about' ? 'page' : undefined">關於長穩</NuxtLink>
           </li>
           <li :class="{ active: $route.name == 'news' }">
-            <NuxtLink to="/news">最新消息</NuxtLink>
+            <NuxtLink to="/news" :aria-current="$route.name === 'news' ? 'page' : undefined">最新消息</NuxtLink>
           </li>
           <li :class="{ active: $route.name == 'articles' }">
-            <NuxtLink to="/articles">福利專欄</NuxtLink>
+            <NuxtLink to="/articles" :aria-current="$route.name === 'articles' ? 'page' : undefined">福利專欄</NuxtLink>
           </li>
           <li :class="{ active: $route.name == 'collaborator' }">
-            <NuxtLink to="/collaborator">公益夥伴</NuxtLink>
+            <NuxtLink to="/collaborator" :aria-current="$route.name === 'collaborator' ? 'page' : undefined">公益夥伴</NuxtLink>
           </li>
           <li :class="{ active: $route.name == 'future' }">
-            <NuxtLink to="/future">未來規劃</NuxtLink>
+            <NuxtLink to="/future" :aria-current="$route.name === 'future' ? 'page' : undefined">未來規劃</NuxtLink>
           </li>
           <li>
             <NuxtLink
               to="/ifare"
               class="btn btn-empty-oval transition-general btn-ifare"
+              :aria-current="$route.name?.toString().includes('ifare') ? 'page' : undefined"
               >i-Fare</NuxtLink
             >
           </li>
@@ -71,8 +72,12 @@
       </nav>
       <div class="part part-menu">
         <button
+          ref="menuButtonRef"
           class="btn btn-icon btn-menu no-userselect"
           @click="MenuToggle"
+          :aria-expanded="isShowMenu"
+          aria-controls="mobile-menu"
+          aria-label="開啟菜單"
           :name="
             ($route.name != 'index' &&
               !$route.name?.toString().includes('ifare')) ||
@@ -86,35 +91,35 @@
       </div>
     </div>
   </header>
-  <div class="mobile-menu" :class="{ active: isShowMenu }">
+  <div id="mobile-menu" class="mobile-menu" :class="{ active: isShowMenu }" role="dialog" aria-modal="true" aria-label="行動選單">
     <ul class="list-unstyled menu-list">
       <li :class="{ active: $route.name == 'about'}">
-        <NuxtLink class="mobileNav-link" to="/about" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/about" :aria-current="$route.name === 'about' ? 'page' : undefined" @click="MenuToggle"
           >關於長穩</NuxtLink
         >
       </li>
       <li :class="{ active: $route.name == 'news'}">
-        <NuxtLink class="mobileNav-link" to="/news" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/news" :aria-current="$route.name === 'news' ? 'page' : undefined" @click="MenuToggle"
           >最新消息</NuxtLink
         >
       </li>
       <li :class="{ active: $route.name == 'articles'}">
-        <NuxtLink class="mobileNav-link" to="/articles" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/articles" :aria-current="$route.name === 'articles' ? 'page' : undefined" @click="MenuToggle"
           >福利專欄</NuxtLink
         >
       </li>
       <li :class="{ active: $route.name == 'ifare'}">
-        <NuxtLink class="mobileNav-link" to="/ifare" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/ifare" :aria-current="$route.name?.toString().includes('ifare') ? 'page' : undefined" @click="MenuToggle"
           >i-Fare</NuxtLink
         >
       </li>
       <li :class="{ active: $route.name == 'collaborator'}">
-        <NuxtLink class="mobileNav-link" to="/collaborator" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/collaborator" :aria-current="$route.name === 'collaborator' ? 'page' : undefined" @click="MenuToggle"
           >公益夥伴</NuxtLink
         >
       </li>
       <li :class="{ active: $route.name == 'future'}">
-        <NuxtLink class="mobileNav-link" to="/future" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/future" :aria-current="$route.name === 'future' ? 'page' : undefined" @click="MenuToggle"
           >未來規劃</NuxtLink
         >
       </li>
@@ -133,7 +138,7 @@
       </div>
     </section>
     <section class="section-right-top">
-      <button class="btn btn-icon btn-close" @click="MenuToggle">
+      <button class="btn btn-icon btn-close" @click="MenuToggle" aria-label="關閉菜單">
         <i class="ic-close"></i>
       </button>
     </section>
@@ -142,6 +147,7 @@
 
 <script setup lang="ts">
 const isShowMenu = ref(false);
+const menuButtonRef = ref<HTMLButtonElement | null>(null);
 
 const emits = defineEmits(["isOpened"]);
 
@@ -149,4 +155,26 @@ function MenuToggle() {
   isShowMenu.value = !isShowMenu.value;
   emits("isOpened", isShowMenu.value)
 }
+
+// Focus management: 開啟時 focus 至首個 menu link，關閉時 focus 回菜單按鈕
+watch(isShowMenu, async (open) => {
+  await nextTick();
+  if (open) {
+    const firstLink = document.querySelector<HTMLElement>('.mobile-menu.active .menu-list li:first-child a');
+    firstLink?.focus();
+  } else {
+    menuButtonRef.value?.focus();
+  }
+});
+
+// ESC 關閉 menu
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && isShowMenu.value) {
+    isShowMenu.value = false;
+    emits("isOpened", false);
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeyDown));
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown));
 </script>
