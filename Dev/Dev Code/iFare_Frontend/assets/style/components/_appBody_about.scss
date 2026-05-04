@@ -280,6 +280,7 @@
         display: block;
         position: absolute;
         z-index: 48;
+        pointer-events: none;
       }
       &::before {
         top: -300px;
