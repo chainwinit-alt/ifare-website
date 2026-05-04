@@ -83,6 +83,7 @@ desktop.ini
 *.log
 App_Data/Logs/
 Logs/
+scripts/memory-log-*.csv
 
 # ===========================
 # Secrets / Config overrides
