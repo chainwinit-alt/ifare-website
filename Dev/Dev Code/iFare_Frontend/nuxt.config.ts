@@ -15,7 +15,7 @@ export default defineNuxtConfig({
   nitro: {
     devProxy: {
       '/api/services/app': {
-        target: 'https://localhost:44312/api/services/app',
+        target: 'https://www.i-fare.org.tw/ifare_api/api/services/app',
         changeOrigin: true,
         secure: false
       }

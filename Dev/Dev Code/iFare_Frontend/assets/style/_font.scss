@@ -20,32 +20,12 @@ body {
         font-weight: 400;
         line-height: 20px;
 
-        [name]::before{
-            font-family: Noto Sans TC;
-            color: rgba($color-white, .5);
-        }
         [name="tel"]{
             font-family: Roboto;
             color: $color-white;
             text-decoration: none;
-            &::before{
-                content: '聯絡電話';
-            }
-        }
-        [name="mail"]{
-            &::before{
-                content: '聯絡信箱';
-            }
-        }
-        [name="address"]{
-            &::before{
-                content: '地址';
-            }
         }
         [name="datetime"]{
-            &::before{
-                content: '服務時間';
-            }
             span {
                 &:nth-child(2), &:nth-child(3) {
                     font-family: Roboto;
