@@ -1,6 +1,16 @@
 <template>
   <div class="app-body-child" :name="$route.name">
-    <div class="section-list">
+    <div v-if="isLoading" class="part-loading" role="status" aria-live="polite">
+      <span class="skeleton-line skeleton-line-title"></span>
+      <span class="skeleton-line"></span>
+      <span class="skeleton-line"></span>
+      <span class="skeleton-line skeleton-line-info"></span>
+    </div>
+    <div v-else-if="hasError" class="part-error" role="alert">
+      <p>無法載入洽辦單位資訊，可能網路不穩或伺服器忙碌。</p>
+      <button class="btn-retry" @click="loadOfficeUnit">重新載入</button>
+    </div>
+    <div v-else class="section-list">
       <section class="section-top">
         <div class="title-component">
           <i class="ic-title-pattern"></i>
@@ -150,17 +160,38 @@ const _contactItem = reactive<contactItem>({
   title: "",
   officeList: undefined,
 });
-const OfficeUnitListGet = $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
-OfficeUnitListGet.then((res: any) => {
-  let _data = res.result.result;
-  _data = _data.find((item: any) => item.id == _contactID);
-  
 
-  _contactItem.title = _data.title;
-  releaseTime.value = _data.releaseTime
-  updateTime.value = _data.updateTime
+const isLoading = ref(true);
+const hasError = ref(false);
+
+async function loadOfficeUnit() {
+  isLoading.value = true;
+  hasError.value = false;
+  // 清空既有資料 (重試時)
+  areaList.splice(0);
+  areaSelectList.splice(0);
+  contactList.splice(0);
+  try {
+    const res: any = await $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
+    if (!res?.result?.result) throw new Error("Empty response");
+    let _data = res.result.result;
+    _data = _data.find((item: any) => item.id == _contactID);
+    if (!_data) throw new Error("Office unit not found");
+
+    _contactItem.title = _data.title;
+    releaseTime.value = _data.releaseTime;
+    updateTime.value = _data.updateTime;
+    populateOfficeData(_data);
+    isLoading.value = false;
+  } catch (e) {
+    console.warn('[ifare/contact] load failed:', e);
+    isLoading.value = false;
+    hasError.value = true;
+  }
+}
+
+function populateOfficeData(_data: any) {
   _data.officeList.forEach((_officeItem: any, k: number) => {
-    console.log(_officeItem)
     areaList.push({
       isActive: k == 0,
       areaName: _officeItem.codeDomicile_LabelName,
@@ -181,7 +212,10 @@ OfficeUnitListGet.then((res: any) => {
       }),
     });
   });
-});
+}
+
+// 開始載入 (page 進入時)
+loadOfficeUnit();
 
 function jumpTo(areaName: string) {
   areaList.forEach((_area, i) => {
@@ -190,7 +224,6 @@ function jumpTo(areaName: string) {
 }
 
 function getSelectValue(type: string, val: string) {
-  console.log(`[${type}] val => ${val}`)
   let _area = areaSelectList.find((p:any) => p.val == val);
   jumpTo(`${_area?.name}`)
   $router.push({ path: route.path, query: route.query, hash: `#${_area?.name}`})

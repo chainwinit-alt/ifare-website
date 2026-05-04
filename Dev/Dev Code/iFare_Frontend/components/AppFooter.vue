@@ -39,7 +39,7 @@
         </ul>
       </div>
       <div class="part part-bottom">
-        <h6 class="txt-copyright">© 1995-2020 財團法人桃園市長穩社福慈善基金會 版權所有</h6>
+        <h6 class="txt-copyright">© 1995-{{ new Date().getFullYear() }} 財團法人桃園市長穩社福慈善基金會 版權所有</h6>
       </div>
     </div>
   </footer>

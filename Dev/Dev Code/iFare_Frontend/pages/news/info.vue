@@ -2,7 +2,7 @@
   <div class="app-body-child" :name="$route.name">
     <section class="section section-top">
       <h2 class="article-title">{{ newsItem.title }}</h2>
-      <h6 class="article-date">{{ newsItem.releaseTime }}</h6>
+      <p class="article-date">{{ newsItem.releaseTime }}</p>
       <div class="article-tags">
         <label class="article-num">{{ newsItem.id }}</label>
       </div>
@@ -13,7 +13,8 @@
           :src="embedUrl"
           title="YouTube video player"
           frameborder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
+          sandbox="allow-same-origin allow-scripts allow-presentation allow-popups"
           referrerpolicy="strict-origin-when-cross-origin"
           allowfullscreen
         ></iframe>
@@ -22,7 +23,7 @@
     <section class="section section-info">
       <div class="article-info">
         <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
-        <div class="raw-html" v-html="newsItem.content"></div>
+        <div class="raw-html" v-html="useSanitize(newsItem.content)"></div>
       </div>
     </section>
   </div>

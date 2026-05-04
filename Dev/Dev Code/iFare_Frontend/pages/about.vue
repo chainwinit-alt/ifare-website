@@ -8,7 +8,7 @@
     <div class="part-top">
       <div class="title-component">
         <!-- <i class="ic-title-pattern"></i> -->
-        <h3 class="comp-title">關於長穩</h3>
+        <h1 class="comp-title">關於長穩</h1>
         <span class="comp-shadow">ABOUT</span>
       </div>
     </div>
@@ -95,7 +95,7 @@
                         <li>穩懋半導體股份有限公司</li>
                         <li>董事長暨總裁</li>
                     </ul>
-                    <h6 class="member-name">陳進財</h6>
+                    <h4 class="member-name">陳進財</h4>
                 </div>
                 <div class="bg-mask"></div>
                 <div class="member-photo ic-about-member-1"></div>
@@ -104,7 +104,7 @@
                 <div class="member-info" name="boss_P">
                     <ul class="list-unstyled member-intros">
                     </ul>
-                    <h6 class="member-name">鄔筠軒</h6>
+                    <h4 class="member-name">鄔筠軒</h4>
                 </div>
                 <div class="bg-mask"></div>
                 <div class="member-photo ic-about-member-2"></div>
@@ -115,7 +115,7 @@
                 <div class="member-info" name="boss_C">
                     <ul class="list-unstyled member-intros">
                     </ul>
-                    <h6 class="member-name">顏杏蓉</h6>
+                    <h4 class="member-name">顏杏蓉</h4>
                 </div>
             </div>
             <div class="purpose-content">

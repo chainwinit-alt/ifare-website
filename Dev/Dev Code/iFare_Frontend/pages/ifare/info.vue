@@ -18,39 +18,39 @@
             <div class="part part-qualify">
               <div class="title-component">
                 <i class="ic-title-pattern"></i>
-                <h3 class="comp-title">申請資格</h3>
+                <h2 class="comp-title">申請資格</h2>
               </div>
-              <div class="info-content info-content--plain" v-html="renderPlainText(_welfareItem.qualification)"></div>
+              <div class="info-content info-content--plain" v-html="useSanitize(renderPlainText(_welfareItem.qualification))"></div>
             </div>
             <div class="part part-welfare">
               <div class="title-component">
                 <i class="ic-title-pattern"></i>
-                <h3 class="comp-title">福利內容</h3>
+                <h2 class="comp-title">福利內容</h2>
               </div>
               <div
                 class="raw-html info-content"
-                v-html="_welfareItem.welfareInfo"
+                v-html="useSanitize(_welfareItem.welfareInfo)"
               ></div>
             </div>
             <div class="part part-evidence">
               <div class="title-component">
                 <i class="ic-title-pattern"></i>
-                <h3 class="comp-title">應備證件資料</h3>
+                <h2 class="comp-title">應備證件資料</h2>
               </div>
-              <div class="info-content info-content--plain" v-html="renderPlainText(_welfareItem.evidence)"></div>
+              <div class="info-content info-content--plain" v-html="useSanitize(renderPlainText(_welfareItem.evidence))"></div>
             </div>
             <div class="part part-remark" v-if="_welfareItem.remark">
               <div class="title-component">
                 <i class="ic-title-pattern"></i>
-                <h3 class="comp-title">備註</h3>
+                <h2 class="comp-title">備註</h2>
               </div>
-              <div class="info-content info-content--plain" v-html="renderPlainText(_welfareItem.remark)"></div>
+              <div class="info-content info-content--plain" v-html="useSanitize(renderPlainText(_welfareItem.remark))"></div>
             </div>
             <div class="part part-office">
               <div class="bg-office"></div>
               <div class="title-component">
                 <i class="ic-title-pattern"></i>
-                <h3 class="comp-title">洽辦單位</h3>
+                <h2 class="comp-title">洽辦單位</h2>
               </div>
               <div class="info-content" :class="{'cursor-pointer': _welfareItem.officeUnitID != 1}" @click="JumpTo(_welfareItem.officeUnitID)">
                 <label :class="{'cursor-pointer': _welfareItem.officeUnitID != 1, 'info-label-tel': _welfareItem.welfareTel}">
@@ -70,7 +70,7 @@
       </section>
       <section class="section-relation">
         <div class="relation-links">
-          <h5 class="relation-title">相關福利</h5>
+          <h2 class="relation-title">相關福利</h2>
           <ul class="list-unstyled relation-list">
             <li class="relation-item transition-general" v-for="_welfare in iFarePolicyList">
               <NuxtLink
@@ -79,7 +79,7 @@
                     query: { id: _welfare.id, reload: '' },
                   }"
                 >
-                <h6 class="link-title">{{ _welfare.title }}</h6>
+                <h3 class="link-title">{{ _welfare.title }}</h3>
                 <div class="relation-item-bottom">
                   <ul class="list-unstyled filter-list">
                     <li name="area">{{ _welfare.area }}</li>

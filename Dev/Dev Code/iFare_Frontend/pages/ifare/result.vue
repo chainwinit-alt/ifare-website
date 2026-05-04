@@ -233,7 +233,6 @@ const canSearch = computed(() => {
 });
 
 function getSelectValue(type: string, val: string) {
-  console.log(`[${type}] val => ${val}`)
   if (type == "policy") {
     codeSelect_policy.value = val;
   }
@@ -248,21 +247,14 @@ function getSelectValue(type: string, val: string) {
 }
 
 function getSelectItems(type: string, items: any) {
-  console.log('type:', type)
-  console.log(items)
-
   let selectIncome = items.find((p:any) => p.type == 'Income')
   codeSelectIncome.value = selectIncome ? selectIncome.value : ""
-  console.log(codeSelectIncome)
 
   let selectIdentitys = items.filter((p:any) => p.type == 'Identity')
-  console.log(selectIdentitys)
   if (selectIdentitys.length > 0) {
     codeSelectIdentity.value.splice(0)
     if (selectIdentitys.find((p:any) => p.value == 1)) return false
     codeSelectIdentity.value.push(...selectIdentitys.map((p:any) => { return p.value}))
-    // codeSelectIdentity.value.splice(0, selectIdentitys.length, ...selectIdentitys.map((p:any) => { return p.value}))
-    console.log(codeSelectIdentity)
   } else {
     codeSelectIdentity.value.splice(0)
   }
@@ -382,7 +374,6 @@ codeIdentity.then((res: any) => {
 });
 
 function SwitchIdentity(codeVal: any) {
-  console.log(codeVal)
   identitySelectList.forEach((item:any, i) => {
     if (item.val == codeVal) {
       if (item.isActive) {
@@ -538,7 +529,6 @@ function isSelectOpen(type: string, val: boolean) {
 }
 
 function ResetParam() {
-  console.log('ResetParam')
   codeSelect_area.value = ""
   const _tempArea = JSON.parse(JSON.stringify(areaSelectList))
   areaSelectList.splice(0)
