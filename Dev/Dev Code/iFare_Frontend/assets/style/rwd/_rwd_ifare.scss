@@ -168,72 +168,80 @@
                         }
                     }
 
+                    // #6: 手機版改全寬垂直堆疊，避免 5 個控制項擠在 40px 高 + 文字截斷
                     .card-filter-mobile {
                         display: flex;
+                        flex-direction: column;
                         margin: 0 -20px;
-                        border-radius: 4px;
+                        border-radius: 8px;
                         background: $color-white;
                         box-shadow: 0px 11px 30px -8px rgba($color-black, 0.12);
-                        height: 40px;
-                        padding-left: 10px;
-                        align-items: center;
+                        padding: 12px 16px;
+                        align-items: stretch;
                         position: relative;
-                        overflow: hidden;
+                        gap: 10px;
 
                         .part-filter-btns {
                             display: flex;
-                            flex-direction: row;
+                            flex-direction: column;
                             width: 100%;
-                            gap: 12px;
-                            align-items: center;
-                            justify-content: space-between;
+                            gap: 10px;
 
                             .part-start, .part-end {
-                                display: inline-flex;
-                                flex-direction: row;
-                                align-items: center;
+                                display: flex;
+                                flex-direction: column;
+                                align-items: stretch;
+                                width: 100%;
+                                gap: 10px;
                             }
 
                             .component-select {
-                                border: none;
+                                border: 1px solid rgba($color-black, 0.08);
+                                border-radius: 6px;
+                                width: 100%;
 
                                 .comp-group {
-                                    padding: 0;
-                                    gap: 4px;
+                                    padding: 10px 12px;
+                                    gap: 8px;
+                                    justify-content: space-between;
                                     .comp-placeholder, .comp-name {
-                                        min-width: 36px;
-                                        max-width: 72px;
+                                        min-width: 0;
+                                        max-width: none;
                                         white-space: nowrap;
                                         text-overflow: ellipsis;
                                         overflow: hidden;
+                                        flex: 1;
                                     }
 
                                     .ic-select-arrow {
                                         width: 14px;
                                         height: 14px;
+                                        flex-shrink: 0;
                                     }
                                 }
                             }
                             .part-start {
-                                gap: 8px;
+                                gap: 10px;
                             }
 
                             .part-end {
-                                gap: 8px;
+                                gap: 10px;
                                 .else-mode {
-                                    width: auto;
+                                    width: 100%;
                                     .btn-advance {
-                                        border-radius: 0;
-                                        border: none;
+                                        border-radius: 6px;
+                                        border: 1px solid rgba($color-black, 0.08);
                                         background: $color-white;
-                                        padding: 0 12px;
+                                        padding: 10px 12px;
+                                        width: 100%;
+                                        justify-content: flex-start;
                                     }
                                 }
                                 & > .btn-filter{
-                                    height: 40px;
-                                    width: 36px;
-                                    padding: 0;
-                                    border-radius: 0;
+                                    height: 44px;  // iOS 觸控標準
+                                    width: 100%;
+                                    padding: 0 16px;
+                                    border-radius: 6px;
                                     justify-content: center;
                                 }
                             }
@@ -401,10 +409,17 @@
                             }
                         }
         
+                        // #14: 手機版不全隱表頭，改顯示為小字標籤行 (保留語意 + 視覺輕量)
                         .detail-title {
-                            display: none;
+                            display: flex;
+                            flex-direction: row;
+                            gap: 12px;
+                            padding: 8px 0 4px;
+                            font-size: 12px;
+                            opacity: 0.55;
+                            border-top: 1px dashed rgba(23, 24, 24, 0.08);
                         }
-        
+
                         .content-item {
                             flex-direction: column;
                             align-items: flex-start;

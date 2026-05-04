@@ -4,6 +4,16 @@
     left: 0;
     width: 100%;
     z-index: 999;
+    // #47: iPhone 瀏海 / 動態島安全區域 — viewport 上方留出 notch 高度
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+}
+
+// 行動選單也要避開瀏海
+.mobile-menu {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .app-header {

@@ -121,6 +121,8 @@
   const emits = defineEmits(["update:selectValue", "isOpened"]);
 
   watch(props.selectList, (newList, oldList) => {
+    if (!newList || !Array.isArray(newList)) return;  // 防呆: null/undefined/非陣列
+
     if (props.selectDefault) {
       const _defaultItem = newList.find((p:any) => p.val == props.selectDefault)
       if (_defaultItem) {

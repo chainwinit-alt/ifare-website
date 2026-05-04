@@ -1,50 +1,14 @@
 <template>
-  <header
-    class="app-header"
-    :name="
-      ($route.name != 'index' && !$route.name?.toString().includes('ifare'))
-        ? 'other'
-        : $route.name == 'index' || $route.name?.toString().includes('contact')
-        ? $route.name
-        : 'indexIFare'
-    "
-  >
+  <header class="app-header" :name="headerNameMode">
     <div class="row">
       <div class="part part-icon">
         <NuxtLink class="no-userselect" to="/">
-          <i
-            class="ic-logo app-icon"
-            :name="
-              ($route.name != 'index' &&
-                !$route.name?.toString().includes('ifare')) ||
-              $route.name?.toString().includes('contact')
-                ? 'other'
-                : 'indexIFare'
-            "
-          ></i>
-          <h4
-            class="ic-logo-title app-icon-title"
-            :name="
-              ($route.name != 'index' &&
-                !$route.name?.toString().includes('ifare')) ||
-              $route.name?.toString().includes('contact')
-                ? 'other'
-                : 'indexIFare'
-            "
-          ></h4>
+          <i class="ic-logo app-icon" :name="elementColorMode"></i>
+          <h4 class="ic-logo-title app-icon-title" :name="elementColorMode"></h4>
         </NuxtLink>
       </div>
       <nav class="part part-nav">
-        <ul
-          class="list-unstyled"
-          :name="
-            ($route.name != 'index' &&
-              !$route.name?.toString().includes('ifare')) ||
-            $route.name?.toString().includes('contact')
-              ? 'other'
-              : 'indexIFare'
-          "
-        >
+        <ul class="list-unstyled" :name="elementColorMode">
           <li :class="{ active: $route.name == 'about' }">
             <NuxtLink to="/about" :aria-current="$route.name === 'about' ? 'page' : undefined">關於長穩</NuxtLink>
           </li>
@@ -78,13 +42,7 @@
           :aria-expanded="isShowMenu"
           aria-controls="mobile-menu"
           aria-label="開啟菜單"
-          :name="
-            ($route.name != 'index' &&
-              !$route.name?.toString().includes('ifare')) ||
-            $route.name?.toString().includes('contact')
-              ? 'other'
-              : 'indexIFare'
-          "
+          :name="elementColorMode"
         >
           <i class="ic-menu"></i>
         </button>
@@ -146,10 +104,32 @@
 </template>
 
 <script setup lang="ts">
+const route = useRoute();
 const isShowMenu = ref(false);
 const menuButtonRef = ref<HTMLButtonElement | null>(null);
 
 const emits = defineEmits(["isOpened"]);
+
+// #45: 抽出原本散在 5 處的 route 條件，集中管理
+// header :name 用 (3 種值: 路由名 / 'indexIFare' / 'other')
+const headerNameMode = computed(() => {
+  const name = route.name?.toString() || ''
+  const isIndex = name === 'index'
+  const isIfare = name.includes('ifare')
+  const isContact = name.includes('contact')
+  if (!isIndex && !isIfare) return 'other'
+  if (isIndex || isContact) return name
+  return 'indexIFare'
+})
+// 子元素 (logo / nav ul / button) 用 (2 種值: 'other' / 'indexIFare')
+const elementColorMode = computed(() => {
+  const name = route.name?.toString() || ''
+  const isIndex = name === 'index'
+  const isIfare = name.includes('ifare')
+  const isContact = name.includes('contact')
+  if ((!isIndex && !isIfare) || isContact) return 'other'
+  return 'indexIFare'
+})
 
 function MenuToggle() {
   isShowMenu.value = !isShowMenu.value;
