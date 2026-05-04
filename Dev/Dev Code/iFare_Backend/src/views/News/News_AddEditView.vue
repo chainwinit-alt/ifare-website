@@ -33,16 +33,6 @@
             placeholder="請輸入標題"
           />
         </div>
-        <div class="item-group">
-          <label class="item-title" style="min-width: 80px;">影片網址</label>
-          <el-input
-            class="p-input full-width"
-            v-model="input_videoUrl"
-            type="text"
-            size="large"
-            placeholder="貼上 YouTube 網址（例：https://www.youtube.com/watch?v=xxxxx）"
-          />
-        </div>
         <div class="item-group full-width html-editor">
           <html-editor v-model:editorValue="editorValue"/>
         </div>
@@ -113,7 +103,6 @@ const createdate = ref("")
 const switch_state = ref(true);
 
 const input_title = ref("");
-const input_videoUrl = ref("");
 
 const datepicker_release = ref();
 const datepicker_discontinued = ref();
@@ -130,7 +119,6 @@ if (routeNameType.indexOf("edit") >= 0) {
     if (_res.result.length <= 0) return console.error("No Datas.")
     createdate.value = _res.result[0].createDate
     input_title.value = _res.result[0].title
-    input_videoUrl.value = _res.result[0].videoUrl || ""
     //@ts-ignore
     editorValue.value = decodeURIComponent(_res.result[0].detail).replaceAll("https://drive.google.com/uc?export=download&", "https://drive.google.com/thumbnail?sz=w800&")
     datepicker_release.value = _res.result[0].releaseTime
@@ -142,7 +130,6 @@ if (routeNameType.indexOf("edit") >= 0) {
 function SaveAction() {
   console.log(datepicker_release.value)
   const _title = input_title.value
-  const _videoUrl = input_videoUrl.value
   const _detail = encodeURIComponent(editorValue.value.replaceAll("https://drive.google.com/uc?export=download&", "https://drive.google.com/thumbnail?sz=w800&"))
   const _releaseTime = datepicker_release.value.toLocaleString('sv')
   const _discontinuedTime = datepicker_discontinued.value.toLocaleString('sv')
@@ -154,7 +141,7 @@ function SaveAction() {
 
   if (routeNameType.indexOf("add") >= 0) {
     console.log("[Add] Save action");
-    $WebAPI.InsertNews(userStore.token, _title, _detail, _releaseTime, _discontinuedTime, _state, _videoUrl, (res: any) => {
+    $WebAPI.InsertNews(userStore.token, _title, _detail, _releaseTime, _discontinuedTime, _state, (res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {
           $Message({ message: `API res ${_resData}`, type: "error" })
@@ -177,7 +164,7 @@ function SaveAction() {
     console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
-    $WebAPI.UpdateNews(userStore.token, _id, _title, _detail, _releaseTime, _discontinuedTime, _state, _videoUrl, (res: any) => {
+    $WebAPI.UpdateNews(userStore.token, _id, _title, _detail, _releaseTime, _discontinuedTime, _state, (res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {
           $Message({ message: `API res ${_resData}`, type: "error" })
