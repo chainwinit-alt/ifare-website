@@ -613,15 +613,15 @@ body {
         //     font-weight: 500;
         //     line-height: normal;
         // }
-        &::after {
-            content: '(必填)';
-            font-family: Noto Sans TC;
-            font-size: 12px;
-            font-style: normal;
-            font-weight: 400;
-            line-height: 20px; 
-            color: $color-pink;
-        }
+        // &::after {
+        //     content: '(必填)';
+        //     font-family: Noto Sans TC;
+        //     font-size: 12px;
+        //     font-style: normal;
+        //     font-weight: 400;
+        //     line-height: 20px; 
+        //     color: $color-pink;
+        // }
     }
 }
 

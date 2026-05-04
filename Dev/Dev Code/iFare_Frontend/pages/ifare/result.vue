@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="app-body-child" :name="$route.name">
     <div class="section-list">
       <section class="section-filter">
@@ -40,6 +40,10 @@
                 @update:select-value="getSelectValue"
               />
             </div>
+            <div class="filter-group">
+              <label class="filter-title">關鍵字</label>
+              <input v-model="searchQuery" class="input-query" type="text" placeholder="輸入繁中關鍵字" />
+            </div>
           </div>
           <div class="part-bottom" v-show="isOpts">
             <div class="filter-group">
@@ -80,7 +84,7 @@
               ></i>
               <span>篩選</span>
             </button>
-            <button class="btn btn-filter" @click="Search" :disabled="codeSelect_policy == '' || codeSelectRecipient == '' || codeSelect_area == ''">
+            <button class="btn btn-filter" @click="Search" :disabled="!canSearch">
               <span>搜尋</span>
               <i class="icon ic-search"></i>
             </button>
@@ -129,7 +133,7 @@
                 @is-opened="isSelectOpen"
                 @update:select-items="getSelectItems"
                 />
-              <button class="btn-filter" @click="Search" :disabled="codeSelect_policy == '' || codeSelectRecipient == '' || codeSelect_area == ''">
+              <button class="btn-filter" @click="Search" :disabled="!canSearch">
                 <span></span>
                 <i class="icon ic-search"></i>
               </button>
@@ -155,9 +159,9 @@
                   <div class="result-filter">
                     <label class="result-filter-area">{{ _item.area }}</label>
                     <label class="result-filter-qualify">
-                      <span :class="{remark: _item.hasRecipient}">{{_item.hasRecipient ? '有' : '無'}}</span>年齡限制、
-                      <span :class="{remark: _item.hasIncome}">{{ _item.hasIncome ? '有' : '無' }}</span>經濟限制、
-                      <span :class="{remark: _item.hasIndentity}">{{ _item.hasIndentity ? '有' : '無' }}</span>特殊身分
+                      <span :class="{ remark: _item.hasRecipient }">{{ _item.hasRecipient ? '有' : '無' }}</span>年齡限制、
+                      <span :class="{ remark: _item.hasIncome }">{{ _item.hasIncome ? '有' : '無' }}</span>經濟限制、
+                      <span :class="{ remark: _item.hasIndentity }">{{ _item.hasIndentity ? '有' : '無' }}</span>特殊身分
                     </label>
                   </div>
                   <i class="ic-arrow-right link-url transition-general"></i>
@@ -212,12 +216,21 @@ const policySelectList = reactive<Array<selectItem>>([]);
 const codeSelect_policy:Ref<string> = ref("");
 const areaSelectList = reactive<Array<selectItem>>([]);
 const codeSelect_area:Ref<string> = ref("");
+const searchQuery = ref("");
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient:Ref<string> = ref("");
 const incomeSelectList = reactive<Array<selectItem>>([]);
 const codeSelectIncome = ref("");
 const identitySelectList = reactive<Array<selectItem>>([]);
 const codeSelectIdentity: any = ref([]);
+const canSearch = computed(() => {
+  return Boolean(
+    codeSelect_policy.value ||
+    codeSelectRecipient.value ||
+    codeSelect_area.value ||
+    searchQuery.value.trim()
+  );
+});
 
 function getSelectValue(type: string, val: string) {
   console.log(`[${type}] val => ${val}`)
@@ -258,6 +271,7 @@ function getSelectItems(type: string, items: any) {
 // Code Policy
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
+  if (!res?.result?.result) return;
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
@@ -271,6 +285,7 @@ codePolicy.then((res: any) => {
 // Code area
 const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
 codeArea.then((res: any) => {
+  if (!res?.result?.result) return;
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
@@ -284,6 +299,7 @@ codeArea.then((res: any) => {
 // Code recipient
 const codeRecipient = $WebApiGet("/Code/GetCodeRecipientList");
 codeRecipient.then((res: any) => {
+  if (!res?.result?.result) return;
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
@@ -317,6 +333,7 @@ function SwitchRecipient(codeVal: any) {
 // Code income
 const codeIncome = $WebApiGet("/Code/GetCodeIncomeList");
 codeIncome.then((res: any) => {
+  if (!res?.result?.result) return;
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
@@ -352,10 +369,11 @@ function SwitchIncome(codeVal: any) {
 // Code identity
 const codeIdentity = $WebApiGet("/Code/GetCodeIdentityList");
 codeIdentity.then((res: any) => {
+  if (!res?.result?.result) return;
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
-      name: item.codeName == '全選' ? '不限' : item.codeName,
+      name: item.codeName == '?券' ? '銝?' : item.codeName,
       val: item.id,
       isActive: false,
     };
@@ -395,12 +413,14 @@ function SwitchIdentity(codeVal: any) {
 }
 
 function Search() {
+  if (!canSearch.value) return false;
   let query: any = {};
   if (codeSelect_policy.value) query.CodePolicy = codeSelect_policy.value;
   if (codeSelectRecipient.value)
     query.CodeRecipient = codeSelectRecipient.value;
   if (codeSelect_area.value) query.CodeDomicile = codeSelect_area.value;
   if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
+  if (searchQuery.value.trim()) query.Query = searchQuery.value.trim();
   if (codeSelectIdentity.value.length > 0)
     query.CodeIdentities = codeSelectIdentity.value;
   SetDataInit(query);
@@ -411,9 +431,10 @@ const PAGEITEMMAX = 10;
 const $route = useRoute();
 
 // Init filter default value.
-codeSelect_policy.value = `${$route.query.policy}`
-codeSelect_area.value = `${$route.query.area}`
-codeSelectRecipient.value = `${$route.query.recipient}`
+codeSelect_policy.value = typeof $route.query.policy == "string" ? $route.query.policy : ""
+codeSelect_area.value = typeof $route.query.area == "string" ? $route.query.area : ""
+codeSelectRecipient.value = typeof $route.query.recipient == "string" ? $route.query.recipient : ""
+searchQuery.value = typeof $route.query.query == "string" ? $route.query.query : ""
 
 const _query: any = {};
 
@@ -421,6 +442,7 @@ if (Object.keys($route.query).length > 0) {
   if ($route.query.policy) _query.CodePolicy = $route.query.policy;
   if ($route.query.recipient) _query.CodeRecipient = $route.query.recipient;
   if ($route.query.area) _query.CodeDomicile = $route.query.area;
+  if ($route.query.query) _query.Query = $route.query.query;
 }
 
 interface iFarePolicyItem {
@@ -448,6 +470,7 @@ SetDataInit(_query);
 function SetDataInit(_q: any) {
   const listNews = $WebApiGet("/FarePolicy/GetIFarePolicyList", _q);
   listNews.then((res: any) => {
+    if (!res?.result?.result) return;
     const _data = res.result.result;
     let _newsList: Array<iFarePolicyItem> = _data.map(
       (item: any, i: number) => {
@@ -525,6 +548,8 @@ function ResetParam() {
   const _tempPolicy = JSON.parse(JSON.stringify(policySelectList))
   policySelectList.splice(0)
   policySelectList.push(..._tempPolicy)
+
+  searchQuery.value = ""
 
   SwitchRecipient("reset")
   SwitchIncome("reset")
