@@ -4,15 +4,16 @@
     background: $color-primary-dark;
     z-index: 50;
 
-    .btn-line {
+    .btn-social {
         display: inline-flex;
-        height: 40px;
+        height: 44px;
         padding: 0px 24px 0px 12px;
         align-items: center;
         border: 0;
         border-radius: 4px;
         background: $color-white;
         box-shadow: 0px 11px 30px -8px rgba($color-black, 0.50);
+        text-decoration: none;
 
         .icon {
             display: inline-block;
@@ -32,7 +33,9 @@
             position: relative;
             top: -8px;
             display: inline-flex;
+            flex-wrap: wrap;
             align-items: center;
+            justify-content: center;
             border-radius: 8px;
             padding: 60px 58px;
             gap: 40px;
@@ -41,8 +44,15 @@
             box-shadow: 0px 11px 30px -8px rgba($color-primary, 0.20);
             backdrop-filter: blur(20px);
             width: fit-content;
+            max-width: calc(100% - 64px);
             margin: -28px auto 0;
             z-index: 60;
+
+            .card-more-socials {
+                display: inline-flex;
+                align-items: center;
+                gap: 32px;
+            }
         }
         
         .app-icon{
@@ -54,17 +64,48 @@
             display: flex;
             flex-direction: column;
             gap: 25px;
-            
+
             & > * {
                 display: flex;
                 & > * {
                     justify-content: left;
                 }
             }
-            [name]::before{
-                width: 72px;
-                text-align: right;
+            .footer-info-label {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                width: 96px;
                 padding-right: 16px;
+                color: rgba($color-white, .7);
+            }
+            .footer-info-icon {
+                display: inline-block;
+                width: 16px;
+                height: 16px;
+                background-color: rgba($color-white, .7);
+                -webkit-mask-position: center;
+                -webkit-mask-repeat: no-repeat;
+                -webkit-mask-size: contain;
+                mask-position: center;
+                mask-repeat: no-repeat;
+                mask-size: contain;
+            }
+            .ic-info-tel {
+                -webkit-mask-image: url("../img/Tel.svg");
+                mask-image: url("../img/Tel.svg");
+            }
+            .ic-info-mail {
+                -webkit-mask-image: url("../img/Mail.svg");
+                mask-image: url("../img/Mail.svg");
+            }
+            .ic-info-address {
+                -webkit-mask-image: url("../img/Location.svg");
+                mask-image: url("../img/Location.svg");
+            }
+            .ic-info-time {
+                -webkit-mask-image: url("../img/Clock.svg");
+                mask-image: url("../img/Clock.svg");
             }
             [name="datetime"]{
                 & > span {
@@ -86,20 +127,6 @@
         .part-bottom {
             width: 100%;
             border-top: 1px solid rgba($color-white, .3);
-        }
-
-        .link-track {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            text-decoration: none;
-            &::before{
-                content: '';
-                display: inline-block;
-                height: 24px;
-                width: 24px;
-            }
         }
 
         .txt-copyright{
