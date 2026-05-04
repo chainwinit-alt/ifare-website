@@ -153,45 +153,119 @@
         justify-content: center;
         margin-bottom: 130px;
       }
-  
+
       .part-how-body {
         display: flex;
         flex-direction: row;
         justify-content: center;
-        gap: 48px;
+        align-items: flex-start;
+        gap: 32px;
       }
-  
+
+      // Dynamic Island style card (暖象牙白配色)
       .how-content {
-        display: inline-flex;
+        position: relative;
+        display: flex;
         flex-direction: column;
         min-width: 264px;
         width: 264px;
-        gap: 24px;
+        padding: 20px 24px;
+        background: linear-gradient(135deg, $color-header 0%, #faead8 100%);
+        color: $color-bg-mask-index;
+        border: 1px solid rgba($color-bg-mask, 0.06);
+        border-radius: 28px;
+        cursor: pointer;
+        outline: none;
+        will-change: transform;
+        box-shadow:
+          0 8px 24px -6px rgba($color-bg-mask-index, 0.12),
+          inset 0 1px 0 rgba($color-white, 0.6);
+        transition:
+          transform 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+          box-shadow 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+          border-color 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+
+        // 用 ::before opacity overlay 取代 background gradient transition (GPU 友善)
+        &::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background: linear-gradient(135deg, $color-white 0%, $color-header 100%);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        // 確保內容在 ::before 之上
+        > * {
+          position: relative;
+          z-index: 1;
+        }
+
+        &:hover,
+        &:focus-visible,
+        &.is-active {
+          transform: translateY(-4px);
+          border-color: rgba($color-primary, 0.4);
+          box-shadow:
+            0 18px 40px -10px rgba($color-primary-dark, 0.22),
+            0 0 0 1px rgba($color-primary, 0.18),
+            inset 0 1px 0 rgba($color-white, 0.85);
+
+          &::before {
+            opacity: 1;
+          }
+        }
       }
-  
-      .how-top{
+
+      .how-top {
         display: flex;
         align-items: center;
+        gap: 14px;
       }
-  
+
       .how-logo {
         display: inline-block;
-        width: 40px;
-        height: 40px;
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
       }
-  
-      .how-title{
+
+      .how-title {
         margin: 0;
-        color: $color-black;
-        font-size: 22px;
-        font-weight: 500;
-        line-height: 34px;
-      }
-      .how-info {
-        color: rgba($color-black, .7);
-        font-size: 16px;
-        font-weight: 400;
+        color: $color-bg-mask-index;
+        font-size: 20px;
+        font-weight: 600;
         line-height: 28px;
+      }
+
+      // Smooth grid-template-rows trick (no layout thrash, GPU-friendly)
+      .how-info-wrap {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+      }
+
+      .how-info-wrap > .how-info {
+        overflow: hidden;
+        color: rgba($color-bg-mask-index, .72);
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 24px;
+        padding-top: 0;
+        transition: padding-top 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+      }
+
+      .how-content:hover,
+      .how-content:focus-visible,
+      .how-content.is-active {
+        .how-info-wrap {
+          grid-template-rows: 1fr;
+        }
+        .how-info-wrap > .how-info {
+          padding-top: 14px;
+        }
       }
     }
   
@@ -237,7 +311,39 @@
         display: inline-flex;
         align-items: center;
       }
-  
+
+      // 共用 transition：所有可動元素統一 cadence
+      .member-photo,
+      .bg-mask,
+      .member-info {
+        transition:
+          transform 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+          box-shadow 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+      }
+
+      // 主要兩位（陳進財 / 鄔筠軒）— 整組 hover：照片放大、白框微脹、橘標牌浮起
+      .part-member-body .member-content {
+        cursor: pointer;
+
+        .member-photo {
+          will-change: transform;
+        }
+
+        &:hover {
+          .member-photo {
+            transform: scale(1.06);
+          }
+          .bg-mask {
+            transform: scale(1.03);
+            box-shadow: 0 18px 40px -10px rgba($color-black, 0.18);
+          }
+          .member-info {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 36px -10px rgba($color-orange, 0.55);
+          }
+        }
+      }
+
       .member-info {
         position: absolute;
         left: 0;
@@ -331,9 +437,15 @@
         .member-content {
           width: 143px;
           height: 1px;
-  
+
           .member-info {
             position: relative;
+            cursor: pointer;
+
+            &:hover {
+              transform: translateY(-4px) scale(1.04);
+              box-shadow: 0 16px 36px -10px rgba($color-orange, 0.55);
+            }
           }
         }
   
@@ -408,6 +520,23 @@
                 border-bottom: 1px solid $color-orange;
                 text-decoration: none;
                 color: $color-orange;
+            }
+        }
+
+        // 統一 CTA 連結的流暢度：hover 時連結微浮 + 箭頭滑出
+        .advance-link {
+            transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+
+            i {
+                transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+            }
+
+            &:hover {
+                transform: translateY(-2px);
+
+                i {
+                    transform: translateX(6px);
+                }
             }
         }
     }
