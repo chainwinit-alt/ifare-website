@@ -114,11 +114,13 @@ namespace IFare_API.TaskManager.Fare.Policy
                                     .Include(p => p.IfarePolicyCodeRecipients.Where(p2 => p2.CodeRecipient.State != DataState.Disabled))
                                     .Where(p => p.State != DataState.Disabled && p.State != DataState.Delete);
 
-            if (param.IsCodeDomicileFiltered) query = query.Where(p => p.CodeDomicileId == param.CodeDomicile || p.CodeDomicileId == 1);    // ID = 1 (中央)
+            // 嚴格篩選：使用者選什麼條件，只回符合該條件的 policy
+            // (拿掉原本 OR == 1 的「不限」彈性，避免「無年齡限制/無經濟限制」福利大量混入造成搜尋無效感)
+            if (param.IsCodeDomicileFiltered) query = query.Where(p => p.CodeDomicileId == param.CodeDomicile);
             if (param.IsCodePolicyFiltered) query = query.Where(p => p.CodePolicyId == param.CodePolicy);
-            if (param.IsCodeIncomeFiltered) query = query.Where(p => p.IfarePolicyCodeIncomes.Where(p2 => p2.CodeIncomeId == param.CodeIncome || p2.CodeIncomeId == 1).Count() > 0);
-            if (param.IsCodeRecipientFiltered) query = query.Where(p => p.IfarePolicyCodeRecipients.Where(p2 => p2.CodeRecipientId == param.CodeRecipient || p2.CodeRecipientId == 1).Count() > 0);
-            if (param.IsCodeIdentitiesFiltered) query = query.Where(p => p.IfarePolicyCodeIdentities.Where(p2 => param.CodeIdentities.Contains(p2.CodeIdentityId) || p2.CodeIdentityId == 1).Count() > 0);
+            if (param.IsCodeIncomeFiltered) query = query.Where(p => p.IfarePolicyCodeIncomes.Where(p2 => p2.CodeIncomeId == param.CodeIncome).Count() > 0);
+            if (param.IsCodeRecipientFiltered) query = query.Where(p => p.IfarePolicyCodeRecipients.Where(p2 => p2.CodeRecipientId == param.CodeRecipient).Count() > 0);
+            if (param.IsCodeIdentitiesFiltered) query = query.Where(p => p.IfarePolicyCodeIdentities.Where(p2 => param.CodeIdentities.Contains(p2.CodeIdentityId)).Count() > 0);
 
             list = query.Select(p => new FarePolicyData 
                         {
