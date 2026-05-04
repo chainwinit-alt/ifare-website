@@ -33,6 +33,11 @@ for (const name of wb.SheetNames) {
   // 保留 !ref / !cols / !rows / !merges (這些是 layout 必須的)
 }
 
+// 3.1 清掉壞掉的 defined Names (e.g., _xlnm._FilterDatabase 卡在舊範圍會讓 Excel 看不到資料)
+if (wb.Workbook?.Names) {
+  wb.Workbook.Names = [];
+}
+
 // 4. 寫出 (xlsx-js-style 預設會重建 theme 為標準小檔)
 XLSX.writeFile(wb, TMP);
 
