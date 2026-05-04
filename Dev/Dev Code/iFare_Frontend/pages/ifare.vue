@@ -34,25 +34,33 @@
             <span>找尋適合您的社會福利</span>
           </h3>
         </div>
-        <div class="card-ifare-filter">
+        <div class="card-ifare-filter" role="search" aria-labelledby="ifare-search-title">
+          <span id="ifare-search-title" class="sr-only">i-Fare 福利搜尋表單</span>
           <div class="item item-policy">
-            <label class="filter-name">受助者情況</label>
+            <label class="filter-name" id="label-policy" for="select-policy">受助者情況</label>
             <CompSelect
+              id="select-policy"
               placeholder="選擇受助情境"
               select-title="受助情境"
               select-type="policy"
               :select-list="policySelectList"
+              aria-labelledby="label-policy"
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
             />
           </div>
           <div class="item item-recipient transition-general" :class="{'visible': isVisibleRecipient}">
-            <label class="filter-name">受助者年齡區間</label>
-            <div class="btn-tag-list">
+            <label class="filter-name" id="label-recipient">受助者年齡區間</label>
+            <div class="btn-tag-list" role="group" aria-labelledby="label-recipient">
               <span
                 class="btn btn-tag transition-general"
                 :class="{ active: _recipient.isActive }"
+                role="button"
+                tabindex="0"
+                :aria-pressed="_recipient.isActive"
                 @click="SwitchRecipient(_recipient.val)"
+                @keydown.enter.prevent="SwitchRecipient(_recipient.val)"
+                @keydown.space.prevent="SwitchRecipient(_recipient.val)"
                 :name="_recipient.name"
                 v-for="_recipient in recipientSelectList"
                 :key="_recipient.val"
@@ -61,24 +69,41 @@
             </div>
           </div>
           <div class="item item-identity">
-            <label class="filter-name">受助者戶籍地</label>
+            <label class="filter-name" id="label-area" for="select-area">受助者戶籍地</label>
             <CompSelect
+              id="select-area"
               placeholder="選擇受助者所在戶籍"
               select-title="戶籍地"
               select-type="area"
               :select-list="areaSelectList"
+              aria-labelledby="label-area"
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
             />
           </div>
           <div class="item item-query">
-            <label class="filter-name">關鍵字</label>
-            <input v-model="searchQuery" class="input-query" type="text" placeholder="輸入繁中關鍵字" />
+            <label class="filter-name" for="input-query-keyword">關鍵字</label>
+            <input
+              id="input-query-keyword"
+              v-model="searchQuery"
+              class="input-query"
+              type="search"
+              placeholder="輸入繁中關鍵字"
+              aria-describedby="input-query-hint"
+              maxlength="50"
+            />
+            <span id="input-query-hint" class="sr-only">輸入福利相關關鍵字以縮小搜尋範圍，按搜尋按鈕送出</span>
           </div>
           <div class="item item-bottom">
-            <button class="btn-filter transition-general" @click="Search" :disabled="!canSearch">
+            <button
+              class="btn-filter transition-general"
+              type="submit"
+              @click="Search"
+              :disabled="!canSearch"
+              :aria-disabled="!canSearch"
+            >
               <span>搜尋</span>
-              <i class="icon ic-search"></i>
+              <i class="icon ic-search" aria-hidden="true"></i>
             </button>
           </div>
         </div>
@@ -132,13 +157,20 @@
                 class="faq-item transition-general"
                 :class="{ active: item.isActive }"
                 @click="item.isActive = !item.isActive"
+                @keydown.enter.prevent="item.isActive = !item.isActive"
+                @keydown.space.prevent="item.isActive = !item.isActive"
                 v-for="(item, i) in qaList"
                 :key="i"
+                role="button"
+                tabindex="0"
+                :aria-expanded="item.isActive"
+                :aria-controls="`faq-info-${i}`"
               >
                 <div class="faq-comp">
                   <h5 class="faq-title">
                     <i
                       class="faq-logo ic-faq transition-general"
+                      aria-hidden="true"
                     ></i>
                     <span>{{ item.question }}</span>
                   </h5>
@@ -148,9 +180,10 @@
                       'ic-plus': !item.isActive,
                       'ic-dash-primary-dark': item.isActive,
                     }"
+                    aria-hidden="true"
                   ></i>
                 </div>
-                <div class="faq-info transition-general">
+                <div class="faq-info transition-general" :id="`faq-info-${i}`" :aria-hidden="!item.isActive">
                   <span class="info-content transition-general">{{ item.answer }}</span>
                 </div>
               </li>

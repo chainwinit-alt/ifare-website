@@ -151,8 +151,13 @@ $STANDARD_WIDTH_PHONE: 516px;
                 .article-item {
                     padding: 16px 24px 24px;
 
+                    // #29: 不再隱藏箭頭，改 inline 大小 + opacity 提供「可點擊」視覺暗示
                     .link-url {
-                        display: none;
+                        display: inline-block;
+                        width: 18px;
+                        height: 18px;
+                        opacity: 0.55;
+                        align-self: flex-end;
                     }
                 }
             }
