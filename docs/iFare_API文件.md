@@ -1,12 +1,17 @@
 # iFare 基金會網站 — API 文件
 
-> 版本：v2.2（補完待審版）
+> 版本：v2.3（FarePolicy + BM25 細節補完版）
 > 建立日期：2026-04-14
 > 整併日期：2026-04-28
-> 補完日期：2026-05-05
+> 最後補完日期：2026-05-05
 > 負責人：昀臻
 >
-> **本版說明**：v2.2 將 v2.1 標 [TBD] 的項目透過 source code 進一步驗證 / 補完，目前所有可從 code 端確認的事實已寫入。FarePolicy 章節依 round4 分支現況描述（合併 master `b89f5b9` 後可能微調）。新增 §6.7 BM25 / Jieba 模糊搜尋演算法說明。**待主管 / DevOps 校對**的項目集中於文末附錄。
+> **本版說明**：v2.3 在主管合併 master `b89f5b9` (v1.0.3) 後對程式碼再校對一輪，補完：
+> - §2.3.4 / §3.4.2 FarePolicy 完整 DTO 結構（含後台所有 Insert / Update 欄位、巢狀關聯）
+> - §6.7 BM25 演算法精確參數（`k1=1.2` / `b=0.75`、欄位權重表、Hybrid 評分公式、閾值 0.08）
+> - §4.3 錯誤碼狀態確認（前台 15 個、後台 16 個 — v1.0.3 在後台新增 `-3 PermissionFail`，前台未跟進）
+>
+> 本版 [TBD] 項目大幅縮減為 5 項業務 / 部署細節（需主管確認，非 code 可解）。
 
 ---
 
@@ -124,8 +129,6 @@ JWT 關閉。`appsettings.json` 中 `Authentication.JwtBearer.IsEnabled = "false
 
 #### 2.3.4 福利政策 — `/FarePolicy/*`（**主搜尋端點**）
 
-📌 本節依 **`feat/uiux-round4` 分支現況** 描述。如主管合併 master `b89f5b9` (v1.0.3) 後參數有變動，本節需重新對照。
-
 | 方法 | 端點 | 用途 |
 |------|------|------|
 | GET / POST | `GetIFarePolicyList` | 搜尋福利政策（多條件 + 關鍵字 + 模糊搜尋） |
@@ -140,16 +143,52 @@ JWT 關閉。`appsettings.json` 中 `Authentication.JwtBearer.IsEnabled = "false
 | CodePolicy | long? | 否 | 政策類別代碼 ID |
 | CodeRecipient | long? | 否 | 受助對象代碼 ID |
 | CodeIncome | long? | 否 | 經濟條件代碼 ID |
-| CodeIdentities | long[]? | 否 | 特殊身分代碼 ID 陣列 |
+| CodeIdentities | List<long>? | 否 | 特殊身分代碼 ID 陣列 |
 | Query | string? | 否 | 關鍵字搜尋字串（**注意：DTO 欄位名為 `Query`，非 v2.0 寫的 `Keyword`**） |
 
 ⚠️ **目前 round4 分支 DTO 無 `SkipCount` / `MaxResultCount` 欄位**，回傳結構亦**無 `totalCount`**。v2.0 / v1.1 文件描述的「分頁機制 + 50 上限」與目前實作不符。如要分頁需後端新增。
 
-**搜尋實作：BM25 + Jieba 結巴分詞模糊比對**（不是 LIKE 比對）
+**搜尋實作：BM25 + TraditionalChineseFuzzyMatcher 混合評分**（不是 LIKE 比對）
 - 詳見 §6.7「BM25 / Jieba 模糊搜尋演算法」
-- 演算法位於 `IFare_API.Core/TaskManager/Common/TraditionalChineseFuzzyMatcher.cs` + `IFare_API.Core/TaskManager/Fare/Policy/FarePolicyTaskManager.cs`
+- 演算法位置：
+  - `IFare_API.Core/TaskManager/Fare/Policy/FarePolicyTaskManager.cs:97-289`
+  - `IFare_API.Core/TaskManager/Common/TraditionalChineseFuzzyMatcher.cs`
 
 **回傳：** `FarePolicyResultDto`，含 `errCode` / `errMsg` / `result: List<FarePolicyDataDto>`
+
+**`FarePolicyDataDto`**（列表單筆，BM25 索引含這些欄位）：
+
+| 欄位 | 型別 | BM25 / Fuzzy 權重 | 說明 |
+|------|------|-------|------|
+| ID | long | — | 政策 ID |
+| Title | string | **0.50** | 政策名稱（最高權重） |
+| Qualification | string | **0.12** | 申辦條件 |
+| CodeKeywordList | List\<CodeDataDto\> | **0.16** | 關鍵字 |
+| CodePolicy_LabelName | string | **0.08** | 政策類別 |
+| CodeRecipientList | List\<CodeDataDto\> | **0.05** | 受助對象 |
+| CodeDomicile_LabelName | string | **0.04** | 戶籍地 |
+| CodeIdentityList | List\<CodeDataDto\> | **0.03** | 身分別 |
+| CodeIncomeList | List\<CodeDataDto\> | **0.02** | 經濟條件 |
+| CodeDomicile_ID | long | — | 戶籍地代碼 ID |
+| CodePolicy_ID | long | — | 政策類別代碼 ID |
+| CreateTime | DateTime? | — | 建立時間 |
+| ReleaseTime | DateTime? | — | 發布時間 |
+| DiscontinuedTime | DateTime? | — | 終止時間 |
+
+📌 **權重總和 = 1.0**。Title 占一半（最重要），keyword + qualification 次之。詳細 score 計算見 §6.7。
+
+**`FarePolicyDetailDataDto`**（詳情頁回傳，比 List 多以下欄位）：
+
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| WelfareInfo | string | 福利內容（補助金額 / 福利說明） |
+| Evidence | string | 應備文件 |
+| IFareOfficeUnitID | long | 承辦單位 ID |
+| OfficeUnitInfo | string | 承辦單位資訊 |
+| OfficeUnitTel | string | 承辦單位電話 |
+| CompetentAuthority | string | 主管機關 |
+| Remark | string | 備註 |
+| UpdateTime | DateTime? | 更新時間 |
 
 #### 2.3.5 常見問題 — `/FareQA/*`
 
@@ -438,20 +477,60 @@ JWT 開啟。所有端點需在 Header 帶 `Authorization: Bearer <token>`。
 
 #### 3.4.2 FarePolicy（後台）
 
-📌 本節依 **`feat/uiux-round4` 分支現況** 描述基本結構。完整 DTO 欄位（含 Welfare 巢狀關聯、申辦條件、補助金額等）建議在 master `b89f5b9` 合併後一併補完。
+| 方法 | 端點 | 回傳 |
+|------|------|------|
+| POST | `/api/services/app/FarePolicy/GetDataList` | `FarePolicyResultDto` |
+| POST | `/api/services/app/FarePolicy/InsertFarePolicy` | `ErrorInfoBaseDto` |
+| POST | `/api/services/app/FarePolicy/UpdateFarePolicy` | `ErrorInfoBaseDto` |
+| POST | `/api/services/app/FarePolicy/DeleteFarePolicy` | `ErrorInfoBaseDto` |
 
-| 方法 | 端點 |
-|------|------|
-| POST | `/api/services/app/FarePolicy/GetDataList` |
-| POST | `/api/services/app/FarePolicy/InsertFarePolicy` |
-| POST | `/api/services/app/FarePolicy/UpdateFarePolicy` |
-| POST | `/api/services/app/FarePolicy/DeleteFarePolicy` |
+**`FarePolicyFilterParamDto`（後台搜尋 — 全欄位）：**
 
-**`FarePolicyFilterParamDto`（後台搜尋）共通欄位：**
-- 同 §3.4.1 的 CreateDateStart/End、UpdateDateStart/End、State、IDs
-- 額外：CodePolicy、CodeRecipient、CodeDomicile、CodeIncome、CodeIdentities、Query
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| CreateDateStart / End | DateTime? | 建立日期範圍 |
+| UpdateDateStart / End | DateTime? | 更新日期範圍 |
+| ReleaseTimeStart / End | DateTime? | 發布日期範圍 |
+| DiscontinuedTimeStart / End | DateTime? | 終止日期範圍 |
+| CodeDomicile | long? | 戶籍地代碼 |
+| CodePolicy | long? | 政策類型代碼 |
+| CodeKeywords | List\<long\>? | 關鍵字代碼陣列 |
+| State | string | 狀態（Enable / Disable / Delete） |
+| State_Release | string | 發布狀態 |
+| IDs | List\<long\>? | ID 陣列 |
 
-**`FarePolicyInsertDataDto` / `FarePolicyEditorDataDto`：** 含 Title、Qualification、WelfareInfo、CodePolicyID、CodeRecipientID、CodeDomicileIDs、CodeIncomeID、CodeIdentityIDs、ReleaseTime、IsEnabled 等多項 — 完整欄位待第二波補完。
+**`FarePolicyInsertDataDto`（新增 / Update 共用基底欄位）：**
+
+| 欄位 | 型別 | 必填 | 說明 |
+|------|------|------|------|
+| Title | string | ✅ | 政策名稱 |
+| Qualification | string | ✅ | 申辦條件 |
+| WelfareInfo | string | ✅ | 補助金額 / 福利內容 |
+| Evidence | string | 否 | 應備文件 |
+| IFareOfficeUnitID | long | ✅ | 承辦單位 ID（對應 §2.3.6） |
+| OfficeUnitInfo | string | ✅ | 承辦單位資訊 |
+| OfficeUnitTel | string | ✅ | 承辦單位電話 |
+| CodePolicyID | long | ✅ | 政策類型代碼 |
+| CodeDomicileID | long | ✅ | 戶籍地代碼 |
+| CodeIndentityIDs | List\<long\> | ✅ | 身分別代碼陣列（**注意：source code 拼成 `CodeIndentity` 而非 `CodeIdentity`，typo 沿用**） |
+| CodeIncomeIDs | List\<long\> | ✅ | 所得級距代碼陣列 |
+| CodeRecipientIDs | List\<long\> | ✅ | 受款人類型代碼陣列 |
+| CodeKeywordIDs | List\<long\> | ✅ | 關鍵字代碼陣列 |
+| CompetentAuthority | string | ✅ | 主管機關 |
+| ReleaseTime | DateTime? | 否 | 發布時間 |
+| DiscontinuedTime | DateTime? | 否 | 終止時間 |
+| Remark | string | 否 | 備註 |
+| IsEnabled | bool | ✅ | 是否啟用 |
+
+**`FarePolicyEditorDataDto`：** 上述所有欄位 + `ID` (long, 必填)
+**`FarePolicyDeleteDataDto`：** 僅 `ID` (long, 必填)
+
+**`FarePolicyDataDto`（後台列表單筆）：** 與前台 §2.3.4 列出的欄位類似，**額外含**：
+- `State`（啟用 / 停用 / 刪除）
+- `State_Release`（已發布 / 未發布 / 已下架）
+- `CreateUserID` / `CreateDate` / `UpdateUserID` / `UpdateDate`（繼承自 `EditorUserBaseDto`）
+
+⚠️ **注意 typo**：source code 中 `CodeIndentityIDs`（少了 `i` → `Indentity` 而非 `Identity`），前端送請求時需照 source 欄位名才能對到。
 
 #### 3.4.3 Account（帳號管理）
 
@@ -903,32 +982,120 @@ app.UseHealthChecks("/api/health");
 
 當使用者透過 `GetIFarePolicyList` 帶 `Query` 關鍵字搜尋時，系統用以下流程處理：
 
-**步驟 1：分詞（JiebaNet.Segmenter）**
-- 用 `JiebaSegmenter.Cut()` 將中文 `Query` 字串切分為詞彙陣列
-- 例：`"低收入戶補助"` → `["低收入戶", "補助"]`
-- 套件：`JiebaNet.Segmenter` + `JiebaNet.Analyser` NuGet
-- 位置：`IFare_API.Core/TaskManager/Common/TraditionalChineseFuzzyMatcher.cs:6,12`
+#### 演算法總覽
 
-**步驟 2：BM25 評分**
-- `FarePolicyTaskManager.cs` 內 `TokenizeForBm25()` / `BuildTermFrequencyMap()` / `ComputeBm25Score()`
-- 對每筆候選政策，計算 query 詞 vs 政策內容（Title / Qualification / WelfareInfo 等）的 BM25 相似度
-- 評分公式（標準 BM25）：
-  ```
-  score(D, Q) = Σ IDF(qi) · f(qi, D) · (k1 + 1) / (f(qi, D) + k1 · (1 - b + b · |D| / avgdl))
-  ```
-- k1, b 參數實際值需查 `ComputeBm25Score()` 內常數定義（建議補入文件）
+```
+[Query 字串]
+    ↓ (1) Normalize: NFC + 小寫 + 移除空白標點
+    ↓ (2) Jieba 分詞 (cutAll=false)
+    ↓ (3a) BM25 評分 (k1=1.2, b=0.75)         ← 對每筆政策計算
+    ↓ (3b) Fuzzy Score 評分 (8 欄位加權)       ← 對每筆政策計算
+    ↓ (4) Hybrid 評分 = fuzzy×0.68 + bm25×0.32
+    ↓ (5) 過濾 < 0.08 的低分結果
+    ↓ (6) 依分數降序排列回傳
+```
 
-**步驟 3：繁體中文模糊匹配（TraditionalChineseFuzzyMatcher）**
-- 處理錯字 / 同義詞容錯（例如 "補助" vs "補貼"）
-- 與 BM25 結果合併加權
+#### 步驟 1：Query Normalize
 
-**步驟 4：排序與輸出**
-- 依綜合分數降序排列
-- **無分頁限制**（round4 現況）：回傳所有符合候選
+`TraditionalChineseFuzzyMatcher.cs:14-48` 對輸入字串做：
+- Unicode NFC 正規化
+- 全部轉小寫
+- 移除空白字元、標點符號、Control 字元
 
-📌 **演算法權重 / 閾值參數待補**：實際 BM25 的 `k1` / `b` 參數值、模糊匹配閾值等需查 `ComputeBm25Score()` 與 `TraditionalChineseFuzzyMatcher` 實作後補入本節。
+例：`" 低收入  戶 補助！"` → `"低收入戶補助"`
 
-⚠️ master `b89f5b9` (v1.0.3) 是否有調整此演算法的權重 / 閾值，等合併後可一併校對。
+#### 步驟 2：Jieba 分詞
+
+`TraditionalChineseFuzzyMatcher.cs:155-198`
+- 套件：`JiebaNet.Segmenter` + `JiebaNet.Analyser`
+- 切詞模式：`cutAll = false`（精確模式，非全模式）
+- **無停用詞**過濾（保留所有詞彙）
+- **Fallback**：若 Jieba 失敗，改用 2-char bigrams + unigrams 切分
+
+例：`"低收入戶補助"` → Jieba: `["低收入戶", "補助"]` / Fallback: `["低收", "收入", "入戶", "戶補", "補助", ...]`
+
+#### 步驟 3a：BM25 評分
+
+`TraditionalChineseFuzzyMatcher.cs:98-120`
+
+**參數**：
+- `k1 = 1.2`（term frequency 飽和係數）
+- `b = 0.75`（document length normalization 係數）
+
+**IDF 計算**（line 117）：
+```
+IDF(qi) = Log(1 + (docCount - docFreq + 0.5) / (docFreq + 0.5))
+```
+
+**Term frequency 詞彙權重**（line 269-305 `GetInformationWeight`）：
+- 1 字（單字）：基礎權重 `0.18`
+- 2 字（雙字）：基礎權重 `1.0`
+- 3+ 字：基礎權重 `1.15`
+- Frequency ratio 衰減：`max(0.2, 1 - (freq_ratio × 0.85))`
+
+**搜尋文件構建**（`FarePolicyTaskManager.cs:276-289`）：
+每筆政策被組合為一段文字餵進 BM25：
+```
+[Title] [Qualification] [CodePolicy_LabelName] [CodeDomicile_LabelName]
+[Keywords...] [Recipients...] [Identities...] [Incomes...]
+```
+
+#### 步驟 3b：Fuzzy Score 加權（8 欄位）
+
+`FarePolicyTaskManager.cs:241-265 GetSearchScore`
+
+對 query 與政策**各個欄位**分別計算 fuzzy score 後加權：
+
+| 欄位 | 權重 |
+|------|------|
+| Title（政策名稱） | **0.50** |
+| CodeKeywordList（關鍵字） | **0.16** |
+| Qualification（申辦條件） | **0.12** |
+| CodePolicy_LabelName（政策類別） | **0.08** |
+| CodeRecipientList（受款人） | **0.05** |
+| CodeDomicile_LabelName（戶籍地） | **0.04** |
+| CodeIdentityList（身分別） | **0.03** |
+| CodeIncomeList（所得級距） | **0.02** |
+| **總和** | **1.00** |
+
+**單一欄位 Fuzzy score 計算**（`TraditionalChineseFuzzyMatcher.cs:50-68`）：
+- exactContainsBoost：完全包含 +0.35
+- termScore（Token Overlap） × 0.65
+- bigramScore（Dice Coefficient 2-gram） × 0.25
+- unigramScore（Dice Coefficient 1-gram） × 0.10
+- 最終取 `min(1.0, sum)` 截頂
+
+**注意：無編輯距離 / 同義詞 dictionary** — 用 Dice Coefficient + Jieba token overlap 替代。
+
+#### 步驟 4：Hybrid 評分合併
+
+`FarePolicyTaskManager.cs:267-274 GetHybridSearchScore`
+
+```csharp
+normalizedBm25 = Math.Min(1.0, bm25Score / maxBm25Score);
+hybridScore    = (fuzzyScore × 0.68) + (normalizedBm25 × 0.32);
+```
+
+📌 BM25 分數會先**用該批查詢中最高分**做正規化到 [0, 1]，再以 32% 權重併入。Fuzzy score 占主導（68%）。
+
+#### 步驟 5：閾值過濾
+
+`FarePolicyTaskManager.cs:227`：**hybrid score < `0.08` 的政策直接排除**，不出現在結果。
+
+#### 步驟 6：排序輸出
+
+依 `hybridScore` **降序**排列，**無分頁限制**回傳全部符合候選。
+
+#### 範例搜尋詞
+
+`FarePolicyTaskManager.cs` **無寫死的測試 query**，不過 line 291-307 有 logging 機制紀錄使用者實際搜尋字串。可從 log 觀察熱門關鍵字。
+
+#### 調整建議
+
+如要調整搜尋行為：
+- 想讓 Title 比重再高 → 改 `GetSearchScore` 內 0.5 為更大值（記得其他欄位要等比例縮減保持總和 1.0）
+- 想放寬篩選門檻 → 改 line 227 的 `0.08` 閾值（變小 = 顯示更多結果，變大 = 顯示更少更精準）
+- 想偏向 BM25 → 改 `GetHybridSearchScore` 的 0.68 / 0.32 權重
 
 ---
 
@@ -940,32 +1107,32 @@ app.UseHealthChecks("/api/health");
 | v1.1 | 2026-04-28 | 補完所有端點細節；FarePolicy 新增 `Keyword`/`SkipCount`/`MaxResultCount` 參數與 `totalCount` 回應；說明記憶體保護機制 ⚠️ **註：v1.1 描述的部分 FarePolicy 內容與目前 round4 分支實作不符** |
 | v2.0 | 2026-04-28 | 整併版正式釋出 |
 | v2.1 | 2026-05-05 | 第一波補完：對照 source code 修正錯誤碼系統（5 → 16 個）、CRUD 方法簽章、DTO 結構、CORS 實值、Personal / ImgManager 命名修正、Img/GetmImg 補入；新增章節「六、部署 / 維運」 |
-| **v2.2** | **2026-05-05** | **補完待審版：將 v2.1 標 [TBD] 項目透過 source code 進一步驗證；補完 JWT TTL / 演算法、圖片上傳實際機制、Code 6 表 Entity 額外欄位、permissions 實際位置、前台 logging 設定、首次部署 SOP 初稿；新增 §6.7 BM25 / Jieba 演算法說明；FarePolicy 章節改為「依 round4 現況」描述（保留待 master `b89f5b9` 合併後校對註記）** |
+| v2.2 | 2026-05-05 | 補完待審版：將 v2.1 標 [TBD] 項目透過 source code 進一步驗證；補完 JWT TTL / 演算法、圖片上傳實際機制、Code 6 表 Entity 額外欄位、permissions 實際位置、前台 logging 設定、首次部署 SOP 初稿；新增 §6.7 BM25 / Jieba 演算法說明；FarePolicy 章節改為「依 round4 現況」描述 |
+| **v2.3** | **2026-05-05** | **第二波補完（master `b89f5b9` 合併後）：§2.3.4 FarePolicy 前台補上完整 DataDto / DetailDataDto 欄位 + BM25 欄位權重表（Title 0.5 / Keyword 0.16 / Qualification 0.12 ...）；§3.4.2 FarePolicy 後台補上 18 欄 InputDataDto 完整結構；§6.7 BM25 演算法精確化（k1=1.2 / b=0.75 / 閾值 0.08 / Hybrid 公式 fuzzy×0.68 + bm25×0.32）；§4.3 錯誤碼確認後台 v1.0.3 新增 `-3` PermissionFail；附錄縮減為 5 項業務 / 部署細節** |
 
 ---
 
 ## 附錄：尚需校對 / 補完的項目
 
-以下項目**建議由主管 / DevOps 校對後補入或修正**。本版已盡量從 source code 抽取現況資料，但部分需要正式環境 / 業務領域知識才能確認：
+v2.3 已將 master `b89f5b9` 合併後的所有 code 端可確認事實補入。以下 5 項屬於業務領域知識 / 部署環境細節，**需要主管 / DevOps 確認**，code 端解不了：
 
-### 待主管確認
-1. **§3.3 `rememberClient` 細節** — ABP 內建處理，但實際 cookie / session 行為需主管確認
-2. **§3.4.6 CodeDomicile / CodeRecipient ID 對照表** — 「中央 = 1」「縣市 = 2-23」等業務約定的 ID 編號需業務端文件補
-3. **§3.4.5 / §4.6 5MB 圖片上限** — code 內未發現此限制，主管須確認限制實作位置（前端？反向代理？口頭規範？）
-4. **§4.7 正式環境 CORS** — 是否補 `https://www.i-fare.org.tw`？是否清掉 localhost 開頭？
-5. **§6.4 首次部署 SOP** — 初稿基於現況推導，需 DevOps 校對遺漏 / 錯誤步驟
-6. **§6.7 BM25 演算法 k1 / b 參數值** — 從 `ComputeBm25Score()` 取實際常數補入
+### 待主管 / 業務確認
+1. **§3.3 `rememberClient` 細節** — 實際 cookie / session 持續時間、跨裝置行為
+2. **§3.4.6 CodeDomicile / CodeRecipient / CodePolicy ID 對照表** — 「中央 = 1」「縣市 = 2-23」等業務約定的 ID 編號需業務端文件補
+3. **§3.4.5 / §4.6 5MB 圖片上限位置** — code 內未發現此限制，需確認實作層級（前端 TinyMCE 設定？反向代理？口頭規範？）
 
-### 待主管合併 master `b89f5b9` 後校對
-1. **§2.3.4 / §3.4.2 FarePolicy** — 完整 DTO 欄位（Welfare 巢狀關聯、申辦條件、補助金額等）
-2. **§4.3 完整錯誤碼若有新增** — 重新對照 `ErrAPI.cs`
-3. **§6.7 BM25 演算法權重 / 閾值** — v1.0.3 是否有調整
+### 待 DevOps 確認
+4. **§4.7 正式環境 CORS** — 是否補 `https://www.i-fare.org.tw`？是否清掉 prod 環境的 localhost origins？
+5. **§6.4 首次部署 SOP** — 初稿基於 source code + web.config 現況推導，需 DevOps 校對遺漏 / 錯誤步驟（特別是 IIS / HTTPS / 反向代理的詳細設定）
 
-### 建議改善項目（資安 / 維運）
-1. **§3.4.5 圖片上傳安全性補強** — 補檔案大小、副檔名白名單、檔名清洗
-2. **§4.7 環境分離** — 新增 `appsettings.Production.json`
-3. **§5.1 Swagger 保護** — 正式環境補 Basic Auth
-4. **§6.5 Health Check 補實作** — 補 `/api/health` 端點
+---
+
+### 建議改善項目（資安 / 維運）— 與文件無關，但建議主管列入後續 backlog
+
+1. **§3.4.5 圖片上傳安全性補強** — 後端補檔案大小檢查、副檔名白名單、檔名清洗（避免 path traversal）
+2. **§4.7 環境分離** — 新增 `appsettings.Production.json`，區隔 dev / prod 設定
+3. **§5.1 Swagger 保護** — 正式環境 Swagger UI 無 Auth 保護，建議補 Basic Auth 或 IP whitelist
+4. **§6.5 Health Check 補實作** — 補 `/api/health` 端點供監控系統 probe
 
 ---
 
