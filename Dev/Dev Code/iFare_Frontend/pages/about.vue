@@ -110,26 +110,69 @@
                 <div class="member-photo ic-about-member-2"></div>
             </div>
         </div>
-        <div class="part-member-bottom">
-            <div class="member-content">
-                <div class="member-info" name="boss_C">
-                    <ul class="list-unstyled member-intros">
-                    </ul>
-                    <h4 class="member-name">顏杏蓉</h4>
-                </div>
+        <div class="part-member-bottom about-member-bottom-v2">
+            <div class="executive-row">
+                <span class="executive-title">執行長</span>
+                <h4 class="executive-name">顏杏蓉</h4>
             </div>
             <div class="purpose-content">
-                <h6 class="purpose-title">一起加入行動</h6>
-                <span class="purpose-info">
-                                          我們相信，每一份投入都能為孩子、為家庭、為土地帶來改變。<br>
-                                          歡迎加入長穩，一起推動永續、教育與文化的善循環。<br>
-                <h6 class="purpose-title">成為志工</h6>
-                                          陪伴孩子學習、參與教育活動，並共同推動資源整合等公益行動。<br>
-                <h6 class="purpose-title">成為合作夥伴</h6>
-                                          與我們攜手推動教育支持、社福資源整合、文化永續與環境保育。<br>
-                <h6 class="purpose-title">支持我們</h6>
-                                          您的支持能擴大公益能量，讓更多孩子獲得陪伴，更多家庭得到協助。<br>
-</span>
+                <ul class="list-unstyled purpose-list">
+                    <li class="purpose-item">
+                        <span class="purpose-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>
+                            </svg>
+                        </span>
+                        <div class="purpose-text">
+                            <h6 class="purpose-title">一起加入行動</h6>
+                            <p class="purpose-info">
+                                我們相信，每一份投入都能為孩子、為家庭、為土地帶來改變。<br>
+                                歡迎加入長穩，一起推動永續、教育與文化的善循環。
+                            </p>
+                        </div>
+                    </li>
+                    <li class="purpose-item">
+                        <span class="purpose-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="9" cy="7" r="3.2"/>
+                                <path d="M3 21v-1a6 6 0 0 1 12 0v1"/>
+                                <path d="M19 8v6M16 11h6"/>
+                            </svg>
+                        </span>
+                        <div class="purpose-text">
+                            <h6 class="purpose-title">成為志工</h6>
+                            <p class="purpose-info">陪伴孩子學習、參與教育活動，並共同推動資源整合等公益行動。</p>
+                        </div>
+                    </li>
+                    <li class="purpose-item">
+                        <span class="purpose-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m11 17-4 4-3.5-3.5L7 14M13 7l4-4 3.5 3.5L17 10"/>
+                                <path d="m8 13 5-5"/>
+                                <path d="M9 12 4 7l3-3 5 5"/>
+                                <path d="m12 15 5 5 3-3-5-5"/>
+                            </svg>
+                        </span>
+                        <div class="purpose-text">
+                            <h6 class="purpose-title">成為合作夥伴</h6>
+                            <p class="purpose-info">與我們攜手推動教育支持、社福資源整合、文化永續與環境保育。</p>
+                        </div>
+                    </li>
+                    <li class="purpose-item">
+                        <span class="purpose-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 12V8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v4"/>
+                                <path d="M2 12h20v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8z"/>
+                                <path d="M12 22V6"/>
+                                <path d="M12 6S9 2.5 7 4s.5 4 5 4M12 6s3-3.5 5-2-.5 4-5 4"/>
+                            </svg>
+                        </span>
+                        <div class="purpose-text">
+                            <h6 class="purpose-title">支持我們</h6>
+                            <p class="purpose-info">您的支持能擴大公益能量，讓更多孩子獲得陪伴，更多家庭得到協助。</p>
+                        </div>
+                    </li>
+                </ul>
             </div>
         </div>
       </section>
@@ -170,3 +213,190 @@ function toggleHow(idx: number) {
   activeHow.value = activeHow.value === idx ? null : idx;
 }
 </script>
+
+<style lang="scss" scoped>
+// UIUX 新需求 (2026-05-05): 「一起加入行動」等 4 項加 icon + 重整 markup
+// 對應 _color.scss 色票
+$c-orange: #EA5504;
+$c-orange-light: #FFE6D5;
+$c-black: #171818;
+
+// 「執行長 顏杏蓉」橫排、置中於 4 項上方（覆寫全域 .part-member-bottom 的 row 排版）
+// 用 .app-body[name="about"] 提升特異度 + !important 雙保險，蓋過 _appBody_about.scss
+.app-body[name="about"] .part-member-bottom.about-member-bottom-v2 {
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 40px !important;
+  margin-top: 60px;
+}
+
+// 對齊董事長呈現方式：「執行長」標籤在橘色方框上方且**靠左**（如同 boss_P/boss_E ::before 的 left: 0）
+.executive-row {
+  display: inline-flex;
+  flex-direction: column;        // 標籤在上 / 名字框在下
+  align-items: flex-start;       // 靠左對齊（不置中）
+  gap: 8px;
+  margin: 0;
+}
+
+// 「執行長」對齊 _appBody_about.scss 中董事長 / 創辦人 ::before 的視覺
+.executive-title {
+  font-size: 16px;
+  color: $c-orange;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+// 姓名框：方框 + 靈動島 hover 效果（對齊整站 _appBody_about.scss 內 morph 卡片的 cubic-bezier 動畫）
+.executive-name {
+  margin: 0;
+  padding: 18px 28px;
+  background: rgba($c-orange, 0.92);
+  color: #FFFFFF;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 28px;
+  border-radius: 4px;
+  cursor: default;
+  will-change: transform;
+  box-shadow:
+    0 11px 30px -8px rgba($c-orange, 0.5),
+    inset 0 1px 0 rgba(#FFFFFF, 0.18);
+  transition:
+    transform 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    background 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+
+  &:hover {
+    transform: translateY(-4px) scale(1.04);
+    background: $c-orange;
+    box-shadow:
+      0 18px 40px -10px rgba($c-orange, 0.6),
+      inset 0 1px 0 rgba(#FFFFFF, 0.28);
+  }
+}
+
+// 4 項強制同一排（覆寫 global .purpose-content max-width: 502px 限制 + 不換行）
+// 寬度對齊下方 .card-advance（section-about-bottom 內的兩欄 CTA 卡）
+:deep(.purpose-content) {
+  max-width: 920px !important;
+  width: 100%;
+}
+
+// 同步把下方 .card-advance 框定為相同寬度，避免兩個區塊看起來錯位
+:deep(.section-about-bottom .card-advance) {
+  width: 920px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.purpose-list {
+  display: flex;
+  flex-direction: row;        // 4 項橫排
+  flex-wrap: nowrap;          // 強制不換行
+  justify-content: center;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+// 每一項做成輕量卡片 — 與上方 executive name 的橘色方框視覺呼應
+.purpose-item {
+  flex: 1 1 0;                // 4 等分
+  min-width: 0;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;     // icon 在上、文字在下
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(#FFFFFF, 0.7);
+  border: 1px solid rgba($c-black, 0.06);
+  border-radius: 12px;
+  cursor: default;
+  will-change: transform;
+  box-shadow:
+    0 8px 24px -8px rgba($c-black, 0.08),
+    inset 0 1px 0 rgba(#FFFFFF, 0.6);
+  transition:
+    transform 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    background 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+
+  &:hover {
+    transform: translateY(-4px) scale(1.02);
+    background: #FFFFFF;
+    border-color: rgba($c-orange, 0.3);
+    box-shadow:
+      0 16px 36px -10px rgba($c-orange, 0.18),
+      inset 0 1px 0 rgba(#FFFFFF, 0.8);
+
+    .purpose-icon {
+      transform: translateY(-2px) scale(1.05);
+      background: $c-orange;
+      color: #FFFFFF;
+    }
+  }
+}
+
+.purpose-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: $c-orange-light;
+  color: $c-orange;
+  border-radius: 12px;
+  transition: transform 0.25s ease, background 0.25s ease;
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+// (purpose-item:hover .purpose-icon 已內嵌進 .purpose-item:hover 規則內)
+
+.purpose-text {
+  flex: 1;
+  min-width: 0;
+}
+
+// 覆寫全域 _appBody_about.scss 的 .purpose-title / .purpose-info margin
+.purpose-text .purpose-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: $c-black;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.purpose-text .purpose-info {
+  margin: 0;
+  font-size: 15px;
+  color: rgba($c-black, 0.7);
+  line-height: 1.7;
+}
+
+@media (max-width: 768px) {
+  .purpose-list {
+    flex-direction: column;       // 手機改回垂直 stack
+    flex-wrap: nowrap;
+    gap: 18px;
+    max-width: 100%;
+  }
+  .purpose-item {
+    flex: 1 1 auto;
+    max-width: 100%;
+    flex-direction: row;          // 手機 icon 左 + 文字右（節省垂直空間）
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .purpose-icon { width: 38px; height: 38px; svg { width: 18px; height: 18px; } }
+  .purpose-text .purpose-title { font-size: 16px; }
+  .purpose-text .purpose-info { font-size: 14px; line-height: 1.6; }
+}
+</style>
