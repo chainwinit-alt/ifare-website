@@ -121,6 +121,10 @@
 useHead({
   title: '長穩社福慈善基金會'
 })
+
+// 首頁置頂福利專欄顯示數量
+const TOP_WELFARE_DISPLAY_COUNT = 3;
+
 const { $WebApiGet } = useNuxtApp();
 
 interface newsItem {
@@ -171,7 +175,7 @@ function SetWelfareData() {
     const _data = res.result.result;
 
     let _list: Array<welfareItem> = _data
-      .slice(0, 3)
+      .slice(0, TOP_WELFARE_DISPLAY_COUNT)
       .map((item: any, i: number) => {
         return {
           id: item.id,

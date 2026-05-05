@@ -180,6 +180,9 @@
 </template>
 
 <script setup lang="ts">
+// 福利政策資格預覽截斷長度（字元數）
+const QUALIFICATION_PREVIEW_LENGTH = 50;
+
 const _isSelect = ref(false)
 useHead({
     bodyAttrs: {
@@ -486,7 +489,7 @@ function SetDataInit(_q: any) {
         return {
           id: item.id,
           title: item.title,
-          qualification: `${item.qualification.slice(0, 50)}...`,
+          qualification: `${item.qualification.slice(0, QUALIFICATION_PREVIEW_LENGTH)}...`,
           area: item.codeDomicile_LabelName,
           hasIndentity: item.codeIdentityList.findIndex((p:any) => p.id == 1) < 0,
           hasIncome: item.codeIncomeList.findIndex((p:any) => p.id == 1) < 0,
@@ -532,7 +535,6 @@ function PageChange(pageNum: number) {
 }
 
 function isSelectOpen(type: string, val: boolean) {
-  // console.log(`[${type}] val => ${val} || type ${typeof val}`)
   _isSelect.value = val
   // useHead({
   //       bodyAttrs: {

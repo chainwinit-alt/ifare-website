@@ -230,7 +230,6 @@ function getSelectValue(type: string, val: string) {
 }
 
 function isSelectOpen(type: string, val: boolean) {
-  // console.log(`[${type}] val => ${val} || type ${typeof val}`)
   _isSelect.value = val
   // useHead({
   //   bodyAttrs: {

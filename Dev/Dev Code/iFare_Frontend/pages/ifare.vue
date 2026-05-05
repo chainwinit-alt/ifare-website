@@ -223,7 +223,6 @@ const ALL_POLICY_VALUE = "__all_policy";
 const ALL_AREA_VALUE = "__all_area";
 
 function isSelectOpen(type: string, val: boolean) {
-  // console.log(`[${type}] val => ${val} || type ${typeof val}`)
   _isSelect.value = val
   // useHead({
   //   bodyAttrs: {
@@ -253,7 +252,6 @@ const canSearch = computed(() => {
 });
 
 function getSelectValue(type: string, val: string) {
-  // console.log(`[${type}] val => ${val}`)
   if (type == "policy") {
     codeSelect_policy.value = val;
     // isVisibleRecipient.value = true

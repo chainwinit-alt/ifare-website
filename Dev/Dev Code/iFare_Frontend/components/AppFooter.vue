@@ -16,7 +16,7 @@
         </div>
       </div>
       <div class="part part-info">
-        <i class="ic-footer-logo app-icon"></i>
+        <i class="ic-footer-logo app-icon" role="img" aria-label="iFare 基金會"></i>
         <ul class="list-unstyled footer-info-items">
             <li name="tel">
                 <span class="footer-info-label"><i class="footer-info-icon ic-info-tel"></i>聯絡電話</span>

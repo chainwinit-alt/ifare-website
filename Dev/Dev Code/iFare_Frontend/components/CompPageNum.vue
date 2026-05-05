@@ -7,20 +7,26 @@
       </div>
       <div class="page-control">
         <button
+          type="button"
           class="btn-icon btn-page-prev"
           :class="{ disabled: currentPage == 1 }"
+          :disabled="currentPage == 1"
+          aria-label="上一頁"
           @click="PagePrev"
         >
-          <i class="ic-arrow-simple"></i>
+          <i class="ic-arrow-simple" aria-hidden="true"></i>
         </button>
         <button
+          type="button"
           class="btn-icon btn-page-next"
           :class="{
             disabled: currentPage >= props.pageList.length,
           }"
+          :disabled="currentPage >= props.pageList.length"
+          aria-label="下一頁"
           @click="PageNext"
         >
-          <i class="ic-arrow-simple"></i>
+          <i class="ic-arrow-simple" aria-hidden="true"></i>
         </button>
       </div>
     </div>
@@ -59,27 +65,19 @@
   
     const lastPageItemWidth =
       (props.pageList.length - _currentPageNum + 2) * WIDTH_PAGEITEM; // Add current page and after empty tag.
-  
-      console.log('props.pageList.length: ', props.pageList.length)
-      console.log('_widthPageContent.value: ', _widthPageContent.value)
-      console.log('lastPageItemWidth: ', lastPageItemWidth)
-  
+
     if (_currentPageNum == props.pageList.length) {
-      console.log("ssssss")
       _currentPageNum = _currentPageNum - Math.floor(_widthPageContent.value / WIDTH_PAGEITEM) + 1
-      console.log(_currentPageNum)
       props.pageList.forEach((_item: any, i: number) => {
         _item.isHide = i + 1 < _currentPageNum;
       });
     }
-  
+
     if (lastPageItemWidth > _widthPageContent.value) {
       props.pageList.forEach((_item: any, i: number) => {
         _item.isHide = i + 1 < _currentPageNum;
       });
     }
-  
-    console.log(props.pageList)
   }
   
   function PagePrev(e: any) {

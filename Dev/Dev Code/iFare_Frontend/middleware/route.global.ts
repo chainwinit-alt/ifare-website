@@ -4,6 +4,12 @@
  * 1. 記錄訪客瀏覽路徑至後端 API
  * 2. 處理帶有 ?reload 查詢參數的強制重新載入邏輯
  */
+
+// 強制 reload 後 reloadNuxtApp 快取存活時間（毫秒）
+const RELOAD_CACHE_TTL_MS = 3000;
+// reload 邏輯延遲執行，等 router replace 完成
+const RELOAD_DEFER_MS = 10;
+
 export default defineNuxtRouteMiddleware((to, from) => {
     const $router = useRouter();
     // 檢查目標路由是否含有 reload 查詢參數（用於強制重新整理頁面）
@@ -12,10 +18,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
 
 
     // 呼叫後端 API 記錄訪客造訪的路由路徑
-    const visitorRecord = $WebApiPost("/Visitor/SetVisitorRecord", { router: to.path})
-    visitorRecord.then((res: any) => {
-        // console.log(res)
-    })
+    $WebApiPost("/Visitor/SetVisitorRecord", { router: to.path})
 
     // 若路由含有 reload 參數，移除該參數後強制重新載入頁面
     if (isReload) {
@@ -25,9 +28,9 @@ export default defineNuxtRouteMiddleware((to, from) => {
         // 以乾淨的查詢參數取代目前路由
         $router.replace({ path: to.path, query: _query})
         setTimeout(() => {
-            // 捲回頁面頂端後重新載入（ttl: 3000ms 為快取存活時間）
+            // 捲回頁面頂端後重新載入
             window.scrollTo(0,0)
-            reloadNuxtApp({ path: to.path, ttl: 3000 })
-        }, 10)
+            reloadNuxtApp({ path: to.path, ttl: RELOAD_CACHE_TTL_MS })
+        }, RELOAD_DEFER_MS)
     }
 })

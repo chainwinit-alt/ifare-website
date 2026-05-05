@@ -1,12 +1,17 @@
 <template>
-  <div class="page-component">
+  <nav class="page-component" aria-label="分頁導覽">
     <div class="page-content" ref="_elnPageContent">
       <ul class="list-unstyled pages-list">
         <li
           :class="{ active: _page.isActive, hide: _page.isHide }"
           v-for="_page in pageList"
           :key="_page.num"
+          role="button"
+          tabindex="0"
+          :aria-current="_page.isActive ? 'page' : undefined"
+          :aria-label="`第 ${_page.num} 頁`"
           @click="PageClick(_page.num)"
+          @keydown.enter.space.prevent="PageClick(_page.num)"
         >
           {{ _page.num }}
         </li>
@@ -14,23 +19,29 @@
     </div>
     <div class="page-control">
       <button
+        type="button"
         class="btn-icon btn-page-prev"
         :class="{ disabled: currentPage == 1 }"
+        :disabled="currentPage == 1"
+        aria-label="上一頁"
         @click="PagePrev"
       >
-        <i class="ic-arrow-simple"></i>
+        <i class="ic-arrow-simple" aria-hidden="true"></i>
       </button>
       <button
+        type="button"
         class="btn-icon btn-page-next"
         :class="{
           disabled: currentPage >= props.pageList.length,
         }"
+        :disabled="currentPage >= props.pageList.length"
+        aria-label="下一頁"
         @click="PageNext"
       >
-        <i class="ic-arrow-simple"></i>
+        <i class="ic-arrow-simple" aria-hidden="true"></i>
       </button>
     </div>
-  </div>
+  </nav>
 </template>
 
 <script setup lang="ts">
@@ -83,8 +94,6 @@ function PageNext(e: any) {
       _item.isHide = i + 1 < _currentPageNum;
     });
   }
-
-  console.log(props.pageList)
 }
 
 function PagePrev(e: any) {

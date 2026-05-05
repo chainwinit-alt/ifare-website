@@ -112,6 +112,10 @@ definePageMeta({
   toLinkName: "i-Fare",
   toLink: "/ifare",
 });
+
+// 福利政策資格預覽截斷長度（字元數）
+const QUALIFICATION_PREVIEW_LENGTH = 50;
+
 const { $WebApiGet } = useNuxtApp();
 const route = useRoute();
 const $router = useRouter();
@@ -352,7 +356,7 @@ async function loadRelationList(infoID: number) {
     ..._data.map((item: any) => ({
       id: item.id,
       title: item.title,
-      qualification: `${(item.qualification ?? "").slice(0, 50)}...`,
+      qualification: `${(item.qualification ?? "").slice(0, QUALIFICATION_PREVIEW_LENGTH)}...`,
       area: item.codeDomicile_LabelName,
       hasIndentity: item.codeIdentityList.findIndex((p: any) => p.id == 1) < 0,
       hasIncome: item.codeIncomeList.findIndex((p: any) => p.id == 1) < 0,

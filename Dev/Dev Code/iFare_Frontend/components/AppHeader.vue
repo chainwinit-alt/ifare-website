@@ -2,9 +2,9 @@
   <header class="app-header" :name="headerNameMode">
     <div class="row">
       <div class="part part-icon">
-        <NuxtLink class="no-userselect" to="/">
-          <i class="ic-logo app-icon" :name="elementColorMode"></i>
-          <h4 class="ic-logo-title app-icon-title" :name="elementColorMode"></h4>
+        <NuxtLink class="no-userselect" to="/" aria-label="iFare 基金會 — 回首頁">
+          <i class="ic-logo app-icon" :name="elementColorMode" role="img" aria-hidden="true"></i>
+          <h4 class="ic-logo-title app-icon-title" :name="elementColorMode" aria-hidden="true"></h4>
         </NuxtLink>
       </div>
       <nav class="part part-nav">
@@ -84,8 +84,8 @@
     </ul>
     <section class="section-menu-share">
       <div class="group-share">
-        <NuxtLink class="btn btn-icon" to="/" @click="MenuToggle">
-          <i class="ic-mobile-menu-logo"></i>
+        <NuxtLink class="btn btn-icon" to="/" aria-label="iFare 基金會 — 回首頁" @click="MenuToggle">
+          <i class="ic-mobile-menu-logo" aria-hidden="true"></i>
         </NuxtLink>
         <a class="btn btn-icon" href="https://www.facebook.com/ccfIfare" target="_blank" rel="noopener noreferrer">
           <i class="ic-mobile-share-facebook"></i>

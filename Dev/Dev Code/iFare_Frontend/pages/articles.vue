@@ -375,13 +375,11 @@ function PageChange_Welfare(pageNum: number) {
 const welfareFilter_Policy = ref();
 const welfareFilter_Keyword = ref();
 function setFilter(type: string, val: number) {
-  // console.log(`[${type}] val => ${val} || type ${typeof val}`)
   if (type == "policy") welfareFilter_Policy.value = val;
   if (type == "keyword") welfareFilter_Keyword.value = val;
 }
 
 function isSelectOpen(type: string, val: boolean) {
-  // console.log(`[${type}] val => ${val} || type ${typeof val}`)
   // useHead({
   //       bodyAttrs: {
   //           class: {

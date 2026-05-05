@@ -1,4 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+const SITEMAP_LASTMOD = new Date().toISOString();
+
 export default defineNuxtConfig({
   devtools: { enabled: false },
 
@@ -68,42 +70,42 @@ export default defineNuxtConfig({
       sitemap: {
         priority: 1,
         changefreq: 'daily',
-        lastmod: '2023-12-27T11:09:27+00:00'
+        lastmod: SITEMAP_LASTMOD
       }
     },
     '/about': {
       sitemap: {
         priority: 0.8,
         changefreq: 'daily',
-        lastmod: '2023-12-27T11:09:27+00:00'
+        lastmod: SITEMAP_LASTMOD
       }
     },
     '/news': {
       sitemap: {
         priority: 0.8,
         changefreq: 'daily',
-        lastmod: '2023-12-27T11:09:27+00:00'
+        lastmod: SITEMAP_LASTMOD
       }
     },
     '/articles': {
       sitemap: {
         priority: 0.8,
         changefreq: 'daily',
-        lastmod: '2023-12-27T11:09:27+00:00'
+        lastmod: SITEMAP_LASTMOD
       }
     },
     '/collaborator': {
       sitemap: {
         priority: 0.8,
         changefreq: 'daily',
-        lastmod: '2023-12-27T11:09:27+00:00'
+        lastmod: SITEMAP_LASTMOD
       }
     },
     '/ifare': {
       sitemap: {
         priority: 0.8,
         changefreq: 'daily',
-        lastmod: '2023-12-27T11:09:27+00:00'
+        lastmod: SITEMAP_LASTMOD
       }
     },
     '/articles/lazy': {
