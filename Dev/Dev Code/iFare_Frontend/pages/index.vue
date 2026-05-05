@@ -1,6 +1,6 @@
 <template>
   <div class="app-body" :name="$route.name">
-    <div class="part-bg-top">
+    <div class="part-bg-top" aria-hidden="true">
       <div class="bg-img-list slider-animate">
         <i class="bg-img ic-index-img-0"></i>
         <i class="bg-img ic-index-img-1"></i>
@@ -19,9 +19,9 @@
         <div class="index-top-title">
           <div class="title-group">
             <h1 class="index-title main-title">為生命給力，邁向長穩未來。</h1>
-            <h3 class="index-title sub-title">
+            <p class="index-title sub-title">
               Empowering Lives, A Steady Tomorrow.
-            </h3>
+            </p>
           </div>
           <NuxtLink to="/ifare" class="btn btn-ifare-start transition-general">
             <span class="txt-ifare">i-Fare</span>
@@ -44,7 +44,7 @@
             <li class="news-item transition-general" v-for="_item in newsList">
               <NuxtLink class="item-page-link" :to="{ path: '/news/info', query: { id: _item.id } }">
                 <div class="item-title">
-                  <h2 class="news-title">{{ _item.title }}</h2>
+                  <h4 class="news-title">{{ _item.title }}</h4>
                   <span class="item-date">{{ _item.releaseTime }}</span>
                 </div>
                 <div class="item-body">
@@ -89,7 +89,7 @@
                 :to="{ path: '/articles/welfare', query: { id: _card.id } }"
               >
                 <div class="card-top">
-                  <h2 class="card-title">{{ _card.title }}</h2>
+                  <h4 class="card-title">{{ _card.title }}</h4>
                   <span class="card-date">{{ _card.releaseTime }}</span>
                   <ul class="list-unstyled tags-list">
                     <li v-for="_keyword in _card.keywords">{{ _keyword }}</li>

@@ -2,7 +2,7 @@
   <div class="app-body-child" :name="$route.name">
     <section class="section section-top">
       <h2 class="article-title">{{ newsItem.title }}</h2>
-      <h6 class="article-date">{{ newsItem.releaseTime }}</h6>
+      <p class="article-date">{{ newsItem.releaseTime }}</p>
       <div class="article-tags">
         <label class="article-num">{{ newsItem.id }}</label>
       </div>
@@ -10,7 +10,7 @@
     <section class="section section-info">
       <div class="article-info">
         <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
-        <div class="raw-html" v-html="newsItem.content"></div>
+        <div class="raw-html" v-html="useSanitize(newsItem.content)"></div>
       </div>
     </section>
   </div>
@@ -39,10 +39,11 @@ content: "",
 title: '',
 releaseTime: ''
 });
+
 const listNews = $WebApiGet('/News/GetNewsDetail', { newsID: _newsID})
 listNews.then((res:any) => {
     const _data = res.result.result
-    
+
     let _newsList:Array<newsItem> = _data.map((item:any, i:number) => {
         return {
             id: item.id,
@@ -69,3 +70,20 @@ async function ShareWebUrlToLine() {
 }
 
 </script>
+
+<style scoped lang="scss">
+// admin 在編輯器內貼的 YouTube iframe，前台保持 16:9 響應式 + 不爆寬
+.raw-html {
+  :deep(iframe) {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    margin: 24px 0;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.18);
+    background: #000;
+  }
+}
+</style>
