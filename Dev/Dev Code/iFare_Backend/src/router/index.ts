@@ -123,6 +123,12 @@ import Personal_ChangePwdViewVue from '@/views/Personal/Personal_ChangePwdView.v
 import ImgManager_DataListView from '@/views/ImgManager/ImgManager_DataListView.vue'
 //#endregion
 
+//#region [View.vue] 動態頁面管理 (CMS) — 後臺優化 #X
+import PageManagement_IndexViewVue from '@/views/PageManagement/PageManagement_IndexView.vue'
+import PageManagement_DataListViewVue from '@/views/PageManagement/PageManagement_DataListView.vue'
+import PageManagement_AddEditViewVue from '@/views/PageManagement/PageManagement_AddEditView.vue'
+//#endregion
+
 // 輸出基礎路徑（開發除錯用）
 console.log(import.meta.env.BASE_URL)
 
@@ -881,6 +887,48 @@ const router = createRouter({
           meta: {
             requiresAuth: true,
             title: '變更密碼'
+          }
+        }
+      ]
+      //#endregion
+    },
+    {
+      //#region 動態頁面管理 (CMS) — 後臺優化 #X
+      path: '/PageManagement',
+      name: 'PageManagement_Index',
+      component: PageManagement_IndexViewVue,
+      meta: {
+        indexKey: 'PageManagement',
+        requiresAuth: true,
+        title_parent: '頁面管理',
+        urlName_parent: 'PageManagement_DataList'
+      },
+      children: [
+        {
+          path: '',
+          name: 'PageManagement_DataList',
+          component: PageManagement_DataListViewVue,
+          meta: {
+            requiresAuth: true,
+            title: '頁面管理'
+          }
+        },
+        {
+          path: 'Add',
+          name: 'PageManagement_Add',
+          component: PageManagement_AddEditViewVue,
+          meta: {
+            requiresAuth: true,
+            title: '新增頁面'
+          }
+        },
+        {
+          path: 'Edit',
+          name: 'PageManagement_Edit',
+          component: PageManagement_AddEditViewVue,
+          meta: {
+            requiresAuth: true,
+            title: '編輯頁面'
           }
         }
       ]

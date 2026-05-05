@@ -34,7 +34,10 @@ declare module 'vue' {
     IconSupport: typeof import('./src/components/icons/IconSupport.vue')['default']
     IconTooling: typeof import('./src/components/icons/IconTooling.vue')['default']
     MainHeader: typeof import('./src/components/MainHeader.vue')['default']
+    PreviewPane: typeof import('./src/components/PageBuilder/PreviewPane.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SectionEditor: typeof import('./src/components/PageBuilder/SectionEditor.vue')['default']
+    SectionList: typeof import('./src/components/PageBuilder/SectionList.vue')['default']
   }
 }
