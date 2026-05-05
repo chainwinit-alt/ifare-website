@@ -83,6 +83,12 @@ desktop.ini
 *.log
 App_Data/Logs/
 Logs/
+scripts/memory-log-*.csv
+
+# ===========================
+# Local-only assets (not part of repo)
+# ===========================
+png/
 
 # ===========================
 # Secrets / Config overrides
