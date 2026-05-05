@@ -11,6 +11,9 @@ const RELOAD_CACHE_TTL_MS = 3000;
 const RELOAD_DEFER_MS = 10;
 
 export default defineNuxtRouteMiddleware((to, from) => {
+    // 跳過 API 路徑（dev 環境 devProxy 沒接好時，避免 middleware 無窮觸發）
+    if (to.path.startsWith('/api/')) return
+
     const $router = useRouter();
     // 檢查目標路由是否含有 reload 查詢參數（用於強制重新整理頁面）
     const isReload = to.query.hasOwnProperty('reload')

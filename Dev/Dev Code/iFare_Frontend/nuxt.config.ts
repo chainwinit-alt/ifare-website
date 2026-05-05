@@ -13,12 +13,18 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // SSR (server-side fetch) 必須用「絕對 URL」直打正式 API
+    //   原因：Nuxt SSR $fetch 用相對路徑會打回 Nuxt 自己，devProxy 不會生效，造成中介層無窮迴圈
+    // Client (browser) 用相對路徑，走 nitro.devProxy 轉發到正式 API
+    // 部署時用環境變數覆蓋：
+    //   - VM 環境：NUXT_PUBLIC_FRONTEND_API_BASE=http://10.200.0.39/ifare_api/api/services/app
+    //   - 正式機：NUXT_PUBLIC_FRONTEND_API_BASE=https://www.i-fare.org.tw/ifare_api/api/services/app
     frontendApiServerBase:
-      process.env.NUXT_FRONTEND_API_SERVER_BASE || 'http://10.200.0.39/ifare_api/api/services/app',
+      process.env.NUXT_FRONTEND_API_SERVER_BASE || 'https://www.i-fare.org.tw/ifare_api/api/services/app',
     public: {
-      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'http://10.200.0.39',
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'http://ifare.local',
       frontendApiBase:
-        process.env.NUXT_PUBLIC_FRONTEND_API_BASE || 'http://10.200.0.39/ifare_api/api/services/app'
+        process.env.NUXT_PUBLIC_FRONTEND_API_BASE || '/api/services/app'
     }
   },
 
