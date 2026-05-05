@@ -82,17 +82,8 @@
             />
           </div>
           <div class="item item-query">
-            <label class="filter-name" for="input-query-keyword">關鍵字</label>
-            <input
-              id="input-query-keyword"
-              v-model="searchQuery"
-              class="input-query"
-              type="search"
-              placeholder="輸入繁中關鍵字"
-              aria-describedby="input-query-hint"
-              maxlength="50"
-            />
-            <span id="input-query-hint" class="sr-only">輸入福利相關關鍵字以縮小搜尋範圍，按搜尋按鈕送出</span>
+            <label class="filter-name">關鍵字</label>
+            <input v-model="searchQuery" class="input-query" type="text" placeholder="請輸入關鍵字" />
           </div>
           <div class="item item-bottom">
             <button
@@ -228,6 +219,9 @@ interface selectItem {
   isActive: boolean;
 }
 
+const ALL_POLICY_VALUE = "__all_policy";
+const ALL_AREA_VALUE = "__all_area";
+
 function isSelectOpen(type: string, val: boolean) {
   // console.log(`[${type}] val => ${val} || type ${typeof val}`)
   _isSelect.value = val
@@ -276,14 +270,14 @@ codePolicy.then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
 
-  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
       val: item.id,
     };
   });
 
-  policySelectList.push(..._list);
+  policySelectList.push({ name: "全部", val: ALL_POLICY_VALUE, isActive: false }, ..._list);
 });
 
 // Code area
@@ -292,14 +286,14 @@ codeArea.then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
 
-  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
       val: item.id,
     };
   });
 
-  areaSelectList.push(..._list);
+  areaSelectList.push({ name: "全國", val: ALL_AREA_VALUE, isActive: false }, ..._list);
 });
 
 // Code recipient
@@ -320,6 +314,13 @@ codeRecipient.then((res: any) => {
 });
 
 function SwitchRecipient(codeVal: any) {
+  const selectedItem = recipientSelectList.find((item) => item.val == codeVal);
+  if (selectedItem?.isActive) {
+    selectedItem.isActive = false;
+    codeSelectRecipient.value = "";
+    return;
+  }
+
   recipientSelectList.forEach((item, i) => {
     item.isActive = item.val == codeVal;
     if (item.isActive) {

@@ -104,6 +104,14 @@
   }
 
   function ClickSelectItem(name: string, val: string) {
+    if (selectVal.value == val) {
+      selectName.value = "";
+      selectVal.value = "";
+      emits("update:selectValue", props.selectType, "");
+      ToggleSelectDialog()
+      return;
+    }
+
     selectName.value = name;
     selectVal.value = val;
     emits("update:selectValue", props.selectType, selectVal.value);

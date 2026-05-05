@@ -12,11 +12,11 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     frontendApiServerBase:
-      process.env.NUXT_FRONTEND_API_SERVER_BASE || '/api/services/app',
+      process.env.NUXT_FRONTEND_API_SERVER_BASE || 'http://10.200.0.39/ifare_api/api/services/app',
     public: {
-      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'http://ifare.local',
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'http://10.200.0.39',
       frontendApiBase:
-        process.env.NUXT_PUBLIC_FRONTEND_API_BASE || '/api/services/app'
+        process.env.NUXT_PUBLIC_FRONTEND_API_BASE || 'http://10.200.0.39/ifare_api/api/services/app'
     }
   },
 
@@ -52,7 +52,7 @@ export default defineNuxtConfig({
     id: 'G-QCT2XVFX2L'
   },
   site: {
-    url: process.env.NUXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+    url: process.env.NUXT_PUBLIC_SITE_URL || 'http://10.200.0.39'
   },
   sitemap: {
     xslColumns: [
