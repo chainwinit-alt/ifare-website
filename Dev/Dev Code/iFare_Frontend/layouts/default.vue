@@ -15,6 +15,10 @@
         <slot />
         <!-- 頁尾元件 -->
         <AppFooter />
+        <!-- UIUX #136 — 聊天機器人浮動入口（全站固定） -->
+        <CompChatbotEntry v-model:open="isChatbotOpen" />
+        <!-- UIUX #137 — 聊天機器人 Welcome 視窗 -->
+        <CompChatbotWelcome v-model:open="isChatbotOpen" />
     </div>
 </template>
 
@@ -22,9 +26,14 @@
 import { getCurrentInstance } from 'vue';
 import AppHeader from '../components/AppHeader.vue'
 import AppFooter from '../components/AppFooter.vue';
+import CompChatbotEntry from '../components/CompChatbotEntry.vue';
+import CompChatbotWelcome from '../components/CompChatbotWelcome.vue';
 
 // 追蹤行動選單開啟狀態，用於控制 body overflow
 const _isMenuOpen = ref(false)
+
+// UIUX #136 — 聊天機器人開啟狀態（之後 #137 Welcome 視窗 mount 時讀此 ref）
+const isChatbotOpen = ref(false)
 
 // 當選單開啟時，在 body 加上 overflow-disabled class，防止背景頁面捲動
 useHead({
