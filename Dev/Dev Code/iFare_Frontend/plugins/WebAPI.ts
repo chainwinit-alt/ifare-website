@@ -1,19 +1,76 @@
+// API 錯誤分類 — 給呼叫端 + 全域監聽用
+type ApiErrorCategory = 'timeout' | 'network' | 'client' | 'server' | 'unknown'
+
+interface ApiErrorInfo {
+    category: ApiErrorCategory
+    status?: number
+    message: string
+    path: string
+    method: 'GET' | 'POST'
+    raw?: any
+}
+
+function categorizeError(error: any): ApiErrorCategory {
+    // $fetch (ofetch) 對 timeout 拋的 error.cause 是 AbortError
+    if (error?.name === 'AbortError' || error?.cause?.name === 'AbortError') return 'timeout'
+    const status = error?.statusCode ?? error?.response?.status
+    if (typeof status === 'number') {
+        if (status >= 500) return 'server'
+        if (status >= 400) return 'client'
+    }
+    if (error?.message?.includes('fetch failed') || error?.message?.includes('Network')) return 'network'
+    return 'unknown'
+}
+
+const API_TIMEOUT_MS = 15000
+
 export default defineNuxtPlugin(() => {
     const config = useRuntimeConfig()
     const baseURL = import.meta.server
         ? config.frontendApiServerBase
         : config.public.frontendApiBase
 
+    function logError(info: ApiErrorInfo) {
+        // 結構化 log，方便日後改成集中 reporter
+        // eslint-disable-next-line no-console
+        console.warn(`[WebAPI][${info.method}][${info.category}]`, info.path, {
+            status: info.status,
+            message: info.message,
+        })
+    }
+
     return {
         provide: {
-            WebApiGet: async (path: string, query?: object) => await $fetch(path, { baseURL, query }).catch(error => {
-                console.error('[WebAPI][GET]', path, error?.data ?? error)
-                return null
-            }),
-            WebApiPost: async (path: string, query?: object) => await $fetch(path, { method: 'POST', baseURL, query }).catch(error => {
-                console.error('[WebAPI][POST]', path, error?.data ?? error)
-                return null
-            })
-        }
+            WebApiGet: async (path: string, query?: object) => {
+                try {
+                    return await $fetch(path, { baseURL, query, timeout: API_TIMEOUT_MS })
+                } catch (error: any) {
+                    logError({
+                        category: categorizeError(error),
+                        status: error?.statusCode ?? error?.response?.status,
+                        message: error?.message ?? String(error),
+                        path,
+                        method: 'GET',
+                        raw: error?.data ?? error,
+                    })
+                    return null  // 維持向下相容
+                }
+            },
+            WebApiPost: async (path: string, query?: object) => {
+                try {
+                    return await $fetch(path, { method: 'POST', baseURL, query, timeout: API_TIMEOUT_MS })
+                } catch (error: any) {
+                    logError({
+                        category: categorizeError(error),
+                        status: error?.statusCode ?? error?.response?.status,
+                        message: error?.message ?? String(error),
+                        path,
+                        method: 'POST',
+                        raw: error?.data ?? error,
+                    })
+                    return null
+                }
+            },
+        },
     }
 })

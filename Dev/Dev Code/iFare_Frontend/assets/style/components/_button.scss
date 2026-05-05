@@ -1,3 +1,12 @@
+// Generic disabled state (avoid mistaking disabled buttons for clickable)
+button:disabled,
+.btn:disabled,
+.btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .btn {
   display: inline-flex;
   padding: 0 24px;

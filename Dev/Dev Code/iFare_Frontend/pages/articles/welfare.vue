@@ -16,7 +16,7 @@
     <section class="section section-info">
       <div class="article-info">
         <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
-        <div class="raw-html" v-html="_welfareItem.content"></div>
+        <div class="raw-html" v-html="useSanitize(_welfareItem.content)"></div>
       </div>
     </section>
     <section class="section section-bottom">

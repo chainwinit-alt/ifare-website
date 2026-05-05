@@ -137,7 +137,7 @@ export class AjaxRef {
      * 開發環境走本機站台，正式環境走公開後端站台。
      */
     getBaseUrl(): string {
-        return this.isDevMode ? "https://localhost:44311" : "http://10.200.0.39/ifare_bdapi"
+        return "https://www.i-fare.org.tw/ifare_bdapi"
     }
 
     /**

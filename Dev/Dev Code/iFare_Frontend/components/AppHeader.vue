@@ -1,158 +1,102 @@
 <template>
-  <!--
-    網站頁首元件（AppHeader）
-    包含：
-    - 桌機版導覽列（Logo、主選單、i-Fare 按鈕、漢堡選單按鈕）
-    - 行動版側拉選單（mobile-menu）
-
-    name 屬性依路由切換樣式主題：
-      - "index"：首頁深色主題
-      - "indexIFare"：i-Fare 頁主題
-      - "other"：其他頁面淺色主題
-  -->
-  <header
-    class="app-header"
-    :name="
-      ($route.name != 'index' && !$route.name?.toString().includes('ifare'))
-        ? 'other'
-        : $route.name == 'index' || $route.name?.toString().includes('contact')
-        ? $route.name
-        : 'indexIFare'
-    "
-  >
+  <header class="app-header" :name="headerNameMode">
     <div class="row">
-      <!-- Logo 區塊：點擊返回首頁 -->
       <div class="part part-icon">
         <NuxtLink class="no-userselect" to="/">
-          <!-- Logo 圖示：依路由切換白色/深色版本 -->
-          <i
-            class="ic-logo app-icon"
-            :name="
-              ($route.name != 'index' &&
-                !$route.name?.toString().includes('ifare')) ||
-              $route.name?.toString().includes('contact')
-                ? 'other'
-                : 'indexIFare'
-            "
-          ></i>
-          <!-- Logo 文字標題 -->
-          <h4
-            class="ic-logo-title app-icon-title"
-            :name="
-              ($route.name != 'index' &&
-                !$route.name?.toString().includes('ifare')) ||
-              $route.name?.toString().includes('contact')
-                ? 'other'
-                : 'indexIFare'
-            "
-          ></h4>
+          <i class="ic-logo app-icon" :name="elementColorMode"></i>
+          <h4 class="ic-logo-title app-icon-title" :name="elementColorMode"></h4>
         </NuxtLink>
       </div>
-
-      <!-- 桌機版主導覽選單 -->
       <nav class="part part-nav">
-        <ul
-          class="list-unstyled"
-          :name="
-            ($route.name != 'index' &&
-              !$route.name?.toString().includes('ifare')) ||
-            $route.name?.toString().includes('contact')
-              ? 'other'
-              : 'indexIFare'
-          "
-        >
-          <!-- 各導覽項目：active class 標示當前所在頁面 -->
+        <ul class="list-unstyled" :name="elementColorMode">
           <li :class="{ active: $route.name == 'about' }">
-            <NuxtLink to="/about">關於長穩</NuxtLink>
+            <NuxtLink to="/about" :aria-current="$route.name === 'about' ? 'page' : undefined">關於長穩</NuxtLink>
           </li>
           <li :class="{ active: $route.name == 'news' }">
-            <NuxtLink to="/news">最新消息</NuxtLink>
+            <NuxtLink to="/news" :aria-current="$route.name === 'news' ? 'page' : undefined">最新消息</NuxtLink>
           </li>
           <li :class="{ active: $route.name == 'articles' }">
-            <NuxtLink to="/articles">福利專欄</NuxtLink>
+            <NuxtLink to="/articles" :aria-current="$route.name === 'articles' ? 'page' : undefined">福利專欄</NuxtLink>
           </li>
           <li :class="{ active: $route.name == 'collaborator' }">
-            <NuxtLink to="/collaborator">公益夥伴</NuxtLink>
+            <NuxtLink to="/collaborator" :aria-current="$route.name === 'collaborator' ? 'page' : undefined">公益夥伴</NuxtLink>
           </li>
-          <!-- i-Fare 特殊樣式按鈕 -->
+          <li :class="{ active: $route.name == 'future' }">
+            <NuxtLink to="/future" :aria-current="$route.name === 'future' ? 'page' : undefined">未來規劃</NuxtLink>
+          </li>
           <li>
             <NuxtLink
               to="/ifare"
               class="btn btn-empty-oval transition-general btn-ifare"
+              :aria-current="$route.name?.toString().includes('ifare') ? 'page' : undefined"
               >i-Fare</NuxtLink
             >
           </li>
         </ul>
       </nav>
-
-      <!-- 行動版漢堡選單按鈕：點擊切換 isShowMenu 狀態 -->
       <div class="part part-menu">
         <button
+          ref="menuButtonRef"
           class="btn btn-icon btn-menu no-userselect"
           @click="MenuToggle"
-          :name="
-            ($route.name != 'index' &&
-              !$route.name?.toString().includes('ifare')) ||
-            $route.name?.toString().includes('contact')
-              ? 'other'
-              : 'indexIFare'
-          "
+          :aria-expanded="isShowMenu"
+          aria-controls="mobile-menu"
+          aria-label="開啟菜單"
+          :name="elementColorMode"
         >
           <i class="ic-menu"></i>
         </button>
       </div>
     </div>
   </header>
-
-  <!-- 行動版側拉選單：active class 控制顯示/隱藏動畫 -->
-  <div class="mobile-menu" :class="{ active: isShowMenu }">
+  <div id="mobile-menu" class="mobile-menu" :class="{ active: isShowMenu }" role="dialog" aria-modal="true" aria-label="行動選單">
     <ul class="list-unstyled menu-list">
-      <!-- 行動版導覽連結：點擊後自動關閉選單 -->
       <li :class="{ active: $route.name == 'about'}">
-        <NuxtLink class="mobileNav-link" to="/about" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/about" :aria-current="$route.name === 'about' ? 'page' : undefined" @click="MenuToggle"
           >關於長穩</NuxtLink
         >
       </li>
       <li :class="{ active: $route.name == 'news'}">
-        <NuxtLink class="mobileNav-link" to="/news" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/news" :aria-current="$route.name === 'news' ? 'page' : undefined" @click="MenuToggle"
           >最新消息</NuxtLink
         >
       </li>
       <li :class="{ active: $route.name == 'articles'}">
-        <NuxtLink class="mobileNav-link" to="/articles" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/articles" :aria-current="$route.name === 'articles' ? 'page' : undefined" @click="MenuToggle"
           >福利專欄</NuxtLink
         >
       </li>
       <li :class="{ active: $route.name == 'ifare'}">
-        <NuxtLink class="mobileNav-link" to="/ifare" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/ifare" :aria-current="$route.name?.toString().includes('ifare') ? 'page' : undefined" @click="MenuToggle"
           >i-Fare</NuxtLink
         >
       </li>
       <li :class="{ active: $route.name == 'collaborator'}">
-        <NuxtLink class="mobileNav-link" to="/collaborator" @click="MenuToggle"
+        <NuxtLink class="mobileNav-link" to="/collaborator" :aria-current="$route.name === 'collaborator' ? 'page' : undefined" @click="MenuToggle"
           >公益夥伴</NuxtLink
         >
       </li>
+      <li :class="{ active: $route.name == 'future'}">
+        <NuxtLink class="mobileNav-link" to="/future" :aria-current="$route.name === 'future' ? 'page' : undefined" @click="MenuToggle"
+          >未來規劃</NuxtLink
+        >
+      </li>
     </ul>
-
-    <!-- 行動選單底部：Logo 首頁連結、Facebook、LINE 社群連結 -->
     <section class="section-menu-share">
       <div class="group-share">
         <NuxtLink class="btn btn-icon" to="/" @click="MenuToggle">
           <i class="ic-mobile-menu-logo"></i>
         </NuxtLink>
-        <a class="btn btn-icon" href="https://www.facebook.com/ccfIfare">
+        <a class="btn btn-icon" href="https://www.facebook.com/ccfIfare" target="_blank" rel="noopener noreferrer">
           <i class="ic-mobile-share-facebook"></i>
         </a>
-        <a class="btn btn-icon" href="https://lin.ee/eHw9VpL">
+        <a class="btn btn-icon" href="https://lin.ee/eHw9VpL" target="_blank" rel="noopener noreferrer">
           <i class="ic-mobile-share-line"></i>
         </a>
       </div>
     </section>
-
-    <!-- 行動選單右上角關閉按鈕 -->
     <section class="section-right-top">
-      <button class="btn btn-icon btn-close" @click="MenuToggle">
+      <button class="btn btn-icon btn-close" @click="MenuToggle" aria-label="關閉菜單">
         <i class="ic-close"></i>
       </button>
     </section>
@@ -160,18 +104,57 @@
 </template>
 
 <script setup lang="ts">
-// 行動選單的開/關狀態
+const route = useRoute();
 const isShowMenu = ref(false);
+const menuButtonRef = ref<HTMLButtonElement | null>(null);
 
-// 定義向父層（default.vue）發出的事件，通知選單開關狀態
 const emits = defineEmits(["isOpened"]);
 
-/**
- * 切換行動選單的顯示/隱藏狀態
- * 同時向父元件發送 isOpened 事件，以便控制 body overflow
- */
+// #45: 抽出原本散在 5 處的 route 條件，集中管理
+// header :name 用 (3 種值: 路由名 / 'indexIFare' / 'other')
+const headerNameMode = computed(() => {
+  const name = route.name?.toString() || ''
+  const isIndex = name === 'index'
+  const isIfare = name.includes('ifare')
+  const isContact = name.includes('contact')
+  if (!isIndex && !isIfare) return 'other'
+  if (isIndex || isContact) return name
+  return 'indexIFare'
+})
+// 子元素 (logo / nav ul / button) 用 (2 種值: 'other' / 'indexIFare')
+const elementColorMode = computed(() => {
+  const name = route.name?.toString() || ''
+  const isIndex = name === 'index'
+  const isIfare = name.includes('ifare')
+  const isContact = name.includes('contact')
+  if ((!isIndex && !isIfare) || isContact) return 'other'
+  return 'indexIFare'
+})
+
 function MenuToggle() {
   isShowMenu.value = !isShowMenu.value;
   emits("isOpened", isShowMenu.value)
 }
+
+// Focus management: 開啟時 focus 至首個 menu link，關閉時 focus 回菜單按鈕
+watch(isShowMenu, async (open) => {
+  await nextTick();
+  if (open) {
+    const firstLink = document.querySelector<HTMLElement>('.mobile-menu.active .menu-list li:first-child a');
+    firstLink?.focus();
+  } else {
+    menuButtonRef.value?.focus();
+  }
+});
+
+// ESC 關閉 menu
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && isShowMenu.value) {
+    isShowMenu.value = false;
+    emits("isOpened", false);
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeyDown));
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown));
 </script>

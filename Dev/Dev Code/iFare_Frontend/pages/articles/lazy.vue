@@ -13,7 +13,7 @@
     <section class="section section-info">
       <div class="article-info">
         <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
-        <div class="raw-html" v-html="_lazyItem.content"></div>
+        <div class="raw-html" v-html="useSanitize(_lazyItem.content)"></div>
       </div>
     </section>
     <section class="section section-bottom">
@@ -74,7 +74,7 @@ lazyDetailGet.then((res:any) => {
     
     _lazyItem.id = _data.id
     _lazyItem.title = _data.title
-    _lazyItem.content = _data.imageList.map((_img:any, j: number) => { return `<img width='100%' src="${_img.imagePath}" />`}).join(' ')
+    _lazyItem.content = _data.imageList.map((_img:any, j: number) => { return `<img width='100%' src="${_img.imagePath}" alt="${_data.title} - ${j + 1}" loading="lazy" />`}).join(' ')
     _lazyItem.releaseTime = _releaseTime
     _lazyItem.codePolicy = _data.codePolicy_LabelName
     _lazyItem.codeKeywords = _data.codeKeywordList.map((_code:any, j:number) => { return _code.codeName})

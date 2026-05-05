@@ -19,7 +19,7 @@
           <div class="card-list">
             <div class="card-partner transition-general" v-for="_coll in collaboratorList">
               <div class="card-title">
-                <img width="56" height="52" :src="_coll.imageFile" />
+                <img width="56" height="52" :src="_coll.imageFile" :alt="`${_coll.title} logo`" loading="lazy" />
                 <h4 class="partner-title">{{ _coll.title }}</h4>
               </div>
               <ul class="list-unstyled card-infos">

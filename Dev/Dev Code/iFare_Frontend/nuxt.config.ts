@@ -2,6 +2,14 @@
 export default defineNuxtConfig({
   devtools: { enabled: false },
 
+  typescript: {
+    tsConfig: {
+      compilerOptions: {
+        ignoreDeprecations: '6.0'
+      }
+    }
+  },
+
   runtimeConfig: {
     frontendApiServerBase:
       process.env.NUXT_FRONTEND_API_SERVER_BASE || 'http://10.200.0.39/ifare_api/api/services/app',
