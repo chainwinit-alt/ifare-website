@@ -124,6 +124,17 @@
                 @update:select-value="getSelectValue"
               />
             </div>
+            <div class="part-mobile-query">
+              <label class="sr-only" for="ifare-result-mobile-query">關鍵字</label>
+              <input
+                id="ifare-result-mobile-query"
+                v-model="searchQuery"
+                class="input-query"
+                type="text"
+                placeholder="請輸入關鍵字"
+                @keydown.enter.prevent="Search"
+              />
+            </div>
             <div class="part-end">
               <CompSelectElse 
                 select-title="篩選"
@@ -147,7 +158,7 @@
       <section class="section-result">
         <div class="part-list">
           <span class="result-total">{{ storageiFarePolicyList.length }}</span>
-          <div class="result-loading" v-if="isLoading">載入中...</div>
+          <div class="result-loading" v-if="isLoading">政策資料搜尋中...</div>
           <ul class="list-unstyled result-list" v-else>
             <li
               class="result-item transition-general"
@@ -236,6 +247,25 @@ const canSearch = computed(() => {
     searchQuery.value.trim()
   );
 });
+
+function isAllPolicyValue(value: any) {
+  return value == ALL_POLICY_VALUE || value == "全部";
+}
+
+function isAllAreaValue(value: any) {
+  return value == ALL_AREA_VALUE || value == "全國";
+}
+
+function buildFarePolicyApiQuery() {
+  let query: any = {};
+  if (codeSelect_policy.value && !isAllPolicyValue(codeSelect_policy.value)) query.CodePolicy = codeSelect_policy.value;
+  if (codeSelectRecipient.value) query.CodeRecipient = codeSelectRecipient.value;
+  if (codeSelect_area.value && !isAllAreaValue(codeSelect_area.value)) query.CodeDomicile = codeSelect_area.value;
+  if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
+  if (searchQuery.value.trim()) query.Query = searchQuery.value.trim();
+  if (codeSelectIdentity.value.length > 0) query.CodeIdentities = codeSelectIdentity.value;
+  return query;
+}
 
 function getSelectValue(type: string, val: string) {
   if (type == "policy") {
@@ -418,16 +448,7 @@ function SwitchIdentity(codeVal: any) {
 
 function Search() {
   if (!canSearch.value) return false;
-  let query: any = {};
-  if (codeSelect_policy.value && codeSelect_policy.value != ALL_POLICY_VALUE) query.CodePolicy = codeSelect_policy.value;
-  if (codeSelectRecipient.value)
-    query.CodeRecipient = codeSelectRecipient.value;
-  if (codeSelect_area.value && codeSelect_area.value != ALL_AREA_VALUE) query.CodeDomicile = codeSelect_area.value;
-  if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
-  if (searchQuery.value.trim()) query.Query = searchQuery.value.trim();
-  if (codeSelectIdentity.value.length > 0)
-    query.CodeIdentities = codeSelectIdentity.value;
-  SetDataInit(query);
+  SetDataInit(buildFarePolicyApiQuery());
 }
 
 // iFare Policy
@@ -443,9 +464,9 @@ searchQuery.value = typeof $route.query.query == "string" ? $route.query.query :
 const _query: any = {};
 
 if (Object.keys($route.query).length > 0) {
-  if ($route.query.policy && $route.query.policy != ALL_POLICY_VALUE) _query.CodePolicy = $route.query.policy;
+  if ($route.query.policy && !isAllPolicyValue($route.query.policy)) _query.CodePolicy = $route.query.policy;
   if ($route.query.recipient) _query.CodeRecipient = $route.query.recipient;
-  if ($route.query.area && $route.query.area != ALL_AREA_VALUE) _query.CodeDomicile = $route.query.area;
+  if ($route.query.area && !isAllAreaValue($route.query.area)) _query.CodeDomicile = $route.query.area;
   if ($route.query.query) _query.Query = $route.query.query;
 }
 

@@ -22,7 +22,25 @@ function categorizeError(error: any): ApiErrorCategory {
     return 'unknown'
 }
 
-const API_TIMEOUT_MS = 15000
+const API_TIMEOUT_MS = 60000
+
+function sanitizeQuery(path: string, query?: object) {
+    if (!query) return query
+
+    const nextQuery: Record<string, any> = { ...(query as Record<string, any>) }
+
+    if (path.includes('/FarePolicy/GetIFarePolicyList')) {
+        if (nextQuery.CodePolicy === '__all_policy' || nextQuery.CodePolicy === '全部') {
+            delete nextQuery.CodePolicy
+        }
+
+        if (nextQuery.CodeDomicile === '__all_area' || nextQuery.CodeDomicile === '全國') {
+            delete nextQuery.CodeDomicile
+        }
+    }
+
+    return nextQuery
+}
 
 export default defineNuxtPlugin(() => {
     const config = useRuntimeConfig()
@@ -43,7 +61,7 @@ export default defineNuxtPlugin(() => {
         provide: {
             WebApiGet: async (path: string, query?: object) => {
                 try {
-                    return await $fetch(path, { baseURL, query, timeout: API_TIMEOUT_MS })
+                    return await $fetch(path, { baseURL, query: sanitizeQuery(path, query), timeout: API_TIMEOUT_MS })
                 } catch (error: any) {
                     logError({
                         category: categorizeError(error),
@@ -58,7 +76,7 @@ export default defineNuxtPlugin(() => {
             },
             WebApiPost: async (path: string, query?: object) => {
                 try {
-                    return await $fetch(path, { method: 'POST', baseURL, query, timeout: API_TIMEOUT_MS })
+                    return await $fetch(path, { method: 'POST', baseURL, query: sanitizeQuery(path, query), timeout: API_TIMEOUT_MS })
                 } catch (error: any) {
                     logError({
                         category: categorizeError(error),
