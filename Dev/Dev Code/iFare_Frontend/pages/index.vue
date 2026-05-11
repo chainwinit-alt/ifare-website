@@ -45,7 +45,7 @@
               <NuxtLink class="item-page-link" :to="{ path: '/news/info', query: { id: _item.id } }">
                 <div class="item-title">
                   <h4 class="news-title">{{ _item.title }}</h4>
-                  <span class="item-date">{{ _item.releaseTime }}</span>
+                  <span class="item-date">{{ formatDisplayDate(_item.releaseTime) }}</span>
                 </div>
                 <div class="item-body">
                   <div class="item-info">
@@ -90,8 +90,8 @@
               >
                 <div class="card-top">
                   <h4 class="card-title">{{ _card.title }}</h4>
-                  <span class="card-date">{{ _card.releaseTime }}</span>
-                  <ul class="list-unstyled tags-list">
+                  <span class="card-date">{{ formatDisplayDate(_card.releaseTime) }}</span>
+                  <ul class="list-unstyled tags-list tags-list-clamp">
                     <li v-for="_keyword in _card.keywords">{{ _keyword }}</li>
                   </ul>
                 </div>
@@ -126,6 +126,7 @@ useHead({
 const TOP_WELFARE_DISPLAY_COUNT = 3;
 
 const { $WebApiGet } = useNuxtApp();
+const { formatDisplayDate } = useDateFormatter();
 
 interface newsItem {
   id: number;

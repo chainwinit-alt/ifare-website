@@ -1,16 +1,8 @@
 <template>
   <div class="app-body" name="articles">
     <div class="bg-sector-top"></div>
-    <div class="page-navs">
-      <ul class="list-unstyled">
-        <li v-for="_page in $route.matched">
-          <NuxtLink :to="`${_page.meta.toLink}`">{{
-            _page.meta.toLinkName
-          }}</NuxtLink>
-        </li>
-      </ul>
-    </div>
-    <div class="section-list bg-section-list" v-if="$route.name == 'articles'">
+    <CompBreadCrumb />
+    <div class="section-list bg-section-list" v-if="$route.name === 'articles'">
       <section class="section section-welfare bg-section">
         <div class="bg-radial"></div>
         <div class="part-top">
@@ -21,8 +13,8 @@
           </div>
           <div class="part-filter">
             <CompSelect
-              placeholder="選擇類別"
-              select-title="類別"
+              placeholder="選擇分類"
+              select-title="分類"
               select-type="policy"
               :select-list="policySelectList"
               @update:select-value="setFilter"
@@ -43,7 +35,21 @@
         </div>
         <div class="part-body">
           <div class="part-articles">
-            <ul class="list-unstyled article-list">
+            <ul class="list-unstyled article-list" v-if="isLoadingWelfare">
+              <li class="article-item article-item-skeleton" v-for="n in 4" :key="`welfare-skeleton-${n}`">
+                <div class="skeleton-line skeleton-line-title"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line skeleton-line-info"></div>
+              </li>
+            </ul>
+            <div class="part-empty part-error" v-else-if="hasErrorWelfare">
+              <p>福利專欄載入失敗</p>
+              <button class="btn-retry transition-general" @click="loadWelfareList">重新載入</button>
+            </div>
+            <div class="part-empty" v-else-if="welfareList.length === 0">
+              <p>目前沒有符合條件的福利專欄</p>
+            </div>
+            <ul class="list-unstyled article-list" v-else>
               <li
                 class="article-item transition-general"
                 v-for="_welfare in welfareList"
@@ -57,15 +63,13 @@
                   }"
                 >
                   <div class="item-top">
-                    <span class="btn btn-tag active">{{
-                      _welfare.codePolicy
-                    }}</span>
-                    <span class="item-date">{{ _welfare.releaseTime }}</span>
+                    <span class="btn btn-tag active">{{ _welfare.codePolicy }}</span>
+                    <span class="item-date">{{ formatDisplayDate(_welfare.releaseTime) }}</span>
                   </div>
                   <div class="item-title">
                     <h2 class="article-title">{{ _welfare.title }}</h2>
-                    <ul class="list-unstyled tags-list">
-                      <li v-for="_keyword in _welfare.codeKeywords">
+                    <ul class="list-unstyled tags-list tags-list-clamp">
+                      <li v-for="_keyword in _welfare.codeKeywords" :key="`${_welfare.id}-${_keyword.val}`">
                         {{ _keyword.name }}
                       </li>
                     </ul>
@@ -80,46 +84,12 @@
               </li>
             </ul>
           </div>
-          <div class="part-pages">
+          <div class="part-pages" v-if="!isLoadingWelfare && !hasErrorWelfare && pageNums_welfare.length > 0">
             <CompPage :page-list="pageNums_welfare" @change-page="PageChange_Welfare"/>
-            
-            <!-- <div class="page-component">
-              <div class="page-content">
-                <ul class="list-unstyled pages-list">
-                  <li
-                    :class="{ active: _page.isActive }"
-                    v-for="_page in pageNums_welfare"
-                    :key="_page.num"
-                    @click="PageSwitch_Welfare(_page.num)"
-                  >
-                    {{ _page.num }}
-                  </li>
-                </ul>
-              </div>
-              <div class="page-control">
-                <button
-                  class="btn-icon btn-page-prev"
-                  :class="{ disabled: currentPage_Welfare == 1 }"
-                  @click="PageControl('welfare', 'prev', currentPage_Welfare)"
-                >
-                  <i class="ic-arrow-simple"></i>
-                </button>
-                <button
-                  class="btn-icon btn-page-next"
-                  :class="{
-                    disabled:
-                      currentPage_Welfare >
-                      storage_welfareList.length / PAGEITEMMAX_WELFARE,
-                  }"
-                  @click="PageControl('welfare', 'next', currentPage_Welfare)"
-                >
-                  <i class="ic-arrow-simple"></i>
-                </button>
-              </div>
-            </div> -->
           </div>
         </div>
       </section>
+
       <section class="section section-lazy bg-section">
         <div class="part-top">
           <div class="title-component">
@@ -140,7 +110,21 @@
         </div>
         <div class="part-body">
           <div class="part-articles">
-            <ul class="list-unstyled article-list">
+            <ul class="list-unstyled article-list" v-if="isLoadingLazy">
+              <li class="article-item article-item-skeleton" v-for="n in 4" :key="`lazy-skeleton-${n}`">
+                <div class="skeleton-line skeleton-line-title"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line skeleton-line-info"></div>
+              </li>
+            </ul>
+            <div class="part-empty part-error" v-else-if="hasErrorLazy">
+              <p>懶人包載入失敗</p>
+              <button class="btn-retry transition-general" @click="loadLazyList">重新載入</button>
+            </div>
+            <div class="part-empty" v-else-if="lazyList.length === 0">
+              <p>目前沒有符合條件的懶人包</p>
+            </div>
+            <ul class="list-unstyled article-list" v-else>
               <li
                 class="article-item transition-general"
                 v-for="_lazy in lazyList"
@@ -154,8 +138,8 @@
                     <i class="ic-box item-pattern"></i>
                     <div class="item-content">
                       <h5 class="item-title">{{ _lazy.title }}</h5>
-                      <ul class="list-unstyled tags-list">
-                        <li v-for="_keyword in _lazy.codeKeywords">
+                      <ul class="list-unstyled tags-list tags-list-clamp">
+                        <li v-for="_keyword in _lazy.codeKeywords" :key="`${_lazy.id}-${_keyword.val}`">
                           {{ _keyword.name }}
                         </li>
                       </ul>
@@ -168,38 +152,8 @@
               </li>
             </ul>
           </div>
-          <div class="part-pages">
+          <div class="part-pages" v-if="!isLoadingLazy && !hasErrorLazy && pageNums_lazy.length > 0">
             <CompPage :page-list="pageNums_lazy" @change-page="PageChange_Lazy"/>
-            <!-- <ul class="list-unstyled pages-list">
-              <li
-                :class="{ active: _page.isActive }"
-                v-for="_page in pageNums_lazy"
-                :key="_page.num"
-                @click="PageSwitch_Lazy(_page.num)"
-              >
-                {{ _page.num }}
-              </li>
-            </ul>
-            <div class="page-control">
-              <button
-                class="btn-icon btn-page-prev"
-                :class="{ disabled: currentPage_Lazy == 1 }"
-                @click="PageControl('lazy', 'prev', currentPage_Lazy)"
-              >
-                <i class="ic-arrow-simple"></i>
-              </button>
-              <button
-                class="btn-icon btn-page-next"
-                :class="{
-                  disabled:
-                    currentPage_Lazy >
-                    storage_lazyList.length / PAGEITEMMAX_LAZY,
-                }"
-                @click="PageControl('lazy', 'next', currentPage_Lazy)"
-              >
-                <i class="ic-arrow-simple"></i>
-              </button>
-            </div> -->
           </div>
         </div>
       </section>
@@ -209,32 +163,43 @@
 </template>
 
 <script setup lang="ts">
-const _isSelect = ref(false)
+import CompSelect from "../components/CompSelect.vue";
+import CompPage from "../components/CompPage.vue";
+
+const isSelectOpened = ref(false);
+
 useHead({
-  title: '福利專欄',
+  title: "福利專欄",
   bodyAttrs: {
-      class: {
-        "overflow-disabled": _isSelect,
-        "select-mode": _isSelect
-      }
-  }
-})
+    class: {
+      "overflow-disabled": isSelectOpened,
+      "select-mode": isSelectOpened,
+    },
+  },
+});
 
 definePageMeta({
   title: "福利專欄",
   toLinkName: "首頁",
   toLink: "/",
 });
-import CompSelect from "../components/CompSelect.vue";
-import CompPage from "../components/CompPage.vue"
+
 const { $WebApiGet } = useNuxtApp();
+const { formatDisplayDate } = useDateFormatter();
+
 const PAGEITEMMAX_WELFARE = 4;
 const PAGEITEMMAX_LAZY = 8;
 
+const isLoadingWelfare = ref(true);
+const hasErrorWelfare = ref(false);
+const isLoadingLazy = ref(true);
+const hasErrorLazy = ref(false);
+
 interface selectItem {
   name: string;
-  val: string;
+  val: string | number;
 }
+
 interface welfareItem {
   id: number;
   title: string;
@@ -257,328 +222,222 @@ interface pageNum {
   isHide: boolean;
 }
 
-// definePageMeta({
-//     test: "test"
-// })
-
-// Code Policy
 const policySelectList = reactive<Array<selectItem>>([]);
-const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
-codePolicy.then((res: any) => {
-  const _data = res.result.result;
-  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
-    return {
-      val: item.id,
-      name: item.codeName,
-    };
-  });
-  // Add all item (default).
-  policySelectList.push({
-    val: 'all',
-    name: '全部'
-  })
-  policySelectList.push(..._list);
-});
-
-// Code Keywords
 const keywordSelectList = reactive<Array<selectItem>>([]);
-const codeKeyword = $WebApiGet("/Code/GetCodeKeywordList");
-codeKeyword.then((res: any) => {
-  const _data = res.result.result;
-  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
-    return {
-      val: item.id,
-      name: item.codeName,
-    };
-  });
 
-  // Add all item (default).
-  keywordSelectList.push({
-    val: 'all',
-    name: '全部'
-  })
-  keywordSelectList.push(..._list);
-});
+async function loadPolicyOptions() {
+  const res: any = await $WebApiGet("/Code/GetCodePolicyList");
+  if (!res?.result?.result) return;
 
-// welfare
+  const nextList: Array<selectItem> = res.result.result.map((item: any) => ({
+    val: item.id,
+    name: item.codeName,
+  }));
+
+  policySelectList.splice(0);
+  policySelectList.push({ val: "all", name: "全部" });
+  policySelectList.push(...nextList);
+}
+
+async function loadKeywordOptions() {
+  const res: any = await $WebApiGet("/Code/GetCodeKeywordList");
+  if (!res?.result?.result) return;
+
+  const nextList: Array<selectItem> = res.result.result.map((item: any) => ({
+    val: item.id,
+    name: item.codeName,
+  }));
+
+  keywordSelectList.splice(0);
+  keywordSelectList.push({ val: "all", name: "全部" });
+  keywordSelectList.push(...nextList);
+}
+
 const welfareList = reactive<Array<welfareItem>>([]);
 const storage_welfareList = reactive<Array<welfareItem>>([]);
 const storageAll_welfareList = reactive<Array<welfareItem>>([]);
 const pageNums_welfare = reactive<Array<pageNum>>([]);
-const GetListWelfare = $WebApiGet("/ArticlesWelfare/GetArticlesWelfareList");
+const welfareFilterPolicy = ref<string | number | undefined>();
+const welfareFilterKeyword = ref<string | number | undefined>();
 
-GetListWelfare.then((res: any) => {
-  const _data = res.result.result;
-  let _list: Array<welfareItem> = _data.map((item: any, i: number) => {
-    return {
+function setPageNums(target: Array<pageNum>, totalItems: number, pageSize: number) {
+  target.splice(0);
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  for (let index = 0; index < totalPages; index += 1) {
+    target.push({
+      num: index + 1,
+      isActive: index === 0,
+      isHide: false,
+    });
+  }
+}
+
+function syncWelfareDisplay(list: Array<welfareItem>) {
+  storage_welfareList.splice(0);
+  welfareList.splice(0);
+  storage_welfareList.push(...list);
+  welfareList.push(...list.slice(0, PAGEITEMMAX_WELFARE));
+  setPageNums(pageNums_welfare, list.length, PAGEITEMMAX_WELFARE);
+}
+
+function applyWelfareFilter() {
+  let nextList = [...storageAll_welfareList];
+
+  if (welfareFilterPolicy.value && welfareFilterPolicy.value !== "all") {
+    nextList = nextList.filter((item) => item.codePolicy_ID == welfareFilterPolicy.value);
+  }
+
+  if (welfareFilterKeyword.value && welfareFilterKeyword.value !== "all") {
+    nextList = nextList.filter((item) =>
+      item.codeKeywords.map((keyword) => keyword.val).includes(welfareFilterKeyword.value!)
+    );
+  }
+
+  syncWelfareDisplay(nextList);
+}
+
+async function loadWelfareList() {
+  isLoadingWelfare.value = true;
+  hasErrorWelfare.value = false;
+  storage_welfareList.splice(0);
+  welfareList.splice(0);
+  pageNums_welfare.splice(0);
+
+  try {
+    const res: any = await $WebApiGet("/ArticlesWelfare/GetArticlesWelfareList");
+    if (!res?.result?.result) throw new Error("Empty welfare response");
+
+    const nextList: Array<welfareItem> = res.result.result.map((item: any) => ({
       id: item.id,
       title: item.title,
       releaseTime: item.releaseTime,
       content: item.detail,
       codePolicy_ID: item.codePolicy_ID,
       codePolicy: item.codePolicy_LabelName,
-      codeKeywords: item.codeKeywordList.map((_code: any, j: number) => {
-        return { name: _code.codeName, val: _code.id };
-      }),
-    };
-  });
+      codeKeywords: item.codeKeywordList.map((_code: any) => ({
+        name: _code.codeName,
+        val: _code.id,
+      })),
+    }));
 
-  storage_welfareList.push(..._list);
-  storageAll_welfareList.push(..._list);
-  welfareList.push(
-    ..._list.slice(
-      0,
-      _list.length > PAGEITEMMAX_WELFARE ? PAGEITEMMAX_WELFARE : _list.length
-    )
-  );
-
-  // Num page init.
-  for (let n = 0; n <= _list.length / PAGEITEMMAX_WELFARE; n++) {
-    pageNums_welfare.push({
-      num: n + 1,
-      isActive: n == 0,
-      isHide: false
-    });
+    storageAll_welfareList.splice(0);
+    storageAll_welfareList.push(...nextList);
+    applyWelfareFilter();
+  } catch (error) {
+    console.warn("[articles][welfare] load failed:", error);
+    hasErrorWelfare.value = true;
+    storageAll_welfareList.splice(0);
+  } finally {
+    isLoadingWelfare.value = false;
   }
-});
+}
 
 function PageChange_Welfare(pageNum: number) {
   welfareList.splice(0);
-
-  const index_S = (pageNum - 1) * PAGEITEMMAX_WELFARE;
-  const index_E =
-    pageNum <= storage_welfareList.length / PAGEITEMMAX_WELFARE
-      ? pageNum * PAGEITEMMAX_WELFARE
-      : storage_welfareList.length;
-
-  let nextItems = storage_welfareList.slice(index_S, index_E);
-  welfareList.push(...nextItems);
+  const indexStart = (pageNum - 1) * PAGEITEMMAX_WELFARE;
+  const indexEnd = Math.min(pageNum * PAGEITEMMAX_WELFARE, storage_welfareList.length);
+  welfareList.push(...storage_welfareList.slice(indexStart, indexEnd));
 }
 
-// function PageSwitch_Welfare(pageNum: number) {
-//   pageNums_welfare.forEach((_page, i) => {
-//     _page.isActive = _page.num == pageNum;
-//   });
-
-//   welfareList.splice(0);
-
-//   const index_S = (pageNum - 1) * PAGEITEMMAX_WELFARE;
-//   const index_E =
-//     pageNum <= storage_welfareList.length / PAGEITEMMAX_WELFARE
-//       ? pageNum * PAGEITEMMAX_WELFARE
-//       : storage_welfareList.length;
-
-//   let nextItems = storage_welfareList.slice(index_S, index_E);
-//   welfareList.push(...nextItems);
-// }
-
-const welfareFilter_Policy = ref();
-const welfareFilter_Keyword = ref();
-function setFilter(type: string, val: number) {
-  if (type == "policy") welfareFilter_Policy.value = val;
-  if (type == "keyword") welfareFilter_Keyword.value = val;
+function setFilter(type: string, val: string | number) {
+  if (type === "policy") welfareFilterPolicy.value = val;
+  if (type === "keyword") welfareFilterKeyword.value = val;
 }
 
-// #30 — 福利專欄篩選自動觸發 (跟懶人包一致),debounce 300ms 避免雙連選的多次計算
-let _welfareFilterTimer: ReturnType<typeof setTimeout> | null = null;
-watch([welfareFilter_Policy, welfareFilter_Keyword], () => {
-  if (_welfareFilterTimer) clearTimeout(_welfareFilterTimer);
-  _welfareFilterTimer = setTimeout(() => FilterWelfare(), 300);
+let welfareFilterTimer: ReturnType<typeof setTimeout> | null = null;
+watch([welfareFilterPolicy, welfareFilterKeyword], () => {
+  if (welfareFilterTimer) clearTimeout(welfareFilterTimer);
+  welfareFilterTimer = setTimeout(() => applyWelfareFilter(), 300);
 });
 
-function isSelectOpen(type: string, val: boolean) {
-  // useHead({
-  //       bodyAttrs: {
-  //           class: {
-  //             "overflow-disabled": val,
-  //             "select-mode": val
-  //           }
-  //       }
-  //   })
-  _isSelect.value = val
-}
-
 function FilterWelfare() {
-  pageNums_welfare.splice(0);
-  storage_welfareList.splice(0);
-  welfareList.splice(0);
-
-  let _list: Array<welfareItem> = [];
-  if (welfareFilter_Policy.value && welfareFilter_Keyword.value) {
-    _list = storageAll_welfareList.filter(
-      (p) =>
-        (p.codePolicy_ID == welfareFilter_Policy.value || welfareFilter_Policy.value == 'all') &&
-        (p.codeKeywords.map((p2) => p2.val).includes(welfareFilter_Keyword.value) || welfareFilter_Keyword.value == 'all')
-    );
-  } else {
-    if (welfareFilter_Policy.value)
-      _list = storageAll_welfareList.filter(
-        (p) => p.codePolicy_ID == welfareFilter_Policy.value || welfareFilter_Policy.value == 'all'
-      );
-    if (welfareFilter_Keyword.value)
-      _list = storageAll_welfareList.filter((p) =>
-        p.codeKeywords.map((p2) => p2.val).includes(welfareFilter_Keyword.value) || welfareFilter_Keyword.value == 'all'
-      );
-  }
-
-  storage_welfareList.push(..._list);
-  welfareList.push(
-    ..._list.slice(
-      0,
-      _list.length > PAGEITEMMAX_WELFARE ? PAGEITEMMAX_WELFARE : _list.length
-    )
-  );
-
-  if (welfareList.length <= 0) return false;
-  // Num page init.
-  for (let n = 0; n <= storage_welfareList.length / PAGEITEMMAX_WELFARE; n++) {
-    pageNums_welfare.push({
-      num: n + 1,
-      isActive: n == 0,
-      isHide: false
-    });
-  }
+  applyWelfareFilter();
 }
 
-// lazy
 const lazyList = reactive<Array<lazyItem>>([]);
 const storage_lazyList = reactive<Array<lazyItem>>([]);
 const storageAll_lazy = reactive<Array<lazyItem>>([]);
 const pageNums_lazy = reactive<Array<pageNum>>([]);
-const listLazy = $WebApiGet("/ArticlesLazy/GetArticlesLazyList");
+const lazyFilterKeyword = ref<string | undefined>();
 
-listLazy.then((res: any) => {
-  const _data = res.result.result;
-  let _list: Array<lazyItem> = _data.map((item: any, i: number) => {
-    return {
-      id: item.id,
-      title: item.title,
-      codeKeywords: item.codeKeywordList.map((_code: any, j: number) => {
-        return { name: _code.codeName, val: _code.id };
-      }),
-    };
-  });
-
-  storage_lazyList.push(..._list);
-  storageAll_lazy.push(..._list);
-  lazyList.push(
-    ..._list.slice(
-      0,
-      _list.length > PAGEITEMMAX_LAZY ? PAGEITEMMAX_LAZY : _list.length
-    )
-  );
-
-  // Num page init.
-  for (let n = 0; n <= _list.length / PAGEITEMMAX_LAZY; n++) {
-    pageNums_lazy.push({
-      num: n + 1,
-      isActive: n == 0,
-      isHide: false
-    });
-  }
-});
-
-function PageChange_Lazy(pageNum: number) {
+function syncLazyDisplay(list: Array<lazyItem>) {
+  storage_lazyList.splice(0);
   lazyList.splice(0);
-
-  const index_S = (pageNum - 1) * PAGEITEMMAX_LAZY;
-  const index_E =
-    pageNum <= storage_lazyList.length / PAGEITEMMAX_LAZY
-      ? pageNum * PAGEITEMMAX_LAZY
-      : storage_lazyList.length;
-
-  let nextItems = storage_lazyList.slice(index_S, index_E);
-  lazyList.push(...nextItems);
+  storage_lazyList.push(...list);
+  lazyList.push(...list.slice(0, PAGEITEMMAX_LAZY));
+  setPageNums(pageNums_lazy, list.length, PAGEITEMMAX_LAZY);
 }
 
-// function PageSwitch_Lazy(pageNum: number) {
-//   pageNums_lazy.forEach((_page, i) => {
-//     _page.isActive = _page.num == pageNum;
-//   });
+function applyLazyFilter() {
+  const nextList =
+    lazyFilterKeyword.value && lazyFilterKeyword.value !== "all"
+      ? storageAll_lazy.filter((item) =>
+          item.codeKeywords.map((keyword) => keyword.val).includes(lazyFilterKeyword.value!)
+        )
+      : [...storageAll_lazy];
 
-//   lazyList.splice(0);
+  syncLazyDisplay(nextList);
+}
 
-//   const index_S = (pageNum - 1) * PAGEITEMMAX_LAZY;
-//   const index_E =
-//     pageNum <= storage_lazyList.length / PAGEITEMMAX_LAZY
-//       ? pageNum * PAGEITEMMAX_LAZY
-//       : storage_lazyList.length;
-
-//   let nextItems = storage_lazyList.slice(index_S, index_E);
-//   lazyList.push(...nextItems);
-// }
-
-function FilterLazy(type: string, val: string) {
+async function loadLazyList() {
+  isLoadingLazy.value = true;
+  hasErrorLazy.value = false;
   storage_lazyList.splice(0);
   lazyList.splice(0);
   pageNums_lazy.splice(0);
 
-  storage_lazyList.push(
-    ...storageAll_lazy.filter((p) =>
-      p.codeKeywords.map((p2) => { return p2.val;}).includes(val) || val == 'all'
-    )
-  );
-  lazyList.push(
-    ...storage_lazyList.slice(
-      0,
-      storage_lazyList.length > PAGEITEMMAX_LAZY
-        ? PAGEITEMMAX_LAZY
-        : storage_lazyList.length
-    )
-  );
+  try {
+    const res: any = await $WebApiGet("/ArticlesLazy/GetArticlesLazyList");
+    if (!res?.result?.result) throw new Error("Empty lazy response");
 
-  if (lazyList.length <= 0) return false;
-  // Num page init.
-  for (let n = 0; n <= storage_lazyList.length / PAGEITEMMAX_LAZY; n++) {
-    pageNums_lazy.push({
-      num: n + 1,
-      isActive: n == 0,
-      isHide: false
-    });
+    const nextList: Array<lazyItem> = res.result.result.map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      codeKeywords: item.codeKeywordList.map((_code: any) => ({
+        name: _code.codeName,
+        val: _code.id,
+      })),
+    }));
+
+    storageAll_lazy.splice(0);
+    storageAll_lazy.push(...nextList);
+    applyLazyFilter();
+  } catch (error) {
+    console.warn("[articles][lazy] load failed:", error);
+    hasErrorLazy.value = true;
+    storageAll_lazy.splice(0);
+  } finally {
+    isLoadingLazy.value = false;
   }
 }
 
-const currentPage_Lazy = ref(1);
-const currentPage_Welfare = ref(1);
+function PageChange_Lazy(pageNum: number) {
+  lazyList.splice(0);
+  const indexStart = (pageNum - 1) * PAGEITEMMAX_LAZY;
+  const indexEnd = Math.min(pageNum * PAGEITEMMAX_LAZY, storage_lazyList.length);
+  lazyList.push(...storage_lazyList.slice(indexStart, indexEnd));
+}
 
-// function PageControl(target: string, controlType: string, currentPage: number) {
-//   if (controlType == "next") {
-//     if (target == "welfare") {
-//       if (currentPage >= storage_welfareList.length / PAGEITEMMAX_WELFARE) {
-//         return false;
-//       }
+function FilterLazy(type: string, val: string) {
+  lazyFilterKeyword.value = val;
+  applyLazyFilter();
+}
 
-//       currentPage_Welfare.value += 1;
-//     }
+function isSelectOpen(type: string, val: boolean) {
+  isSelectOpened.value = val;
+}
 
-//     if (target == "lazy") {
-//       if (currentPage >= storage_lazyList.length / PAGEITEMMAX_LAZY) {
-//         return false;
-//       }
+void Promise.allSettled([
+  loadPolicyOptions(),
+  loadKeywordOptions(),
+  loadWelfareList(),
+  loadLazyList(),
+]);
 
-//       currentPage_Lazy.value += 1;
-//     }
-//   }
-
-//   if (controlType == "prev") {
-//     if (target == "welfare") {
-//       if (currentPage <= 1) {
-//         return false;
-//       }
-
-//       currentPage_Welfare.value -= 1;
-//     }
-
-//     if (target == "lazy") {
-//       if (currentPage <= 1) {
-//         return false;
-//       }
-
-//       currentPage_Lazy.value -= 1;
-//     }
-//   }
-
-//   // if (target == "welfare") PageSwitch_Welfare(currentPage_Welfare.value);
-//   // if (target == "lazy") PageSwitch_Lazy(currentPage_Lazy.value);
-// }
+onBeforeUnmount(() => {
+  if (welfareFilterTimer) {
+    clearTimeout(welfareFilterTimer);
+  }
+});
 </script>

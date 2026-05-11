@@ -254,6 +254,28 @@
             right: 0;
             top: 0;
             z-index: 99;
+
+            .btn-reset.is-clearing {
+              transform: scale(.97);
+            }
+
+            .reset-feedback {
+              display: block;
+              margin-top: 8px;
+              color: $color-primary;
+              font-size: 14px;
+              font-weight: 600;
+              line-height: 20px;
+              text-align: center;
+              opacity: 0;
+              transform: translateY(-4px);
+              transition: opacity .2s ease, transform .2s ease;
+
+              &.is-visible {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
           }
         }
 
@@ -262,7 +284,7 @@
         }
       }
 
-      .section-result {
+        .section-result {
         .result-total {
           display: inline-flex;
           align-items: center;

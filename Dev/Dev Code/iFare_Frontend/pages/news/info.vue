@@ -2,14 +2,14 @@
   <div class="app-body-child" :name="$route.name">
     <section class="section section-top">
       <h2 class="article-title">{{ newsItem.title }}</h2>
-      <p class="article-date">{{ newsItem.releaseTime }}</p>
+      <p class="article-date">{{ formatDisplayDate(newsItem.releaseTime) }}</p>
       <div class="article-tags">
         <label class="article-num">{{ newsItem.id }}</label>
       </div>
     </section>
     <section class="section section-info">
       <div class="article-info">
-        <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
+        <button class="btn-icon btn-ic-share" @click="shareCurrentUrlToLine"><i class="ic-share"></i></button>
         <div class="raw-html" v-html="useSanitize(newsItem.content)"></div>
       </div>
     </section>
@@ -23,6 +23,8 @@ definePageMeta({
   toLink: '/news'
 })
 const { $WebApiGet } = useNuxtApp()
+const { shareCurrentUrlToLine } = useShareToLine()
+const { formatDisplayDate } = useDateFormatter()
 const route = useRoute()
 const _newsID = route.query.id
 
@@ -58,16 +60,6 @@ listNews.then((res:any) => {
     newsItem.releaseTime = _newsList[0].releaseTime
     newsItem.content = _newsList[0].content
 })
-
-const _url = useRequestURL()
-async function ShareWebUrlToLine() {
-  const SHARETOLINE = 'https://social-plugins.line.me/lineit/share'
-  const urlShare = `${SHARETOLINE}?url=${encodeURIComponent(_url.href)}`
-
-  await navigateTo(urlShare, {
-    external: true
-  })
-}
 
 </script>
 

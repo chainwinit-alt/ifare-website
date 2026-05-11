@@ -121,7 +121,7 @@
         <button
           type="submit"
           class="btn-send"
-          :disabled="!inputText.trim()"
+          :disabled="!inputText.trim() || isBotTyping"
           aria-label="送出"
         >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -158,6 +158,14 @@ interface ChatMessage {
   /** 安全 HTML 字串 (允許 <a> / <br>) */
   contentHtml: string;
   ts: number;
+}
+
+interface ChatbotApiResponse {
+  configured: boolean;
+  model?: string;
+  errorCode?: string;
+  retryable?: boolean;
+  reply: string;
 }
 
 // Quick Actions — 2x2 Grid（含 bot 回應）
@@ -248,15 +256,48 @@ function pushBotMessage(html: string) {
   scrollToBottom();
 }
 
-function scheduleBotReply(userText: string, customReply?: string) {
+function pushBotText(text: string) {
+  pushBotMessage(escapeHtml(text).replace(/\n/g, '<br>'));
+}
+
+function getChatHistory() {
+  return messages.value.slice(-8).map((msg) => ({
+    role: msg.role === 'bot' ? 'assistant' : 'user',
+    content: msg.content,
+  }));
+}
+
+async function scheduleBotReply(userText: string, customReply?: string) {
   isBotTyping.value = true;
   scrollToBottom();
-  const delay = 500 + Math.random() * 500;  // 0.5-1s 模擬思考
-  setTimeout(() => {
+
+  try {
+    if (customReply) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      pushBotMessage(customReply);
+      return;
+    }
+
+    const res = await $fetch<ChatbotApiResponse>('/api/chatbot', {
+      method: 'POST',
+      body: {
+        message: userText,
+        history: getChatHistory(),
+      },
+    });
+
+    if (res.configured) {
+      pushBotText(res.reply);
+      return;
+    }
+
+    pushBotMessage(generateBotReply(userText));
+  } catch (error) {
+    console.error('[chatbot] request failed', error);
+    pushBotMessage(generateBotReply(userText));
+  } finally {
     isBotTyping.value = false;
-    const reply = customReply ?? generateBotReply(userText);
-    pushBotMessage(reply);
-  }, delay);
+  }
 }
 
 // v1：基於關鍵字的 hardcode 回應

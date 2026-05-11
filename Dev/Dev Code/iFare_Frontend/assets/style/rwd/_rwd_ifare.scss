@@ -322,6 +322,25 @@
                         right: -20px;
                         top: -42px;
                         z-index: 150;
+
+                        .reset-feedback {
+                            position: absolute;
+                            top: calc(100% + 8px);
+                            left: 50%;
+                            color: $color-primary;
+                            font-size: 12px;
+                            font-weight: 600;
+                            line-height: 18px;
+                            white-space: nowrap;
+                            opacity: 0;
+                            transform: translate(-50%, -4px);
+                            transition: opacity .2s ease, transform .2s ease;
+
+                            &.is-visible {
+                                opacity: 1;
+                                transform: translate(-50%, 0);
+                            }
+                        }
                     }
                 }
         

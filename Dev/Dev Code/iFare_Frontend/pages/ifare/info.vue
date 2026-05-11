@@ -4,14 +4,14 @@
       <section class="section-top">
         <h1 class="info-title">{{ _welfareItem.title }}</h1>
         <div class="date-group">
-          <label class="date-release">{{ _welfareItem.releaseTime }}</label>
-          <label class="date-update">{{ _welfareItem.updateTime }}</label>
+          <label class="date-release">{{ formatDisplayDate(_welfareItem.releaseTime) }}</label>
+          <label class="date-update">{{ formatDisplayDate(_welfareItem.updateTime) }}</label>
           <label class="article-num">{{ _welfareItem.id }}</label>
         </div>
       </section>
       <section class="section-body">
         <div class="card-info">
-          <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine">
+          <button class="btn-icon btn-ic-share" @click="shareCurrentUrlToLine">
             <i class="ic-share"></i>
           </button>
           <div class="part-info-list">
@@ -76,7 +76,7 @@
               <NuxtLink
                   :to="{
                     path: '/ifare/info',
-                    query: { id: _welfare.id, reload: '' },
+                    query: { id: _welfare.id },
                   }"
                 >
                 <h3 class="link-title">{{ _welfare.title }}</h3>
@@ -92,7 +92,7 @@
                   <NuxtLink
                     :to="{
                       path: '/ifare/info',
-                      query: { id: _welfare.id, reload: '' },
+                      query: { id: _welfare.id },
                     }"
                     class="ic-arrow-right link-url transition-general"
                   ></NuxtLink>
@@ -117,6 +117,8 @@ definePageMeta({
 const QUALIFICATION_PREVIEW_LENGTH = 50;
 
 const { $WebApiGet } = useNuxtApp();
+const { shareCurrentUrlToLine } = useShareToLine();
+const { formatDisplayDate } = useDateFormatter();
 const route = useRoute();
 const $router = useRouter();
 
@@ -368,22 +370,13 @@ async function loadRelationList(infoID: number) {
 loadOfficeList();
 
 watch(
-  () => Number(route.query.id || 0),
-  async (infoID) => {
+  () => [Number(route.query.id || 0), String(route.query.reload ?? "")] as const,
+  async ([infoID]) => {
     await Promise.all([loadPolicyDetail(infoID), loadRelationList(infoID)]);
   },
   { immediate: true }
 );
 
-const _url = useRequestURL();
-async function ShareWebUrlToLine() {
-  const SHARETOLINE = "https://social-plugins.line.me/lineit/share";
-  const urlShare = `${SHARETOLINE}?url=${encodeURIComponent(_url.href)}`;
-
-  await navigateTo(urlShare, {
-    external: true,
-  });
-}
 </script>
 
 <style scoped>

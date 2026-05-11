@@ -1,11 +1,7 @@
 <template>
     <div class="app-body" name="news">
         <div class="bg-sector-top"></div>
-        <div class="page-navs">
-            <ul class="list-unstyled">
-                <li v-for="_page in $route.matched"><NuxtLink :to="`${_page.meta.toLink}`">{{ _page.meta.toLinkName }}</NuxtLink></li>
-            </ul>
-        </div>
+        <CompBreadCrumb />
         <div class="section-list bg-section-list" v-if="$route.name == 'news'">
             <section class="section section-news bg-section">
                 <div class="bg-radial"></div>
@@ -37,7 +33,7 @@
                                 <NuxtLink class="item-page-link" :to="{path: '/news/info', query: {id: _news.id}}">
                                     <div class="item-title">
                                         <h2 class="article-title">{{ _news.title }}</h2>
-                                        <span class="item-date">{{ _news.releaseTime }}</span>
+                                        <span class="item-date">{{ formatDisplayDate(_news.releaseTime) }}</span>
                                     </div>
                                     <div class="item-body">
                                         <div class="item-info">
@@ -77,6 +73,7 @@ definePageMeta({
 })
 import CompPage from "../components/CompPage.vue"
 const { $WebApiGet } = useNuxtApp()
+const { formatDisplayDate } = useDateFormatter()
 const PAGEITEMMAX = 10
 
 interface newsItem {

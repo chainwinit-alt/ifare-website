@@ -44,6 +44,7 @@ const hasPage = ref(false);
 
 // 允許的訊息來源（後台 dev server）
 const ALLOWED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const DEFAULT_PARENT_ORIGIN = ALLOWED_ORIGINS[0];
 
 interface PreviewMessage {
   type: 'preview:update';
@@ -52,6 +53,17 @@ interface PreviewMessage {
 
 interface ReadyMessage {
   type: 'preview:ready';
+}
+
+function resolveParentOrigin() {
+  if (!import.meta.client || !document.referrer) return DEFAULT_PARENT_ORIGIN;
+
+  try {
+    const referrerOrigin = new URL(document.referrer).origin;
+    return ALLOWED_ORIGINS.includes(referrerOrigin) ? referrerOrigin : DEFAULT_PARENT_ORIGIN;
+  } catch {
+    return DEFAULT_PARENT_ORIGIN;
+  }
 }
 
 function handleMessage(event: MessageEvent) {
@@ -69,7 +81,7 @@ onMounted(() => {
   // 通知 parent (後台) 已準備好接收資料
   if (window.parent && window.parent !== window) {
     const msg: ReadyMessage = { type: 'preview:ready' };
-    window.parent.postMessage(msg, '*');
+    window.parent.postMessage(msg, resolveParentOrigin());
   }
 });
 

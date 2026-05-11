@@ -1,10 +1,6 @@
 <template>
   <div class="app-body" name="future">
-    <div class="page-navs">
-      <ul class="list-unstyled">
-        <li v-for="_page in $route.matched"><NuxtLink :to="`${_page.meta.toLink}`">{{ _page.meta.toLinkName }}</NuxtLink></li>
-      </ul>
-    </div>
+    <CompBreadCrumb />
     <div class="section-list bg-section-list">
       <section class="section section-future bg-section">
         <div class="bg-radial"></div>

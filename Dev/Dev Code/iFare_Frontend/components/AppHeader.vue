@@ -50,6 +50,11 @@
     </div>
   </header>
   <div id="mobile-menu" class="mobile-menu" :class="{ active: isShowMenu }" role="dialog" aria-modal="true" aria-label="行動選單">
+    <div class="menu-island" aria-hidden="true">
+      <span class="menu-island__camera"></span>
+      <span class="menu-island__label">{{ mobileMenuIslandLabel }}</span>
+      <span class="menu-island__page">{{ mobileMenuPageLabel }}</span>
+    </div>
     <ul class="list-unstyled menu-list">
       <li :class="{ active: $route.name == 'about'}">
         <NuxtLink class="mobileNav-link" to="/about" :aria-current="$route.name === 'about' ? 'page' : undefined" @click="MenuToggle"
@@ -107,8 +112,21 @@
 const route = useRoute();
 const isShowMenu = ref(false);
 const menuButtonRef = ref<HTMLButtonElement | null>(null);
+const mobileMenuIslandLabel = '\u9577\u7A69\u9078\u55AE';
 
 const emits = defineEmits(["isOpened"]);
+
+const mobileMenuPageLabel = computed(() => {
+  const name = route.name?.toString() || '';
+
+  if (name === 'about') return '\u95DC\u65BC\u9577\u7A69';
+  if (name === 'news' || name.startsWith('news-')) return '\u6700\u65B0\u6D88\u606F';
+  if (name === 'articles' || name.startsWith('articles-')) return '\u798F\u5229\u5C08\u6B04';
+  if (name.includes('ifare')) return 'i-Fare';
+  if (name === 'collaborator' || name.startsWith('collaborator-')) return '\u516C\u76CA\u5925\u4F34';
+  if (name === 'future' || name.startsWith('future-')) return '\u672A\u4F86\u898F\u5283';
+  return '\u5C0E\u89BD';
+});
 
 // #45: 抽出原本散在 5 處的 route 條件，集中管理
 // header :name 用 (3 種值: 路由名 / 'indexIFare' / 'other')

@@ -18,8 +18,8 @@
           <span class="comp-shadow">CONTACT</span>
         </div>
         <div class="date-group">
-          <label class="date-release">{{ releaseTime }}</label>
-          <label class="date-update">{{ updateTime }}</label>
+          <label class="date-release">{{ formatDisplayDate(releaseTime) }}</label>
+          <label class="date-update">{{ formatDisplayDate(updateTime) }}</label>
         </div>
       </section>
       <section class="section-body">
@@ -114,6 +114,7 @@ definePageMeta({
   toLink: '/ifare'
 })
 const { $WebApiGet } = useNuxtApp();
+const { formatDisplayDate } = useDateFormatter();
 const route = useRoute();
 const $router = useRouter();
 const _contactID = route.query.id;

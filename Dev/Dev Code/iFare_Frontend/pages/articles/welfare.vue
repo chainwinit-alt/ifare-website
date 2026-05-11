@@ -1,40 +1,44 @@
 <template>
-    <div class="app-body-child" :name="$route.name">
+  <div class="app-body-child" :name="$route.name">
     <section class="section section-top">
       <div class="article-btn-tags">
-        <span class="btn btn-tag active">{{ _welfareItem.codePolicy }}</span>
+        <span class="btn btn-tag active">{{ welfareItem.codePolicy }}</span>
       </div>
-      <h2 class="article-title">{{ _welfareItem.title }}</h2>
-      <h6 class="article-date">{{ _welfareItem.releaseTime }}</h6>
+      <h2 class="article-title">{{ welfareItem.title }}</h2>
+      <h6 class="article-date">
+        {{ formatDisplayDate(welfareItem.releaseTime) }} ・ 約 {{ estimatedReadMinutes }} 分鐘閱讀
+      </h6>
       <div class="article-tags">
         <ul class="list-unstyled tags-list">
-          <li v-for="_keyword in _welfareItem.codeKeywords">{{ _keyword }}</li>
+          <li v-for="keyword in welfareItem.codeKeywords" :key="keyword">{{ keyword }}</li>
         </ul>
-        <label class="article-num">{{ _welfareItem.id }}</label>
+        <label class="article-num">{{ welfareItem.id }}</label>
       </div>
     </section>
+
     <section class="section section-info">
       <div class="article-info">
-        <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
-        <div class="raw-html" v-html="useSanitize(_welfareItem.content)"></div>
+        <button class="btn-icon btn-ic-share" @click="shareCurrentUrlToLine"><i class="ic-share"></i></button>
+        <div class="raw-html" v-html="useSanitize(welfareItem.content)"></div>
       </div>
     </section>
+
     <section class="section section-bottom">
       <div class="relation-links">
-        <h5 class="relation-title">相關專欄</h5>
+        <h5 class="relation-title">相關文章</h5>
         <ul class="list-unstyled relation-list">
-          <li class="relation-item transition-general" v-for="_item in _welfareRelation" :key="_item.id">
-            <NuxtLink class="item-page-link" :to="{path: '/articles/welfare', query: {id: _item.id, reload: ''}}" :key="$route.fullPath">
+          <li class="relation-item transition-general" v-for="item in welfareRelation" :key="item.id">
+            <NuxtLink class="item-page-link" :to="{ path: '/articles/welfare', query: { id: item.id } }">
               <div class="part-top">
-                <span class="btn btn-tag active">{{ _item.codePolicy }}</span>
-                <span class="link-date">{{ _item.releaseTime }}</span>
+                <span class="btn btn-tag active">{{ item.codePolicy }}</span>
+                <span class="link-date">{{ formatDisplayDate(item.releaseTime) }}</span>
               </div>
               <h6 class="link-title">
-                {{ _item.title }}
+                {{ item.title }}
               </h6>
               <div class="relation-item-bottom">
                 <ul class="list-unstyled tags-list">
-                  <li v-for="_key in _item.codeKeywords">{{ _key }}</li>
+                  <li v-for="keyword in item.codeKeywords" :key="`${item.id}-${keyword}`">{{ keyword }}</li>
                 </ul>
                 <i class="ic-arrow-right link-url transition-general"></i>
               </div>
@@ -48,71 +52,120 @@
 
 <script setup lang="ts">
 definePageMeta({
-  title: '福利專欄',
-  toLinkName: '福利專欄',
-  toLink: '/articles'
-})
-const { $WebApiGet } = useNuxtApp()
-const route = useRoute()
-const _welfareID = route.query.id
+  title: "福利專欄",
+  toLinkName: "福利專欄",
+  toLink: "/articles"
+});
+
+const { $WebApiGet } = useNuxtApp();
+const { shareCurrentUrlToLine } = useShareToLine();
+const { formatDisplayDate } = useDateFormatter();
+const { estimateReadingMinutes } = useReadingTime();
+const route = useRoute();
 
 interface welfareItem {
-    id: number,
-    title: string,
-    releaseTime: string,
-    content: string,
-    codePolicy: string,
-    codeKeywords: Array<string>
+  id: number;
+  title: string;
+  releaseTime: string;
+  content: string;
+  codePolicy: string;
+  codeKeywords: Array<string>;
 }
 
-const _welfareItem = reactive<welfareItem>({
-content: "",
-title: '',
-releaseTime: '',
-codePolicy: '',
-codeKeywords: [],
-id: 0
+const welfareItem = reactive<welfareItem>({
+  content: "",
+  title: "",
+  releaseTime: "",
+  codePolicy: "",
+  codeKeywords: [],
+  id: 0
 });
-const welfareGet = $WebApiGet('/ArticlesWelfare/GetArticlesWelfareDetail', { articleWelfareID: _welfareID})
-welfareGet.then((res:any) => {
-    const _data = res.result.result
-    
-    _welfareItem.id = _data.id
-    _welfareItem.title = _data.title
-    _welfareItem.content = decodeURIComponent(_data.detail).replaceAll("https://drive.google.com/uc?export=download&", "https://drive.google.com/thumbnail?sz=w800&")
-    _welfareItem.releaseTime = _data.releaseTime
-    _welfareItem.codePolicy = _data.codePolicy_LabelName
-    _welfareItem.codeKeywords = _data.codeKeywordList.map((_code:any, j:number) => { return _code.codeName})
-})
 
+const welfareRelation = reactive<Array<welfareItem>>([]);
+const estimatedReadMinutes = computed(() => estimateReadingMinutes(welfareItem.content));
 
-const _welfareRelation = reactive<Array<welfareItem>>([]);
-const topWelfareGet = $WebApiGet('/ArticlesWelfare/GetArticlesWelfareRelation', { articleWelfareID: _welfareID})
-topWelfareGet.then((res:any) => {
-    const _data = res.result.result
-    
-    let _newsList:Array<welfareItem> = _data.map((item:any, i:number) => {
-        return {
-            id: item.id,
-            title: item.title,
-            releaseTime: item.releaseTime,
-            content: item.detail,
-            codePolicy: item.codePolicy_LabelName,
-            codeKeywords: item.codeKeywordList.map((_code:any, j:number) => { return _code.codeName})
-        }
-    })
+function decodeWelfareContent(value: string) {
+  if (!value) return "";
 
-    _welfareRelation.push(..._newsList)
-})
-
-const _url = useRequestURL()
-async function ShareWebUrlToLine() {
-  const SHARETOLINE = 'https://social-plugins.line.me/lineit/share'
-  const urlShare = `${SHARETOLINE}?url=${encodeURIComponent(_url.href)}`
-
-  await navigateTo(urlShare, {
-    external: true
-  })
+  try {
+    return decodeURIComponent(value).replaceAll(
+      "https://drive.google.com/uc?export=download&",
+      "https://drive.google.com/thumbnail?sz=w800&"
+    );
+  } catch (error) {
+    console.warn("[articles/welfare][decode]", error);
+    return value;
+  }
 }
 
+function resetWelfareItem() {
+  welfareItem.id = 0;
+  welfareItem.title = "";
+  welfareItem.releaseTime = "";
+  welfareItem.content = "";
+  welfareItem.codePolicy = "";
+  welfareItem.codeKeywords = [];
+}
+
+let detailRequestToken = 0;
+async function loadWelfareDetail(articleId: number) {
+  const requestToken = ++detailRequestToken;
+  resetWelfareItem();
+
+  if (!articleId) {
+    return;
+  }
+
+  const res: any = await $WebApiGet("/ArticlesWelfare/GetArticlesWelfareDetail", {
+    articleWelfareID: articleId,
+  });
+  const data = res?.result?.result;
+  if (!data || requestToken !== detailRequestToken) {
+    return;
+  }
+
+  welfareItem.id = data.id;
+  welfareItem.title = data.title;
+  welfareItem.content = decodeWelfareContent(data.detail);
+  welfareItem.releaseTime = data.releaseTime;
+  welfareItem.codePolicy = data.codePolicy_LabelName;
+  welfareItem.codeKeywords = data.codeKeywordList.map((_code: any) => _code.codeName);
+}
+
+let relationRequestToken = 0;
+async function loadWelfareRelation(articleId: number) {
+  const requestToken = ++relationRequestToken;
+  welfareRelation.splice(0);
+
+  if (!articleId) {
+    return;
+  }
+
+  const res: any = await $WebApiGet("/ArticlesWelfare/GetArticlesWelfareRelation", {
+    articleWelfareID: articleId,
+  });
+  const data = res?.result?.result;
+  if (!Array.isArray(data) || requestToken !== relationRequestToken) {
+    return;
+  }
+
+  welfareRelation.push(
+    ...data.map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      releaseTime: item.releaseTime,
+      content: item.detail,
+      codePolicy: item.codePolicy_LabelName,
+      codeKeywords: item.codeKeywordList.map((_code: any) => _code.codeName),
+    }))
+  );
+}
+
+watch(
+  () => [Number(route.query.id || 0), String(route.query.reload ?? "")] as const,
+  async ([articleId]) => {
+    await Promise.all([loadWelfareDetail(articleId), loadWelfareRelation(articleId)]);
+  },
+  { immediate: true }
+);
 </script>

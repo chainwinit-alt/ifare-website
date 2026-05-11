@@ -21,6 +21,8 @@ export default defineNuxtConfig({
     //   - 正式機：NUXT_PUBLIC_FRONTEND_API_BASE=https://www.i-fare.org.tw/ifare_api/api/services/app
     frontendApiServerBase:
       process.env.NUXT_FRONTEND_API_SERVER_BASE || 'https://www.i-fare.org.tw/ifare_api/api/services/app',
+    geminiApiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '',
+    geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'http://ifare.local',
       frontendApiBase:

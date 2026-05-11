@@ -90,7 +90,8 @@
             </button>
           </div>
           <div class="part-reset">
-            <button class="btn btn-reset" @click="ResetParam">清空</button>
+            <button class="btn btn-reset" :class="{ 'is-clearing': showResetFeedback }" @click="ResetParam">清空</button>
+            <span class="reset-feedback" :class="{ 'is-visible': showResetFeedback }" aria-live="polite">已清空篩選條件</span>
           </div>
         </div>
         <div class="card-filter-mobile">
@@ -141,7 +142,8 @@
           </div>
         </div>
         <div class="card-filter-reset">
-          <button class="btn btn-reset" @click="ResetParam">清空</button>
+          <button class="btn btn-reset" :class="{ 'is-clearing': showResetFeedback }" @click="ResetParam">清空</button>
+          <span class="reset-feedback" :class="{ 'is-visible': showResetFeedback }" aria-live="polite">已清空篩選條件</span>
         </div>
       </section>
       <section class="section-result">
@@ -228,6 +230,9 @@ const codeSelectIncome = ref("");
 const identitySelectList = reactive<Array<selectItem>>([]);
 const codeSelectIdentity: any = ref([]);
 const isLoading = ref(false);
+const showResetFeedback = ref(false);
+const RESET_FEEDBACK_MS = 1800;
+let resetFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 const canSearch = computed(() => {
   return Boolean(
     codeSelect_policy.value ||
@@ -430,6 +435,26 @@ function Search() {
   SetDataInit(query);
 }
 
+function clearResetFeedbackTimer() {
+  if (!resetFeedbackTimer) {
+    return;
+  }
+
+  clearTimeout(resetFeedbackTimer);
+  resetFeedbackTimer = null;
+}
+
+function triggerResetFeedback() {
+  clearResetFeedbackTimer();
+  showResetFeedback.value = false;
+  nextTick(() => {
+    showResetFeedback.value = true;
+    resetFeedbackTimer = setTimeout(() => {
+      showResetFeedback.value = false;
+    }, RESET_FEEDBACK_MS);
+  });
+}
+
 // iFare Policy
 const PAGEITEMMAX = 10;
 const $route = useRoute();
@@ -559,5 +584,11 @@ function ResetParam() {
   SwitchRecipient("reset")
   SwitchIncome("reset")
   SwitchIdentity("reset")
+  SetDataInit({})
+  triggerResetFeedback()
 }
+
+onBeforeUnmount(() => {
+  clearResetFeedbackTimer()
+})
 </script>
