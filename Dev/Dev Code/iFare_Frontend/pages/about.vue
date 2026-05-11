@@ -1,10 +1,6 @@
 <template>
   <div class="app-body" name="about">
-    <div class="page-navs">
-      <ul class="list-unstyled">
-        <li v-for="_page in $route.matched"><NuxtLink :to="`${_page.meta.toLink}`">{{ _page.meta.toLinkName }}</NuxtLink></li>
-      </ul>
-    </div>
+    <CompBreadCrumb />
     <div class="part-top">
       <div class="title-component">
         <!-- <i class="ic-title-pattern"></i> -->

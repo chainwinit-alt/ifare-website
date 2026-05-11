@@ -83,15 +83,21 @@
                 }
 
                 &.active {
-                    &::before {
+                    position: relative;
+
+                    .mobileNav-link {
+                        color: $color-orange;
+                    }
+
+                    &::after {
                         display: inline-block;
                         content: '';
                         position: absolute;
-                        width: 22px;
-                        height: 37px;
                         left: 0;
-                        top: 4px;
-                        background: url("../img/Title-Pattern.png") $bg-init;
+                        right: 0;
+                        bottom: 0;
+                        height: 4px;
+                        background-color: $color-orange;
                     }
                 }
             }

@@ -1,10 +1,6 @@
 <template>
   <div class="app-body" name="collaborator">
-    <div class="page-navs">
-      <ul class="list-unstyled">
-        <li v-for="_page in $route.matched"><NuxtLink :to="`${_page.meta.toLink}`">{{ _page.meta.toLinkName }}</NuxtLink></li>
-      </ul>
-    </div>
+    <CompBreadCrumb />
     <div class="section-list bg-section-list">
       <section class="section section-collaborator bg-section">
         <div class="bg-radial"></div>
@@ -78,7 +74,12 @@
                 <li name="tel">{{ _coll.tel }}</li>
                 <li name="service">{{ _coll.serviceItem }}</li>
                 <li name="website">
-                  <a :href="_coll.url" target="_blank">{{ _coll.url }}</a>
+                  <a
+                    :href="_coll.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    :aria-label="`前往 ${_coll.title} 官網（另開視窗）`"
+                  >前往官網</a>
                 </li>
               </ul>
             </div>

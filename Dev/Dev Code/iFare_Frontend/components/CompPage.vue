@@ -77,19 +77,16 @@ function PageNext(e: any) {
 
   PageClick(currentPage.value + 1);
 
-  let _currentPageNum = currentPage.value
-
+  let _currentPageNum = currentPage.value;
   const lastPageItemWidth =
-    (props.pageList.length - _currentPageNum + 2) * WIDTH_PAGEITEM; // Add current page and after empty tag.
+    (props.pageList.length - _currentPageNum + 2) * WIDTH_PAGEITEM;
 
-  if (_currentPageNum == props.pageList.length) {
-    _currentPageNum = _currentPageNum - Math.floor(_widthPageContent.value / WIDTH_PAGEITEM) + 1
-    props.pageList.forEach((_item: any, i: number) => {
-      _item.isHide = i + 1 < _currentPageNum;
-    });
+  const isAtLastPage = _currentPageNum == props.pageList.length;
+  if (isAtLastPage) {
+    _currentPageNum = _currentPageNum - Math.floor(_widthPageContent.value / WIDTH_PAGEITEM) + 1;
   }
 
-  if (lastPageItemWidth > _widthPageContent.value) {
+  if (isAtLastPage || lastPageItemWidth > _widthPageContent.value) {
     props.pageList.forEach((_item: any, i: number) => {
       _item.isHide = i + 1 < _currentPageNum;
     });
