@@ -83,7 +83,25 @@
           </div>
           <div class="item item-query">
             <label class="filter-name">關鍵字</label>
-            <input v-model="searchQuery" class="input-query" type="text" placeholder="請輸入關鍵字" />
+            <div class="query-input-wrap">
+              <input
+                v-model="searchQuery"
+                class="input-query"
+                type="text"
+                maxlength="50"
+                placeholder="請輸入關鍵字"
+              />
+              <button
+                v-show="searchQuery.trim()"
+                class="btn-clear-query transition-general"
+                type="button"
+                aria-label="清空關鍵字"
+                @click="ClearSearchQuery"
+              >
+                <i class="icon ic-close" aria-hidden="true"></i>
+              </button>
+              <div class="query-count" aria-live="polite">{{ searchQuery.length }}/50</div>
+            </div>
           </div>
           <div class="item item-bottom">
             <button
@@ -147,9 +165,9 @@
               <li
                 class="faq-item transition-general"
                 :class="{ active: item.isActive }"
-                @click="item.isActive = !item.isActive"
-                @keydown.enter.prevent="item.isActive = !item.isActive"
-                @keydown.space.prevent="item.isActive = !item.isActive"
+                @click="ToggleQA(item)"
+                @keydown.enter.prevent="ToggleQA(item)"
+                @keydown.space.prevent="ToggleQA(item)"
                 v-for="(item, i) in qaList"
                 :key="i"
                 role="button"
@@ -345,6 +363,10 @@ function Search() {
   searchQuery.value = ""
 }
 
+function ClearSearchQuery() {
+  searchQuery.value = "";
+}
+
 // Office Unit
 interface OfficeUnitItem {
   id: number;
@@ -506,6 +528,10 @@ function PageSwitch_QA(pageNum: number) {
 
   let nextItems = storageQAList.slice(index_S, index_E);
   qaList.push(...nextItems);
+}
+
+function ToggleQA(item: QAItem) {
+  item.isActive = !item.isActive;
 }
 
 const currentPage_Office = ref(1);

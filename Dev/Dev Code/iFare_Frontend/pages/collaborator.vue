@@ -381,14 +381,77 @@ $c-grey-50: #F3F3F3;
 @media (max-width: 768px) {
   .collaborator-filter {
     margin: 16px 0 24px;
-    gap: 10px;
+    gap: 14px;
+    width: 100%;
+    box-sizing: border-box;
 
     .filter-row {
-      align-items: flex-start;
-      gap: 8px;
+      align-items: stretch;
+      gap: 10px;
+      flex-direction: column;
+      width: 100%;
+      box-sizing: border-box;
     }
 
-    .search-input-wrap { max-width: 100%; }
+    .filter-label {
+      min-width: 0;
+      width: 100%;
+    }
+
+    .btn-tag-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .chip {
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+      height: 46px;
+      padding: 0 10px;
+      box-sizing: border-box;
+      white-space: nowrap;
+      overflow: hidden;
+
+      small {
+        flex-shrink: 0;
+      }
+    }
+
+    .search-input-wrap {
+      max-width: 100%;
+      min-width: 0;
+      width: 100%;
+      box-sizing: border-box;
+
+      input {
+        height: 44px;
+        box-sizing: border-box;
+        text-align: left;
+      }
+    }
+  }
+
+  .card-list {
+    gap: 16px;
+  }
+
+  .card-partner {
+    width: 100% !important;
+    box-sizing: border-box;
+
+    .card-title {
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: 12px;
+    }
+
+    .card-infos {
+      margin-top: 20px !important;
+    }
   }
 }
 </style>

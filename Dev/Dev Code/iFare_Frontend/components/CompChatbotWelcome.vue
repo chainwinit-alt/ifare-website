@@ -695,8 +695,8 @@ $c-grey-500: #8B8B8B;
     right: 0;
     bottom: 0;
     width: 100vw;
-    height: 100vh;
-    max-height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
     border-radius: 16px 16px 0 0;
   }
 
