@@ -379,6 +379,13 @@ function setFilter(type: string, val: number) {
   if (type == "keyword") welfareFilter_Keyword.value = val;
 }
 
+// #30 — 福利專欄篩選自動觸發 (跟懶人包一致),debounce 300ms 避免雙連選的多次計算
+let _welfareFilterTimer: ReturnType<typeof setTimeout> | null = null;
+watch([welfareFilter_Policy, welfareFilter_Keyword], () => {
+  if (_welfareFilterTimer) clearTimeout(_welfareFilterTimer);
+  _welfareFilterTimer = setTimeout(() => FilterWelfare(), 300);
+});
+
 function isSelectOpen(type: string, val: boolean) {
   // useHead({
   //       bodyAttrs: {

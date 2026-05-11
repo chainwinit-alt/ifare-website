@@ -115,6 +115,13 @@
     }
 }
 
+// ---- Clear button spin (用於 .btn-clear-query :active) ----
+// 保留 translateY(-50%) (因為 .btn-clear-query 用 top:50% + translateY(-50%) 垂直置中)
+@keyframes btnClearSpin {
+    from { transform: translateY(-50%) rotate(0deg); }
+    to { transform: translateY(-50%) rotate(360deg); }
+}
+
 .skeleton-line {
     display: block;
     height: 14px;

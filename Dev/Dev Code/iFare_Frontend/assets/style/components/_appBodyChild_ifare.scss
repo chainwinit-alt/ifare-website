@@ -268,13 +268,15 @@
           align-items: center;
           gap: 4px;
           color: $color-black;
-          font-size: 14px;
-          font-weight: 400;
-          line-height: 20px;
+          font-size: 24px;
+          font-weight: 700;
+          line-height: 32px;
           padding: 16px 48px;
           &::before,
           &::after {
             color: rgba($color-black, 0.5);
+            font-size: 14px;
+            font-weight: 400;
           }
           &::before {
             content: "找到";

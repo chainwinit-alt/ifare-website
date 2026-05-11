@@ -231,7 +231,8 @@ h1, h2, h3, h4, h5, h6 {
 .app-footer .btn,
 .app-footer a:not(.no-userselect),
 .btn-social,
-.btn-icon {
+.btn-icon,
+.btn:not(.btn-tag):not(.btn-reset):not(.btn-clear-query):not(.btn-clear-text):not(.btn-search) {
   transition:
     transform 0.22s cubic-bezier(0.32, 0.72, 0, 1),
     box-shadow 0.22s cubic-bezier(0.32, 0.72, 0, 1);

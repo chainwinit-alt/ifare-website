@@ -114,6 +114,11 @@
               <span>搜尋</span>
               <i class="icon ic-search" aria-hidden="true"></i>
             </button>
+            <p
+              v-if="hasAttemptedSearch && !canSearch"
+              class="search-error"
+              role="alert"
+            >請至少填一個篩選條件</p>
           </div>
         </div>
       </section>
@@ -269,6 +274,9 @@ const canSearch = computed(() => {
   );
 });
 
+// #1 — 篩選不完整時錯誤訊息。使用者點過搜尋且 canSearch 仍為 false 時顯示
+const hasAttemptedSearch = ref(false);
+
 function getSelectValue(type: string, val: string) {
   if (type == "policy") {
     codeSelect_policy.value = val;
@@ -346,6 +354,7 @@ function SwitchRecipient(codeVal: any) {
 }
 
 function Search() {
+  hasAttemptedSearch.value = true;
   if (!canSearch.value) return false;
   let query: any = {};
   if (codeSelect_policy.value) query.policy = codeSelect_policy.value;

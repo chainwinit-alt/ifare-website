@@ -299,6 +299,10 @@
           outline: 2px solid rgba($color-primary-dark, 0.35);
           outline-offset: 2px;
         }
+
+        &:active {
+          animation: btnClearSpin 0.3s ease-out;
+        }
       }
 
       .query-count {
@@ -463,4 +467,13 @@
       }
     }
   }
+
+// #1 — 搜尋按鈕下方錯誤訊息(篩選條件不完整時顯示)
+.search-error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: $color-orange;
+  text-align: center;
+}
 

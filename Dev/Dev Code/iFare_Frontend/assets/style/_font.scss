@@ -111,7 +111,9 @@ body {
                 font-size: 12px;
             }
             .item-info {
-            color: rgba($color-black, 0.7);
+                font-size: 14px;
+                line-height: 22px;
+                color: rgba($color-black, 0.55);
             }
         }
     }

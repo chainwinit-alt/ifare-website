@@ -64,7 +64,21 @@
             <span v-if="selectedCategory !== '全部'">屬於「{{ selectedCategory }}」</span>
             <span v-if="searchQuery.trim()">符合「{{ searchQuery.trim() }}」</span>
           </p>
-          <div class="card-list">
+          <!-- #38 載入中 skeleton -->
+          <div class="card-list" v-if="isLoading" aria-busy="true">
+            <div class="card-partner card-partner-skeleton" v-for="n in 3" :key="`skel-${n}`">
+              <div class="skeleton-line skeleton-line-title"></div>
+              <div class="skeleton-line skeleton-line-info"></div>
+              <div class="skeleton-line skeleton-line-info"></div>
+            </div>
+          </div>
+          <!-- #38 載入失敗 -->
+          <div v-else-if="hasError" class="empty-state empty-error" role="alert">
+            <p>載入公益夥伴時發生錯誤</p>
+            <button type="button" class="btn-retry transition-general" @click="LoadCollaborators">重新載入</button>
+          </div>
+          <!-- 正常資料 -->
+          <div class="card-list" v-else>
             <div class="card-partner transition-general" v-for="_coll in filteredList" :key="_coll.id">
               <div class="card-title">
                 <img width="56" height="52" :src="_coll.imageFile" :alt="`${_coll.title} logo`" loading="lazy" />
@@ -84,7 +98,7 @@
               </ul>
             </div>
           </div>
-          <div v-if="hasFilter && filteredList.length === 0" class="empty-state">
+          <div v-if="!isLoading && !hasError && hasFilter && filteredList.length === 0" class="empty-state">
             <p>找不到符合條件的公益夥伴</p>
             <button type="button" class="btn-reset-filter" @click="resetFilter">清空篩選</button>
           </div>
@@ -137,6 +151,10 @@ const CATEGORIES: category[] = [
 
 const collaboratorList = reactive<Array<collaboratorItem>>([]);
 
+// #38 — 載入狀態 + 錯誤狀態,搭配 skeleton + retry
+const isLoading = ref(true);
+const hasError = ref(false);
+
 // #133 v1 + #134: 純前端搜尋 + 分類過濾 (AND 邏輯)
 const searchQuery = ref('');
 const selectedCategory = ref('全部');
@@ -177,22 +195,38 @@ function resetFilter() {
   selectedCategory.value = '全部';
 }
 
-const listNews = $WebApiGet('/Collaborator/GetCollaboratorList')
-listNews.then((res:any) => {
-    const _data = res.result.result
+// #38 — 包成可重試的 function (LoadCollaborators),設 isLoading/hasError 狀態
+function LoadCollaborators() {
+  isLoading.value = true;
+  hasError.value = false;
+  collaboratorList.splice(0);
 
-    let _collaboratorList:Array<collaboratorItem> = _data.map((item:any, i:number) => {
-        return {
-            id: item.id,
-            title: item.title,
-            serviceItem: item.serviceItem,
-            tel: item.tel,
-            url: item.url,
-            imageFile: item.imageFile
-        }
+  $WebApiGet('/Collaborator/GetCollaboratorList')
+    .then((res: any) => {
+      if (!res?.result?.result) {
+        hasError.value = true;
+        return;
+      }
+      const _data = res.result.result;
+      const _collaboratorList: Array<collaboratorItem> = _data.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        serviceItem: item.serviceItem,
+        tel: item.tel,
+        url: item.url,
+        imageFile: item.imageFile,
+      }));
+      collaboratorList.push(..._collaboratorList);
     })
-    collaboratorList.push(..._collaboratorList)
-})
+    .catch(() => {
+      hasError.value = true;
+    })
+    .finally(() => {
+      isLoading.value = false;
+    });
+}
+
+LoadCollaborators();
 </script>
 
 <style lang="scss" scoped>
