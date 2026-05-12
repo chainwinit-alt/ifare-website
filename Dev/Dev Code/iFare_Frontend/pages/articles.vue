@@ -35,6 +35,10 @@
         </div>
         <div class="part-body">
           <div class="part-articles">
+            <div v-if="isLoadingWelfare" class="loading-hint" role="status" aria-live="polite">
+              <span class="loading-spinner" aria-hidden="true"></span>
+              <span>福利專欄搜尋中…</span>
+            </div>
             <ul class="list-unstyled article-list" v-if="isLoadingWelfare">
               <li class="article-item article-item-skeleton" v-for="n in 4" :key="`welfare-skeleton-${n}`">
                 <div class="skeleton-line skeleton-line-title"></div>
@@ -110,6 +114,10 @@
         </div>
         <div class="part-body">
           <div class="part-articles">
+            <div v-if="isLoadingLazy" class="loading-hint" role="status" aria-live="polite">
+              <span class="loading-spinner" aria-hidden="true"></span>
+              <span>福利懶人包搜尋中…</span>
+            </div>
             <ul class="list-unstyled article-list" v-if="isLoadingLazy">
               <li class="article-item article-item-skeleton" v-for="n in 4" :key="`lazy-skeleton-${n}`">
                 <div class="skeleton-line skeleton-line-title"></div>

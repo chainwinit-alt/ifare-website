@@ -42,7 +42,8 @@
         <button
           type="button"
           class="header-close"
-          aria-label="關閉"
+          aria-label="退出聊天"
+          title="退出聊天"
           @click="handleClose"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -106,6 +107,16 @@
             </div>
           </div>
         </template>
+      </div>
+
+      <!-- ⑤.0 Action Bar — 顯式「退出聊天」入口 (header X 在手機可能被瀏覽器 chrome 擋住) -->
+      <div class="chatbot-actions">
+        <button type="button" class="chatbot-exit-btn" @click="handleClose" aria-label="退出聊天">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+          <span>退出聊天</span>
+        </button>
       </div>
 
       <!-- ⑤ Input Bar (固定底部) -->
@@ -665,6 +676,41 @@ $c-grey-500: #8B8B8B;
   }
 }
 
+// ⑤.0 Action Bar — 顯式退出按鈕（手機 header X 易被網址列遮）
+.chatbot-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 12px;
+  border-top: 1px solid $c-grey-200;
+  background: $c-grey-50;
+  flex-shrink: 0;
+}
+
+.chatbot-exit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: $c-grey-500;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color .2s ease, background .2s ease;
+
+  &:hover {
+    color: $c-orange-dark;
+    background: rgba($c-orange, .08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba($c-orange, .55);
+    outline-offset: 2px;
+  }
+}
+
 // ⑤ Input Bar 固定底部
 .chatbot-input {
   display: flex;
@@ -734,11 +780,19 @@ $c-grey-500: #8B8B8B;
 @media (max-width: 768px) {
   .chatbot-window {
     right: 0;
+    top: 0;
     bottom: 0;
     width: 100vw;
     height: 100dvh;
     max-height: 100dvh;
-    border-radius: 16px 16px 0 0;
+    border-radius: 0;
+  }
+
+  // 手機版 header 退到 safe-area 下方，避免被網址列 / 動態島 / 狀態列遮住
+  .chatbot-header {
+    padding-top: env(safe-area-inset-top, 0px);
+    min-height: calc(56px + env(safe-area-inset-top, 0px));
+    align-items: flex-end;
   }
 
   .chatbot-input {

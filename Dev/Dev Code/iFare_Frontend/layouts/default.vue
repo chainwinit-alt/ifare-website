@@ -9,6 +9,8 @@
         - 其他頁面使用 "other"
     -->
     <div class="app" :name="!$route.name?.toString().includes('ifare')?'other':'indexIFare'">
+        <!-- 全站路由轉場進度條 — 跳轉時頂部 3px 橘條，避免使用者空等 -->
+        <NuxtLoadingIndicator color="#EA5504" :height="3" :throttle="200" :duration="3000" />
         <!-- 頁首元件：監聽 is-opened 事件以判斷行動選單是否開啟 -->
         <AppHeader @is-opened="isMenuOpen"/>
         <!-- 頁面主體內容由各路由頁面填入 -->
