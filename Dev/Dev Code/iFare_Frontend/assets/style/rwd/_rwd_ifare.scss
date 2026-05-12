@@ -413,6 +413,24 @@
                     .card-info {
                         padding: 28px 24px;
                         border-radius: 16px 16px 0 0;
+
+                        // #12 — 手機把分享列改 static，避免 4 顆按鈕 absolute 跑版
+                        .share-bar {
+                            position: static;
+                            margin: 0 0 16px;
+                            justify-content: flex-end;
+                            gap: 6px;
+
+                            .btn-ic-share {
+                                min-width: 36px;
+                                height: 36px;
+                                padding: 6px 10px;
+
+                                .share-label {
+                                    font-size: 13px;
+                                }
+                            }
+                        }
                     }
 
                     .part-info-list {
@@ -473,12 +491,19 @@
                     gap: 48px;
                     padding: 0 32px;
 
+                    // #13 — 手機版改成 chip 水平滑動列，與桌面一致；隱藏下拉
                     .part-areas {
-                        display: none;
+                        display: block;
+                        width: 100%;
+                        margin-bottom: 8px;
+
+                        &::after {
+                            display: none;
+                        }
                     }
 
                     .part-filter {
-                        display: flex;
+                        display: none;
                     }
         
                     .detail-list {
@@ -528,9 +553,41 @@
                         }
                     }
 
+                    // #13 — 手機 chip 水平滑動，覆寫桌面 column 樣式
                     .area-list {
+                        flex-direction: row;
+                        flex-wrap: nowrap;
+                        overflow-x: auto;
+                        overflow-y: hidden;
+                        gap: 8px;
+                        padding: 4px 4px 12px;
+                        margin: 0 -4px;
+                        scrollbar-width: thin;
+                        scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+                        -webkit-overflow-scrolling: touch;
+
+                        &::-webkit-scrollbar {
+                            height: 4px;
+                        }
+                        &::-webkit-scrollbar-thumb {
+                            background: rgba(0, 0, 0, 0.15);
+                            border-radius: 2px;
+                        }
                         &::after {
                             display: none;
+                        }
+
+                        .area-item {
+                            flex: 0 0 auto;
+                            height: 36px;
+                            padding: 0 18px;
+                            border-radius: 999px;
+                            background: rgba($color-primary-dark, 0.06);
+
+                            &.active,
+                            &:hover {
+                                background: rgba($color-orange, 0.14);
+                            }
                         }
                     }
                 }

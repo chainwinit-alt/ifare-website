@@ -74,7 +74,7 @@
           </div>
           <!-- #38 載入失敗 -->
           <div v-else-if="hasError" class="empty-state empty-error" role="alert">
-            <p>載入公益夥伴時發生錯誤</p>
+            <p>{{ errorMessage }}</p>
             <button type="button" class="btn-retry transition-general" @click="LoadCollaborators">重新載入</button>
           </div>
           <!-- 正常資料 -->
@@ -117,8 +117,8 @@ definePageMeta({
   toLinkName: '首頁',
   toLink: '/'
 })
-const { $WebApiGet } = useNuxtApp()
-const PAGEITEMMAX = 10
+const { $WebApiGetDetailed } = useNuxtApp()
+const { getApiErrorMessage } = useApiErrorMessage()
 
 interface collaboratorItem {
     id: number,
@@ -154,6 +154,7 @@ const collaboratorList = reactive<Array<collaboratorItem>>([]);
 // #38 — 載入狀態 + 錯誤狀態,搭配 skeleton + retry
 const isLoading = ref(true);
 const hasError = ref(false);
+const errorMessage = ref('載入公益夥伴時發生錯誤');
 
 // #133 v1 + #134: 純前端搜尋 + 分類過濾 (AND 邏輯)
 const searchQuery = ref('');
@@ -196,34 +197,36 @@ function resetFilter() {
 }
 
 // #38 — 包成可重試的 function (LoadCollaborators),設 isLoading/hasError 狀態
-function LoadCollaborators() {
+async function LoadCollaborators() {
   isLoading.value = true;
   hasError.value = false;
+  errorMessage.value = '載入公益夥伴時發生錯誤';
   collaboratorList.splice(0);
 
-  $WebApiGet('/Collaborator/GetCollaboratorList')
-    .then((res: any) => {
-      if (!res?.result?.result) {
-        hasError.value = true;
-        return;
-      }
-      const _data = res.result.result;
-      const _collaboratorList: Array<collaboratorItem> = _data.map((item: any) => ({
-        id: item.id,
-        title: item.title,
-        serviceItem: item.serviceItem,
-        tel: item.tel,
-        url: item.url,
-        imageFile: item.imageFile,
-      }));
-      collaboratorList.push(..._collaboratorList);
-    })
-    .catch(() => {
+  try {
+    const { data, error } = await $WebApiGetDetailed('/Collaborator/GetCollaboratorList');
+    if (error || !data?.result?.result) {
       hasError.value = true;
-    })
-    .finally(() => {
-      isLoading.value = false;
-    });
+      errorMessage.value = getApiErrorMessage(error, '載入公益夥伴時發生錯誤');
+      return;
+    }
+
+    const _data = data.result.result;
+    const _collaboratorList: Array<collaboratorItem> = _data.map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      serviceItem: item.serviceItem,
+      tel: item.tel,
+      url: item.url,
+      imageFile: item.imageFile,
+    }));
+    collaboratorList.push(..._collaboratorList);
+  } catch (error) {
+    hasError.value = true;
+    errorMessage.value = getApiErrorMessage(error, '載入公益夥伴時發生錯誤');
+  } finally {
+    isLoading.value = false;
+  }
 }
 
 LoadCollaborators();

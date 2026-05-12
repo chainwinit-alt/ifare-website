@@ -21,7 +21,7 @@
                             </li>
                         </ul>
                         <div class="part-empty part-error" v-else-if="hasError">
-                            <p>載入最新消息時發生錯誤</p>
+                            <p>{{ errorMessage }}</p>
                             <button class="btn-retry transition-general" @click="LoadNews">重新載入</button>
                         </div>
                         <div class="part-empty" v-else-if="newsList.length === 0">
@@ -72,8 +72,9 @@ definePageMeta({
   toLink: '/'
 })
 import CompPage from "../components/CompPage.vue"
-const { $WebApiGet } = useNuxtApp()
+const { $WebApiGetDetailed } = useNuxtApp()
 const { formatDisplayDate } = useDateFormatter()
+const { getApiErrorMessage } = useApiErrorMessage()
 const PAGEITEMMAX = 10
 
 interface newsItem {
@@ -94,21 +95,24 @@ const storageNewsList = reactive<Array<newsItem>>([])
 const pageNums = reactive<Array<pageNum>>([])
 const isLoading = ref(true)
 const hasError = ref(false)
+const errorMessage = ref('載入最新消息時發生錯誤')
 
-function LoadNews() {
+async function LoadNews() {
     isLoading.value = true
     hasError.value = false
+    errorMessage.value = '載入最新消息時發生錯誤'
     storageNewsList.splice(0)
     newsList.splice(0)
     pageNums.splice(0)
 
-    $WebApiGet('/News/GetNewsList').then((res:any) => {
-        if (!res || !res.result || !res.result.result) {
+    try {
+        const { data, error } = await $WebApiGetDetailed('/News/GetNewsList')
+        if (error || !data || !data.result || !data.result.result) {
             hasError.value = true
-            isLoading.value = false
+            errorMessage.value = getApiErrorMessage(error, '載入最新消息時發生錯誤')
             return
         }
-        const _data = res.result.result
+        const _data = data.result.result
         let _newsList:Array<newsItem> = _data.map((item:any) => ({
             id: item.id,
             title: item.title,
@@ -126,11 +130,12 @@ function LoadNews() {
                 isHide: false
             })
         }
-        isLoading.value = false
-    }).catch(() => {
+    } catch (error) {
         hasError.value = true
+        errorMessage.value = getApiErrorMessage(error, '載入最新消息時發生錯誤')
+    } finally {
         isLoading.value = false
-    })
+    }
 }
 
 LoadNews()

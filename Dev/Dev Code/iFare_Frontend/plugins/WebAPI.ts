@@ -10,6 +10,11 @@ interface ApiErrorInfo {
     raw?: any
 }
 
+interface ApiResponseResult<T> {
+    data: T | null
+    error: ApiErrorInfo | null
+}
+
 function categorizeError(error: any): ApiErrorCategory {
     // $fetch (ofetch) 對 timeout 拋的 error.cause 是 AbortError
     if (error?.name === 'AbortError' || error?.cause?.name === 'AbortError') return 'timeout'
@@ -39,37 +44,50 @@ export default defineNuxtPlugin(() => {
         })
     }
 
+    async function requestWithDetail<T>(
+        method: 'GET' | 'POST',
+        path: string,
+        query?: object,
+    ): Promise<ApiResponseResult<T>> {
+        try {
+            const data = await $fetch<T>(path, {
+                method,
+                baseURL,
+                query,
+                timeout: API_TIMEOUT_MS,
+            })
+
+            return { data, error: null }
+        } catch (error: any) {
+            const detail: ApiErrorInfo = {
+                category: categorizeError(error),
+                status: error?.statusCode ?? error?.response?.status,
+                message: error?.message ?? String(error),
+                path,
+                method,
+                raw: error?.data ?? error,
+            }
+
+            logError(detail)
+            return { data: null, error: detail }
+        }
+    }
+
     return {
         provide: {
             WebApiGet: async (path: string, query?: object) => {
-                try {
-                    return await $fetch(path, { baseURL, query, timeout: API_TIMEOUT_MS })
-                } catch (error: any) {
-                    logError({
-                        category: categorizeError(error),
-                        status: error?.statusCode ?? error?.response?.status,
-                        message: error?.message ?? String(error),
-                        path,
-                        method: 'GET',
-                        raw: error?.data ?? error,
-                    })
-                    return null  // 維持向下相容
-                }
+                const { data } = await requestWithDetail('GET', path, query)
+                return data
             },
             WebApiPost: async (path: string, query?: object) => {
-                try {
-                    return await $fetch(path, { method: 'POST', baseURL, query, timeout: API_TIMEOUT_MS })
-                } catch (error: any) {
-                    logError({
-                        category: categorizeError(error),
-                        status: error?.statusCode ?? error?.response?.status,
-                        message: error?.message ?? String(error),
-                        path,
-                        method: 'POST',
-                        raw: error?.data ?? error,
-                    })
-                    return null
-                }
+                const { data } = await requestWithDetail('POST', path, query)
+                return data
+            },
+            WebApiGetDetailed: async (path: string, query?: object) => {
+                return requestWithDetail('GET', path, query)
+            },
+            WebApiPostDetailed: async (path: string, query?: object) => {
+                return requestWithDetail('POST', path, query)
             },
         },
     }

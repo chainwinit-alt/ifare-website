@@ -150,6 +150,25 @@
         <div class="part-list">
           <span class="result-total">{{ storageiFarePolicyList.length }}</span>
           <div class="result-loading" v-if="isLoading">載入中...</div>
+          <div class="result-loading result-error" v-else-if="hasError">
+            <p>{{ errorMessage }}</p>
+            <button class="btn btn-filter" type="button" @click="RetryLoad">重新載入</button>
+          </div>
+          <div class="result-loading result-empty" v-else-if="!isLoading && iFarePolicyList.length === 0" role="status">
+            <div class="empty-illustration" aria-hidden="true">
+              <i class="icon ic-search"></i>
+            </div>
+            <p class="empty-title">沒有找到符合條件的福利</p>
+            <p class="empty-hint">試試放寬篩選條件、調整關鍵字，或看看所有福利政策。</p>
+            <div class="empty-actions">
+              <button class="btn btn-filter" type="button" @click="ScrollToFilter">
+                <span>修改搜尋條件</span>
+              </button>
+              <button class="btn btn-reset" type="button" @click="ResetParam">
+                <span>看全部福利</span>
+              </button>
+            </div>
+          </div>
           <ul class="list-unstyled result-list" v-else>
             <li
               class="result-item transition-general"
@@ -196,7 +215,8 @@ definePageMeta({
   toLinkName: "i-Fare",
   toLink: "/ifare",
 });
-const { $WebApiGet } = useNuxtApp();
+const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
+const { getApiErrorMessage } = useApiErrorMessage();
 import CompSelect from "../components/CompSelect.vue";
 import CompSelectRecipient from "../components/CompSelectRecipient.vue";
 import CompSelectElse from "~/components/CompSelectElse.vue";
@@ -230,9 +250,12 @@ const codeSelectIncome = ref("");
 const identitySelectList = reactive<Array<selectItem>>([]);
 const codeSelectIdentity: any = ref([]);
 const isLoading = ref(false);
+const hasError = ref(false);
+const errorMessage = ref('載入福利政策時發生錯誤');
 const showResetFeedback = ref(false);
 const RESET_FEEDBACK_MS = 1800;
 let resetFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
+let lastQuery: any = {};
 const canSearch = computed(() => {
   return Boolean(
     codeSelect_policy.value ||
@@ -435,6 +458,16 @@ function Search() {
   SetDataInit(query);
 }
 
+function RetryLoad() {
+  SetDataInit(lastQuery);
+}
+
+function ScrollToFilter() {
+  if (typeof window === 'undefined') return
+  const el = document.querySelector('.section-filter')
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 function clearResetFeedbackTimer() {
   if (!resetFeedbackTimer) {
     return;
@@ -497,15 +530,23 @@ const pageNums = reactive<Array<pageNum>>([]);
 SetDataInit(_query);
 
 function SetDataInit(_q: any) {
+  lastQuery = { ..._q };
   isLoading.value = true;
-  const listNews = $WebApiGet("/FarePolicy/GetIFarePolicyList", _q);
-  listNews.then((res: any) => {
+  hasError.value = false;
+  errorMessage.value = '載入福利政策時發生錯誤';
+  const listNews = $WebApiGetDetailed("/FarePolicy/GetIFarePolicyList", _q);
+  listNews.then(({ data, error }: any) => {
     storageiFarePolicyList.splice(0);
     iFarePolicyList.splice(0);
     pageNums.splice(0);
 
-    if (!res?.result?.result) return;
-    const _data = res.result.result;
+    if (error || !data?.result?.result) {
+      hasError.value = true;
+      errorMessage.value = getApiErrorMessage(error, '載入福利政策時發生錯誤');
+      return;
+    }
+
+    const _data = data.result.result;
     let _newsList: Array<iFarePolicyItem> = _data.map(
       (item: any, i: number) => {
         return {
@@ -538,6 +579,9 @@ function SetDataInit(_q: any) {
         isHide: false
       });
     }
+  }).catch((error: any) => {
+    hasError.value = true;
+    errorMessage.value = getApiErrorMessage(error, '載入福利政策時發生錯誤');
   }).finally(() => {
     isLoading.value = false;
   });

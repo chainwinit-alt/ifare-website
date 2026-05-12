@@ -43,7 +43,7 @@
               </li>
             </ul>
             <div class="part-empty part-error" v-else-if="hasErrorWelfare">
-              <p>福利專欄載入失敗</p>
+              <p>{{ welfareErrorMessage }}</p>
               <button class="btn-retry transition-general" @click="loadWelfareList">重新載入</button>
             </div>
             <div class="part-empty" v-else-if="welfareList.length === 0">
@@ -118,7 +118,7 @@
               </li>
             </ul>
             <div class="part-empty part-error" v-else-if="hasErrorLazy">
-              <p>懶人包載入失敗</p>
+              <p>{{ lazyErrorMessage }}</p>
               <button class="btn-retry transition-general" @click="loadLazyList">重新載入</button>
             </div>
             <div class="part-empty" v-else-if="lazyList.length === 0">
@@ -184,16 +184,19 @@ definePageMeta({
   toLink: "/",
 });
 
-const { $WebApiGet } = useNuxtApp();
+const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
 const { formatDisplayDate } = useDateFormatter();
+const { getApiErrorMessage } = useApiErrorMessage();
 
 const PAGEITEMMAX_WELFARE = 4;
 const PAGEITEMMAX_LAZY = 8;
 
 const isLoadingWelfare = ref(true);
 const hasErrorWelfare = ref(false);
+const welfareErrorMessage = ref('福利專欄載入失敗');
 const isLoadingLazy = ref(true);
 const hasErrorLazy = ref(false);
+const lazyErrorMessage = ref('懶人包載入失敗');
 
 interface selectItem {
   name: string;
@@ -300,15 +303,18 @@ function applyWelfareFilter() {
 async function loadWelfareList() {
   isLoadingWelfare.value = true;
   hasErrorWelfare.value = false;
+  welfareErrorMessage.value = '福利專欄載入失敗';
   storage_welfareList.splice(0);
   welfareList.splice(0);
   pageNums_welfare.splice(0);
 
   try {
-    const res: any = await $WebApiGet("/ArticlesWelfare/GetArticlesWelfareList");
-    if (!res?.result?.result) throw new Error("Empty welfare response");
+    const { data, error } = await $WebApiGetDetailed("/ArticlesWelfare/GetArticlesWelfareList");
+    if (error || !data?.result?.result) {
+      throw error || new Error("Empty welfare response");
+    }
 
-    const nextList: Array<welfareItem> = res.result.result.map((item: any) => ({
+    const nextList: Array<welfareItem> = data.result.result.map((item: any) => ({
       id: item.id,
       title: item.title,
       releaseTime: item.releaseTime,
@@ -327,6 +333,7 @@ async function loadWelfareList() {
   } catch (error) {
     console.warn("[articles][welfare] load failed:", error);
     hasErrorWelfare.value = true;
+    welfareErrorMessage.value = getApiErrorMessage(error, '福利專欄載入失敗');
     storageAll_welfareList.splice(0);
   } finally {
     isLoadingWelfare.value = false;
@@ -383,15 +390,18 @@ function applyLazyFilter() {
 async function loadLazyList() {
   isLoadingLazy.value = true;
   hasErrorLazy.value = false;
+  lazyErrorMessage.value = '懶人包載入失敗';
   storage_lazyList.splice(0);
   lazyList.splice(0);
   pageNums_lazy.splice(0);
 
   try {
-    const res: any = await $WebApiGet("/ArticlesLazy/GetArticlesLazyList");
-    if (!res?.result?.result) throw new Error("Empty lazy response");
+    const { data, error } = await $WebApiGetDetailed("/ArticlesLazy/GetArticlesLazyList");
+    if (error || !data?.result?.result) {
+      throw error || new Error("Empty lazy response");
+    }
 
-    const nextList: Array<lazyItem> = res.result.result.map((item: any) => ({
+    const nextList: Array<lazyItem> = data.result.result.map((item: any) => ({
       id: item.id,
       title: item.title,
       codeKeywords: item.codeKeywordList.map((_code: any) => ({
@@ -406,6 +416,7 @@ async function loadLazyList() {
   } catch (error) {
     console.warn("[articles][lazy] load failed:", error);
     hasErrorLazy.value = true;
+    lazyErrorMessage.value = getApiErrorMessage(error, '懶人包載入失敗');
     storageAll_lazy.splice(0);
   } finally {
     isLoadingLazy.value = false;

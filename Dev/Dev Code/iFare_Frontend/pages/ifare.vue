@@ -133,7 +133,15 @@
         </div>
         <div class="part-body">
           <div class="part-list">
-            <ul class="list-unstyled agency-list">
+            <div v-if="isLoadingOffice" class="part-empty">相關福利機構載入中...</div>
+            <div v-else-if="hasErrorOffice" class="part-empty part-error" role="alert">
+              <p>{{ officeErrorMessage }}</p>
+              <button class="btn-retry transition-general" type="button" @click="loadOfficeList">重新載入</button>
+            </div>
+            <div v-else-if="officeList.length === 0" class="part-empty">
+              <p>目前沒有相關福利機構資料</p>
+            </div>
+            <ul v-else class="list-unstyled agency-list">
               <li
                 class="agency-item"
                 v-for="_office in officeList"
@@ -150,7 +158,7 @@
               </li>
             </ul>
           </div>
-          <div class="part-pages">
+          <div v-if="!isLoadingOffice && !hasErrorOffice && officeList.length > 0" class="part-pages">
             <!-- <CompPage :page-list="pageNums_office" @change-page="PageChange_Office"/> -->
             <CompPageNum :page-list="pageNums_office" @change-page="PageChange_Office"/>
           </div>
@@ -166,7 +174,15 @@
         </div>
         <div class="part-body">
           <div class="part-faq">
-            <ul class="list-unstyled faq-list">
+            <div v-if="isLoadingQA" class="part-empty">常見福利問題載入中...</div>
+            <div v-else-if="hasErrorQA" class="part-empty part-error" role="alert">
+              <p>{{ qaErrorMessage }}</p>
+              <button class="btn-retry transition-general" type="button" @click="loadQAList">重新載入</button>
+            </div>
+            <div v-else-if="qaList.length === 0" class="part-empty">
+              <p>目前沒有常見福利問題</p>
+            </div>
+            <ul v-else class="list-unstyled faq-list">
               <li
                 class="faq-item transition-general"
                 :class="{ active: item.isActive }"
@@ -203,7 +219,7 @@
               </li>
             </ul>
           </div>
-          <div class="part-pages">
+          <div v-if="!isLoadingQA && !hasErrorQA && qaList.length > 0" class="part-pages">
             <!-- <CompPage :page-list="pageNums_QA" @change-page="PageChange_QA"/> -->
             <CompPageNum :page-list="pageNums_QA" @change-page="PageChange_QA"/>
           </div>
@@ -230,7 +246,8 @@ definePageMeta({
   toLinkName: "首頁",
   toLink: "/",
 });
-const { $WebApiGet } = useNuxtApp();
+const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
+const { getApiErrorMessage } = useApiErrorMessage();
 const $router = useRouter();
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue"
@@ -264,7 +281,7 @@ const codeSelect_area = ref("");
 const searchQuery = ref("");
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient = ref("");
-const isVisibleRecipient = ref(true)
+const isVisibleRecipient = ref(false)
 const canSearch = computed(() => {
   return Boolean(
     codeSelect_policy.value ||
@@ -280,7 +297,7 @@ const hasAttemptedSearch = ref(false);
 function getSelectValue(type: string, val: string) {
   if (type == "policy") {
     codeSelect_policy.value = val;
-    // isVisibleRecipient.value = true
+    if (val) isVisibleRecipient.value = true;
   }
 
   if (type == "area") {
@@ -392,40 +409,56 @@ const officeList = reactive<Array<OfficeUnitItem>>([]);
 const storageOfficeList = reactive<Array<OfficeUnitItem>>([]);
 const pageNums_office = reactive<Array<pageNum>>([]);
 const PAGEITEMMAX_OFFICE = 6;
+const isLoadingOffice = ref(true);
+const hasErrorOffice = ref(false);
+const officeErrorMessage = ref('相關福利機構載入失敗');
 
-const listOffice = $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
-listOffice.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+async function loadOfficeList() {
+  isLoadingOffice.value = true;
+  hasErrorOffice.value = false;
+  officeErrorMessage.value = '相關福利機構載入失敗';
+  officeList.splice(0);
+  storageOfficeList.splice(0);
+  pageNums_office.splice(0);
 
-  let _newsList: Array<OfficeUnitItem> = _data
-    .filter((p: any) => p.id != 1)
-    .map((item: any, i: number) => {
-      return {
+  try {
+    const { data, error } = await $WebApiGetDetailed("/FareOfficeUnit/GetIFareOfficeUnitList");
+    if (error || !data?.result?.result) {
+      throw error || new Error('Empty office response');
+    }
+
+    const _data = data.result.result;
+    const _newsList: Array<OfficeUnitItem> = _data
+      .filter((p: any) => p.id != 1)
+      .map((item: any) => ({
         id: item.id,
         title: item.title,
-      };
-    });
+      }));
 
-  storageOfficeList.push(..._newsList);
-  officeList.push(
-    ..._newsList.slice(
-      0,
-      _newsList.length > PAGEITEMMAX_OFFICE
-        ? PAGEITEMMAX_OFFICE
-        : _newsList.length
-    )
-  );
+    storageOfficeList.push(..._newsList);
+    officeList.push(
+      ..._newsList.slice(
+        0,
+        _newsList.length > PAGEITEMMAX_OFFICE
+          ? PAGEITEMMAX_OFFICE
+          : _newsList.length
+      )
+    );
 
-  // Num page init.
-  for (let n = 0; n <= officeList.length / PAGEITEMMAX_OFFICE; n++) {
-    pageNums_office.push({
-      num: n + 1,
-      isActive: n == 0,
-      isHide: false
-    });
+    for (let n = 0; n <= officeList.length / PAGEITEMMAX_OFFICE; n++) {
+      pageNums_office.push({
+        num: n + 1,
+        isActive: n == 0,
+        isHide: false
+      });
+    }
+  } catch (error) {
+    hasErrorOffice.value = true;
+    officeErrorMessage.value = getApiErrorMessage(error, '相關福利機構載入失敗');
+  } finally {
+    isLoadingOffice.value = false;
   }
-});
+}
 
 function PageChange_Office(pageNum: number) {
   officeList.splice(0);
@@ -474,40 +507,56 @@ const qaList = reactive<Array<QAItem>>([]);
 const storageQAList = reactive<Array<QAItem>>([]);
 const pageNums_QA = reactive<Array<pageNum_QA>>([]);
 const PAGEITEMMAX_QA = 9;
+const isLoadingQA = ref(true);
+const hasErrorQA = ref(false);
+const qaErrorMessage = ref('常見福利問題載入失敗');
 
-const listNews = $WebApiGet("/FareQA/GetIFareQAList");
-listNews.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+async function loadQAList() {
+  isLoadingQA.value = true;
+  hasErrorQA.value = false;
+  qaErrorMessage.value = '常見福利問題載入失敗';
+  qaList.splice(0);
+  storageQAList.splice(0);
+  pageNums_QA.splice(0);
 
-  let _newsList: Array<QAItem> = _data
-    .filter((p: any) => p.id != 1)
-    .map((item: any, i: number) => {
-      return {
+  try {
+    const { data, error } = await $WebApiGetDetailed("/FareQA/GetIFareQAList");
+    if (error || !data?.result?.result) {
+      throw error || new Error('Empty QA response');
+    }
+
+    const _data = data.result.result;
+    const _newsList: Array<QAItem> = _data
+      .filter((p: any) => p.id != 1)
+      .map((item: any) => ({
         id: item.id,
         question: item.question,
         answer: item.answer,
         isActive: false,
-      };
-    });
+      }));
 
-  storageQAList.push(..._newsList);
-  qaList.push(
-    ..._newsList.slice(
-      0,
-      _newsList.length > PAGEITEMMAX_QA ? PAGEITEMMAX_QA : _newsList.length
-    )
-  );
+    storageQAList.push(..._newsList);
+    qaList.push(
+      ..._newsList.slice(
+        0,
+        _newsList.length > PAGEITEMMAX_QA ? PAGEITEMMAX_QA : _newsList.length
+      )
+    );
 
-  // Num page init.
-  for (let n = 0; n <= storageQAList.length / PAGEITEMMAX_QA; n++) {
-    pageNums_QA.push({
-      num: n + 1,
-      isActive: n == 0,
-      isHide: false
-    });
+    for (let n = 0; n <= storageQAList.length / PAGEITEMMAX_QA; n++) {
+      pageNums_QA.push({
+        num: n + 1,
+        isActive: n == 0,
+        isHide: false
+      });
+    }
+  } catch (error) {
+    hasErrorQA.value = true;
+    qaErrorMessage.value = getApiErrorMessage(error, '常見福利問題載入失敗');
+  } finally {
+    isLoadingQA.value = false;
   }
-});
+}
 
 function PageChange_QA(pageNum: number) {
   qaList.splice(0);
@@ -587,4 +636,7 @@ const currentPage_QA = ref(1);
 //   if (target == "QA") PageSwitch_QA(currentPage_QA.value);
 //   console.log(storageQAList.length)
 // }
+
+loadOfficeList();
+loadQAList();
 </script>

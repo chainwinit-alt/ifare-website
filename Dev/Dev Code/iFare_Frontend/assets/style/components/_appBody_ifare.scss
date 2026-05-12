@@ -394,7 +394,9 @@
 
         &:focus-visible {
           border-radius: 8px;
-          box-shadow: 0 0 0 2px rgba($color-primary-dark, 0.35);
+          outline: 2px solid rgba($color-primary-dark, 0.7);
+          outline-offset: 4px;
+          box-shadow: 0 0 0 6px rgba($color-primary-dark, 0.12);
         }
 
         .faq-info {

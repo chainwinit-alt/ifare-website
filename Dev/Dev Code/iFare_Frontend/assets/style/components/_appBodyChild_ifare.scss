@@ -392,6 +392,62 @@
           }
         }
 
+        .result-empty {
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          gap: 12px;
+          padding: 64px 24px;
+
+          &::before { content: none; }
+
+          .empty-illustration {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba($color-primary, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: $color-primary-dark;
+            margin-bottom: 4px;
+
+            .icon {
+              width: 32px;
+              height: 32px;
+              background-size: contain;
+            }
+          }
+
+          .empty-title {
+            color: $color-primary-dark;
+            font-size: 18px;
+            font-weight: 600;
+            line-height: 28px;
+            margin: 0;
+          }
+
+          .empty-hint {
+            color: rgba($color-black, 0.6);
+            font-size: 14px;
+            line-height: 22px;
+            margin: 0;
+            max-width: 420px;
+          }
+
+          .empty-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 12px;
+
+            .btn {
+              min-width: 140px;
+            }
+          }
+        }
+
         .result-title {
           color: $color-primary-dark;
           font-size: 18px;
@@ -470,10 +526,58 @@
           background: $color-white;
         }
 
-        .btn-ic-share {
+        // #12 — 4 顆分享按鈕並列容器
+        .share-bar {
           position: absolute;
           right: 48px;
           top: -20px;
+          display: flex;
+          gap: 8px;
+          z-index: 50;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+
+          .btn-ic-share {
+            position: static;
+            min-width: 40px;
+            height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 12px;
+            cursor: pointer;
+            border: 0;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+
+            &:hover {
+              transform: translateY(-1px);
+              box-shadow: 0px 14px 32px -8px rgba($color-shadow, 0.18);
+            }
+
+            &:focus-visible {
+              outline: 2px solid rgba($color-primary-dark, 0.7);
+              outline-offset: 2px;
+            }
+
+            .ic-line,
+            .ic-facebook {
+              width: 22px;
+              height: 22px;
+              display: inline-block;
+            }
+
+            .share-label {
+              font-size: 14px;
+              line-height: 1;
+              color: $color-primary-dark;
+              white-space: nowrap;
+              font-weight: 500;
+            }
+
+            &.is-copied .share-label {
+              color: $color-orange;
+            }
+          }
         }
 
         .part-info-list {

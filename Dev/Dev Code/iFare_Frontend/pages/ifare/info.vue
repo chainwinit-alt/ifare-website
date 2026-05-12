@@ -11,9 +11,41 @@
       </section>
       <section class="section-body">
         <div class="card-info">
-          <button class="btn-icon btn-ic-share" @click="shareCurrentUrlToLine">
-            <i class="ic-share"></i>
-          </button>
+          <div class="share-bar" role="group" aria-label="分享此福利">
+            <button
+              class="btn-ic-share btn-share-line"
+              type="button"
+              @click="shareCurrentUrlToLine"
+              aria-label="分享到 LINE"
+            >
+              <i class="ic-line" aria-hidden="true"></i>
+            </button>
+            <button
+              class="btn-ic-share btn-share-fb"
+              type="button"
+              @click="shareCurrentUrlToFacebook"
+              aria-label="分享到 Facebook"
+            >
+              <i class="ic-facebook" aria-hidden="true"></i>
+            </button>
+            <button
+              class="btn-ic-share btn-share-email"
+              type="button"
+              @click="shareCurrentUrlToEmail"
+              aria-label="用 Email 分享"
+            >
+              <span class="share-label">Email</span>
+            </button>
+            <button
+              class="btn-ic-share btn-share-copy"
+              :class="{ 'is-copied': copyToastVisible }"
+              type="button"
+              @click="onCopyUrl"
+              :aria-label="copyToastVisible ? '已複製連結' : '複製連結'"
+            >
+              <span class="share-label">{{ copyToastVisible ? '✓ 已複製' : '複製連結' }}</span>
+            </button>
+          </div>
           <div class="part-info-list">
             <div class="part part-qualify">
               <div class="title-component">
@@ -52,16 +84,27 @@
                 <i class="ic-title-pattern"></i>
                 <h2 class="comp-title">洽辦單位</h2>
               </div>
-              <div class="info-content" :class="{'cursor-pointer': _welfareItem.officeUnitID != 1}" @click="JumpTo(_welfareItem.officeUnitID)">
-                <label :class="{'cursor-pointer': _welfareItem.officeUnitID != 1, 'info-label-tel': _welfareItem.welfareTel}">
+              <div class="info-content">
+                <span class="info-label" :class="{ 'info-label-tel': _welfareItem.welfareTel }">
                   {{ displayOfficeUnitInfo }}
                   <a :href="'tel:'+_welfareItem.welfareTel" class="info-tel" v-if="_welfareItem.welfareTel">{{ _welfareItem.welfareTelStr }}</a>
-                </label>
-                <a :href="'tel:'+_welfareItem.welfareTel" class="btn-icon btn-go" v-if="_welfareItem.welfareTel">
-                  <i class="ic-phone"></i>
+                </span>
+                <a
+                  :href="'tel:'+_welfareItem.welfareTel"
+                  class="btn-icon btn-go"
+                  v-if="_welfareItem.welfareTel"
+                  :aria-label="`撥打電話 ${_welfareItem.welfareTelStr}`"
+                >
+                  <i class="ic-phone" aria-hidden="true"></i>
                 </a>
-                <button class="btn-icon btn-go" v-if="_welfareItem.officeUnitID != 1">
-                  <i class="ic-arrow-right-orange"></i>
+                <button
+                  class="btn-icon btn-go"
+                  type="button"
+                  v-if="_welfareItem.officeUnitID != 1"
+                  @click="JumpTo(_welfareItem.officeUnitID)"
+                  aria-label="查看洽辦單位詳情"
+                >
+                  <i class="ic-arrow-right-orange" aria-hidden="true"></i>
                 </button>
               </div>
             </div>
@@ -118,9 +161,27 @@ const QUALIFICATION_PREVIEW_LENGTH = 50;
 
 const { $WebApiGet } = useNuxtApp();
 const { shareCurrentUrlToLine } = useShareToLine();
+const { shareCurrentUrlToFacebook, shareCurrentUrlToEmail, copyCurrentUrl } = useShareUrl();
 const { formatDisplayDate } = useDateFormatter();
 const route = useRoute();
 const $router = useRouter();
+
+const copyToastVisible = ref(false);
+let copyToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function onCopyUrl() {
+  const ok = await copyCurrentUrl();
+  if (!ok) return;
+  if (copyToastTimer) clearTimeout(copyToastTimer);
+  copyToastVisible.value = true;
+  copyToastTimer = setTimeout(() => {
+    copyToastVisible.value = false;
+  }, 2000);
+}
+
+onBeforeUnmount(() => {
+  if (copyToastTimer) clearTimeout(copyToastTimer);
+});
 
 function JumpTo(id: any) {
   if (id == 1) return false;
