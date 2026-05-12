@@ -339,10 +339,14 @@
             justify-content: space-between;
             border-bottom: 1px solid rgba($color-black, 0.05);
             padding: 16px 40px 16px 48px;
+            // 靈動島 hover — 浮起 + 陰影柔
+            @include island-hover($lift: 3px, $scale: 1.01, $shadow-color: rgba($color-primary-dark, 0.16));
+
             &:hover {
               background: rgba($color-white, 0.5);
               .ic-arrow-right {
                 @extend .ic-arrow-right-orange;
+                transform: translateX(6px);
               }
             }
             &:first-child {
@@ -683,6 +687,10 @@
 
         .relation-item {
           padding: 24px 24px 16px 56px;
+          border-radius: 12px;
+          // 靈動島 hover — 相關福利卡浮起
+          @include island-hover($lift: 3px, $scale: 1.012, $shadow-color: rgba($color-primary-dark, 0.18));
+
           & > a {
             text-decoration: none;
           }

@@ -375,9 +375,21 @@
       .agency-item {
         display: flex;
         flex-direction: row;
-        
-        padding: 20px 0;
+        padding: 20px 16px;
         border-bottom: 1px solid rgba($color-black, .1);
+        border-radius: 8px;
+        // 靈動島 hover — 福利機構列浮起
+        @include island-hover($lift: 2px, $scale: 1.008, $shadow-color: rgba($color-primary-dark, 0.14));
+
+        &:hover {
+          .ic-open,
+          .link-url {
+            transform: translateX(4px);
+          }
+          .agency-name {
+            color: $color-primary-dark;
+          }
+        }
 
         .item-page-link {
           display: flex;
@@ -397,9 +409,12 @@
         flex-direction: column;
         gap: 0px;
         cursor: pointer;
-        padding: 24px 0;
+        padding: 24px 16px;
         border-bottom: 1px solid rgba($color-black, .1);
+        border-radius: 8px;
         outline: none;
+        // 靈動島 hover — FAQ 卡輕浮起
+        @include island-hover($lift: 2px, $scale: 1.005, $shadow-color: rgba($color-primary-dark, 0.14));
 
         &:focus-visible {
           border-radius: 8px;

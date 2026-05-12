@@ -13,3 +13,42 @@
     -webkit-box-orient: vertical;
     display: -webkit-box;
 }
+
+// ─── 靈動島曲線（iOS-style ease，俗稱動態島動畫） ───
+// 全站 hover/卡片 transition 用此曲線可營造「浮起／柔順 morph」的視覺。
+$ease-island: cubic-bezier(0.32, 0.72, 0, 1);
+
+// 靈動島 hover 效果 — 用於卡片 / list-item / 互動按鈕：浮起 + 放大 + 陰影加深
+// 既有 hover 樣式（color/opacity 等）仍可在呼叫 mixin 後追加，mixin 只負責 transform/shadow/曲線。
+//
+// 用法：
+//   .my-card {
+//     @include island-hover;
+//     &:hover { color: $color-orange; }  // 額外的 hover 效果繼續寫
+//   }
+//
+// 參數：
+//   $lift            向上偏移 (px) — 預設 4
+//   $scale           hover 放大比例 — 預設 1.025
+//   $duration        過渡時間 — 預設 0.32s
+//   $shadow-color    陰影色 — 預設半透明黑，可改成品牌色（$color-orange 等）
+@mixin island-hover($lift: 4px, $scale: 1.025, $duration: 0.32s, $shadow-color: rgba(0, 0, 0, 0.16)) {
+    transition:
+        transform #{$duration} $ease-island,
+        box-shadow #{$duration} $ease-island,
+        background #{$duration} $ease-island,
+        border-color #{$duration} $ease-island,
+        color #{$duration} $ease-island;
+    will-change: transform;
+
+    &:hover,
+    &:focus-visible {
+        transform: translateY(-#{$lift}) scale($scale);
+        box-shadow: 0 18px 40px -12px $shadow-color;
+    }
+
+    &:active {
+        transform: translateY(-#{$lift * 0.5}) scale(1);
+        transition-duration: 0.16s;
+    }
+}
