@@ -776,25 +776,27 @@ $c-grey-500: #8B8B8B;
   transform: translateY(16px) scale(0.96);
 }
 
-// RWD：行動裝置全屏化
+// RWD：行動裝置縮成浮窗（不再滿版），讓背景仍可見、內容不空盪
 @media (max-width: 768px) {
   .chatbot-window {
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 100vw;
-    height: 100dvh;
-    max-height: 100dvh;
-    border-radius: 0;
+    right: 16px;
+    bottom: 96px;                       // 避開 entry button (56 + 24 + 16)
+    top: auto;
+    width: calc(100vw - 32px);
+    max-width: 380px;
+    max-height: min(620px, 80dvh);
+    height: auto;
+    border-radius: 16px;
   }
 
-  // 手機版 header 退到 safe-area 下方，避免被網址列 / 動態島 / 狀態列遮住
+  // 不再滿版 → 取消 safe-area-inset-top 的 header padding，回到桌面風格
   .chatbot-header {
-    padding-top: env(safe-area-inset-top, 0px);
-    min-height: calc(56px + env(safe-area-inset-top, 0px));
-    align-items: flex-end;
+    padding-top: 0;
+    min-height: 56px;
+    align-items: center;
   }
 
+  // input bar 保留 safe-area-bottom，鍵盤彈出時有用
   .chatbot-input {
     padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
