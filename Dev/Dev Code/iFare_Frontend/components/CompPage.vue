@@ -59,9 +59,17 @@ const WIDTH_PAGEITEM = 52;
 
 watch(props.pageList, (newVal, oldVal) => {
   if (newVal.length >= 0) {
-    _widthPageContent.value = _elnPageContent.value.offsetWidth;
+    _widthPageContent.value = _elnPageContent.value?.offsetWidth || 0;
     _widthPageItemsTTL.value = newVal.length * WIDTH_PAGEITEM;
+    // #116 — pageList 變化（重新搜尋等情境）後重置 currentPage 並重算視窗
+    currentPage.value = 1;
+    nextTick(() => recomputeVisibleWindow());
   }
+});
+
+onMounted(() => {
+  _widthPageContent.value = _elnPageContent.value?.offsetWidth || 0;
+  recomputeVisibleWindow();
 });
 
 function PageClick(clickNum: number) {
@@ -70,38 +78,45 @@ function PageClick(clickNum: number) {
   });
   currentPage.value = clickNum;
   emits("changePage", clickNum);
+  // #116 — 切頁後重算 visible window，PageNext / PagePrev 不再各自維護
+  recomputeVisibleWindow();
+}
+
+// #116 — 統一管理 isHide：根據 currentPage 與容器寬度算「可見視窗」，
+// 把 currentPage 放中間，超出視窗的 page item 標 isHide。
+// 修正舊版 PagePrev 只 unhide 當前頁、其他被隱藏的 page 永遠拉不回來的 bug。
+function recomputeVisibleWindow() {
+  const total = props.pageList.length;
+  if (total <= 0) return;
+
+  // 預設視窗：依容器寬度容納幾個 item；若還沒量到寬度，全部顯示
+  let windowSize = total;
+  if (_widthPageContent.value > 0) {
+    windowSize = Math.max(1, Math.floor(_widthPageContent.value / WIDTH_PAGEITEM));
+    windowSize = Math.min(windowSize, total);
+  }
+
+  const cur = currentPage.value;
+  const half = Math.floor((windowSize - 1) / 2);
+  let start = Math.max(1, cur - half);
+  let end = Math.min(total, start + windowSize - 1);
+  if (end - start + 1 < windowSize) {
+    start = Math.max(1, end - windowSize + 1);
+  }
+
+  props.pageList.forEach((_item: any, i: number) => {
+    const num = i + 1;
+    _item.isHide = num < start || num > end;
+  });
 }
 
 function PageNext(e: any) {
   if (currentPage.value >= props.pageList.length) return false;
-
   PageClick(currentPage.value + 1);
-
-  let _currentPageNum = currentPage.value;
-  const lastPageItemWidth =
-    (props.pageList.length - _currentPageNum + 2) * WIDTH_PAGEITEM;
-
-  const isAtLastPage = _currentPageNum == props.pageList.length;
-  if (isAtLastPage) {
-    _currentPageNum = _currentPageNum - Math.floor(_widthPageContent.value / WIDTH_PAGEITEM) + 1;
-  }
-
-  if (isAtLastPage || lastPageItemWidth > _widthPageContent.value) {
-    props.pageList.forEach((_item: any, i: number) => {
-      _item.isHide = i + 1 < _currentPageNum;
-    });
-  }
 }
 
 function PagePrev(e: any) {
   if (currentPage.value <= 1) return false;
-  
   PageClick(currentPage.value - 1);
-
-  props.pageList.forEach((_item: any, i: number) => {
-    if (currentPage.value == i+1) {
-        _item.isHide = false;
-    }
-  });
 }
 </script>

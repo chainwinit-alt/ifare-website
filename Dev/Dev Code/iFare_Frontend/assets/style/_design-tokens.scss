@@ -1,0 +1,41 @@
+// ─── Design Tokens（UIUX #67 / #68） ─────────────────────────────────
+// 目的：把散落各檔的 border-radius / box-shadow 等魔術數字集中收斂，
+// 提供語意化變數讓新 code 直接用；既有 code 不全站 replace（避免設計細節打架），
+// 待設計系統正式整理時再個別替換。
+//
+// 用法：
+//   border-radius: $radius-sm;
+//   box-shadow: $shadow-card;
+
+// ─── Radius（語意：xs=小元件 / sm=按鈕 / md=卡片 / lg=容器 / xl=大區塊） ───
+$radius-xs:     4px;     // skeleton-line / icon button 小圓角
+$radius-sm:     8px;     // 一般按鈕、輸入框
+$radius-md:     12px;    // 卡片、彈出視窗
+$radius-lg:     16px;    // chatbot 視窗、大型卡片
+$radius-xl:     24px;    // 圓潤按鈕（btn-tag / btn-ic-share）
+$radius-2xl:    32px;    // 大型 CTA 按鈕
+$radius-pill:   999px;   // 膠囊形（tag / chip / 圖示按鈕）
+$radius-circle: 50%;     // 正圓
+$radius-bg-l:   880px;   // 背景大圓漸層（既有特殊用途，命名保留）
+$radius-bg-m:   750px;
+$radius-bg-s:   656px;
+$radius-bg-xs:  377px;
+
+// ─── Shadow（語意：rest=靜態卡片 / hover=互動上升 / cta=主按鈕投影 / focus=焦點環） ───
+// 既有 color 變數需要在使用端可用（這裡用 @if 包裝避免 _color 未 import 時報錯）
+@function _shadow-color($alpha) {
+  // 用 black 透明色作為通用，呼叫端可覆寫
+  @return rgba(23, 24, 24, $alpha);
+}
+
+$shadow-rest:   0px 11px 30px -8px #{_shadow-color(0.12)};
+$shadow-card:   0px 8px 22px -8px #{_shadow-color(0.10)};
+$shadow-hover:  0px 18px 36px -10px #{_shadow-color(0.18)};
+$shadow-lift:   0px 24px 44px -18px #{_shadow-color(0.10)};
+$shadow-cta:    0px 11px 30px -8px rgba(234, 85, 4, 0.50);  // orange 主按鈕
+$shadow-focus:  0 0 0 6px rgba(234, 85, 4, 0.18);            // 焦點環
+
+// ─── Notes ──────────────────────────────────────────────────────────
+// - 看到既有 code 用 `5px` / `6px` 之類非標準值，多半屬於早期遺留 — 之後修整時建議
+//   挑接近的 token 替換（5px → 4px / 6px → 8px），同時 review 視覺差異。
+// - shadow 含 color 的因 SCSS 變數中 rgba 編譯時就 lock，若要 dynamic theme 需改 mixin。

@@ -313,14 +313,23 @@
         text-align: right;
       }
 
+      // #73 — 避免 height:0 → height:auto 觸發 layout reflow。
+      // 改用 opacity + transform 為主視覺（GPU composited），max-height 輔助塌縮（不會反推全頁排版）。
       .item-recipient {
         opacity: 0;
-        height: 0;
-        transition-duration: .5s;
+        max-height: 0;
+        overflow: hidden;
+        transform: translateY(-8px);
+        will-change: opacity, transform;
+        transition:
+          opacity 0.3s ease,
+          transform 0.35s ease,
+          max-height 0.4s ease;
 
         &.visible {
           opacity: 1;
-          height: auto;
+          max-height: 320px;          // 預估上限（年齡按鈕列高度 < 200px，留 buffer）
+          transform: translateY(0);
         }
       }
   
