@@ -114,6 +114,7 @@ definePageMeta({
   toLink: '/ifare'
 })
 const { $WebApiGet } = useNuxtApp();
+const { getApiResultArray } = useApiResult();
 const { formatDisplayDate } = useDateFormatter();
 const route = useRoute();
 const $router = useRouter();
@@ -174,8 +175,8 @@ async function loadOfficeUnit() {
   contactList.splice(0);
   try {
     const res: any = await $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
-    if (!res?.result?.result) throw new Error("Empty response");
-    let _data = res.result.result;
+    let _data = getApiResultArray<any>(res);
+    if (_data.length === 0) throw new Error("Empty response");
     _data = _data.find((item: any) => item.id == _contactID);
     if (!_data) throw new Error("Office unit not found");
 

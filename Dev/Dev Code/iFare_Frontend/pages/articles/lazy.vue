@@ -52,6 +52,7 @@ definePageMeta({
 });
 
 const { $WebApiGet } = useNuxtApp();
+const { getApiResultValue } = useApiResult();
 const { shareCurrentUrlToLine } = useShareToLine();
 const { formatDisplayDate } = useDateFormatter();
 const { estimateReadingMinutes } = useReadingTime();
@@ -103,7 +104,7 @@ async function loadLazyDetail(articleId: number) {
   const res: any = await $WebApiGet("/ArticlesLazy/GetArticlesLazyDetail", {
     articlesLazyID: articleId,
   });
-  const data = res?.result?.result;
+  const data = getApiResultValue<any>(res);
   if (!data || requestToken !== detailRequestToken) {
     return;
   }
@@ -134,7 +135,7 @@ async function loadLazyRelation(articleId: number) {
   const res: any = await $WebApiGet("/ArticlesLazy/GetArticlesLazyRelation", {
     articlesLazyID: articleId,
   });
-  const data = res?.result?.result;
+  const data = getApiResultValue<any>(res);
   if (!Array.isArray(data) || requestToken !== relationRequestToken) {
     return;
   }

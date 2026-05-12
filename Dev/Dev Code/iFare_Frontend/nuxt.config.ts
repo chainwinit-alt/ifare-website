@@ -1,5 +1,10 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 const SITEMAP_LASTMOD = new Date().toISOString();
+const DEFAULT_SITE_URL = 'https://www.i-fare.org.tw';
+const RESOLVED_SITE_URL =
+  process.env.NUXT_PUBLIC_SITE_URL ||
+  process.env.NUXT_SITE_URL ||
+  DEFAULT_SITE_URL;
 
 export default defineNuxtConfig({
   devtools: { enabled: false },
@@ -24,7 +29,7 @@ export default defineNuxtConfig({
     geminiApiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '',
     geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     public: {
-      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'http://ifare.local',
+      siteUrl: RESOLVED_SITE_URL,
       frontendApiBase:
         process.env.NUXT_PUBLIC_FRONTEND_API_BASE || '/api/services/app'
     }
@@ -62,7 +67,7 @@ export default defineNuxtConfig({
     id: 'G-QCT2XVFX2L'
   },
   site: {
-    url: process.env.NUXT_PUBLIC_SITE_URL || 'http://10.200.0.39'
+    url: RESOLVED_SITE_URL
   },
   sitemap: {
     xslColumns: [
@@ -116,22 +121,10 @@ export default defineNuxtConfig({
         lastmod: SITEMAP_LASTMOD
       }
     },
-    '/articles/lazy': {
-      index: false
-    },
-    '/articles/welfare': {
-      index: false
-    },
     '/ifare/contact': {
       index: false
     },
-    '/ifare/info': {
-      index: false
-    },
     '/ifare/result': {
-      index: false
-    },
-    '/news/info': {
       index: false
     }
   }

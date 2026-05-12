@@ -75,6 +75,7 @@ import CompPage from "../components/CompPage.vue"
 const { $WebApiGetDetailed } = useNuxtApp()
 const { formatDisplayDate } = useDateFormatter()
 const { getApiErrorMessage } = useApiErrorMessage()
+const { getApiResultArray } = useApiResult()
 const PAGEITEMMAX = 10
 
 interface newsItem {
@@ -107,13 +108,13 @@ async function LoadNews() {
 
     try {
         const { data, error } = await $WebApiGetDetailed('/News/GetNewsList')
-        if (error || !data || !data.result || !data.result.result) {
+        const list = getApiResultArray<any>(data)
+        if (error || list.length === 0) {
             hasError.value = true
             errorMessage.value = getApiErrorMessage(error, '載入最新消息時發生錯誤')
             return
         }
-        const _data = data.result.result
-        let _newsList:Array<newsItem> = _data.map((item:any) => ({
+        let _newsList:Array<newsItem> = list.map((item:any) => ({
             id: item.id,
             title: item.title,
             releaseTime: item.releaseTime,

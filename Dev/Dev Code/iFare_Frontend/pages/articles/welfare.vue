@@ -58,6 +58,7 @@ definePageMeta({
 });
 
 const { $WebApiGet } = useNuxtApp();
+const { getApiResultValue } = useApiResult();
 const { shareCurrentUrlToLine } = useShareToLine();
 const { formatDisplayDate } = useDateFormatter();
 const { estimateReadingMinutes } = useReadingTime();
@@ -119,7 +120,7 @@ async function loadWelfareDetail(articleId: number) {
   const res: any = await $WebApiGet("/ArticlesWelfare/GetArticlesWelfareDetail", {
     articleWelfareID: articleId,
   });
-  const data = res?.result?.result;
+  const data = getApiResultValue<any>(res);
   if (!data || requestToken !== detailRequestToken) {
     return;
   }
@@ -144,7 +145,7 @@ async function loadWelfareRelation(articleId: number) {
   const res: any = await $WebApiGet("/ArticlesWelfare/GetArticlesWelfareRelation", {
     articleWelfareID: articleId,
   });
-  const data = res?.result?.result;
+  const data = getApiResultValue<any>(res);
   if (!Array.isArray(data) || requestToken !== relationRequestToken) {
     return;
   }

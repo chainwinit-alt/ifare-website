@@ -160,6 +160,7 @@ definePageMeta({
 const QUALIFICATION_PREVIEW_LENGTH = 50;
 
 const { $WebApiGet } = useNuxtApp();
+const { getApiResultValue } = useApiResult();
 const { shareCurrentUrlToLine } = useShareToLine();
 const { shareCurrentUrlToFacebook, shareCurrentUrlToEmail, copyCurrentUrl } = useShareUrl();
 const { formatDisplayDate } = useDateFormatter();
@@ -234,7 +235,7 @@ const displayOfficeUnitInfo = computed(
 
 async function loadOfficeList() {
   const res: any = await $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
-  const _data = res?.result?.result;
+  const _data = getApiResultValue<any>(res);
   if (!Array.isArray(_data)) return;
 
   officeList.splice(
@@ -370,7 +371,7 @@ async function loadPolicyDetail(infoID: number) {
   const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyDetail", {
     farePolicyID: infoID,
   });
-  const _data = res?.result?.result;
+  const _data = getApiResultValue<any>(res);
   if (!_data || requestToken !== detailRequestToken) return;
 
   _welfareItem.id = _data.id;
@@ -412,7 +413,7 @@ async function loadRelationList(infoID: number) {
   const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyRelation", {
     farePolicyID: infoID,
   });
-  const _data = res?.result?.result;
+  const _data = getApiResultValue<any>(res);
   if (!Array.isArray(_data) || requestToken !== relationRequestToken) return;
 
   iFarePolicyList.push(

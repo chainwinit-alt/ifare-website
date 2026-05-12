@@ -156,7 +156,7 @@
                   <div class="item-group">
                     <label class="input-title">排程上架時間</label>
                     <el-date-picker
-                      v-model="form.publishTime"
+                      v-model="publishTimeModel"
                       type="datetime"
                       placeholder="未來時間 = 排程"
                       format="YYYY/MM/DD HH:mm"
@@ -168,7 +168,7 @@
                   <div class="item-group">
                     <label class="input-title">排程下架時間</label>
                     <el-date-picker
-                      v-model="form.unpublishTime"
+                      v-model="unpublishTimeModel"
                       type="datetime"
                       placeholder="未來時間 = 排程"
                       format="YYYY/MM/DD HH:mm"
@@ -247,6 +247,20 @@ const isDirty = ref(false);
 const saving = ref(false);
 const isPreviewOpen = ref(false);
 const advancedOpen = ref(false);
+
+const publishTimeModel = computed<string | undefined>({
+  get: () => form.publishTime ?? undefined,
+  set: (value) => {
+    form.publishTime = value ?? null;
+  },
+});
+
+const unpublishTimeModel = computed<string | undefined>({
+  get: () => form.unpublishTime ?? undefined,
+  set: (value) => {
+    form.unpublishTime = value ?? null;
+  },
+});
 
 // 編輯模式 — 載入既有資料
 if (!isAdd && recordId.value) {

@@ -23,6 +23,7 @@ definePageMeta({
   toLink: '/news'
 })
 const { $WebApiGet } = useNuxtApp()
+const { getApiResultArray } = useApiResult()
 const { shareCurrentUrlToLine } = useShareToLine()
 const { formatDisplayDate } = useDateFormatter()
 const route = useRoute()
@@ -44,7 +45,8 @@ releaseTime: ''
 
 const listNews = $WebApiGet('/News/GetNewsDetail', { newsID: _newsID})
 listNews.then((res:any) => {
-    const _data = res.result.result
+    const _data = getApiResultArray<any>(res)
+    if (_data.length === 0) return
 
     let _newsList:Array<newsItem> = _data.map((item:any, i:number) => {
         return {

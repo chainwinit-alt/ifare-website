@@ -216,6 +216,7 @@ definePageMeta({
   toLink: "/ifare",
 });
 const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
+const { getApiResultArray } = useApiResult();
 const { getApiErrorMessage } = useApiErrorMessage();
 import CompSelect from "../components/CompSelect.vue";
 import CompSelectRecipient from "../components/CompSelectRecipient.vue";
@@ -296,8 +297,8 @@ function getSelectItems(type: string, items: any) {
 // Code Policy
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+  const _data = getApiResultArray<any>(res);
+  if (_data.length === 0) return;
 let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
@@ -310,8 +311,8 @@ let _list: Array<selectItem> = _data.map((item: any, i: number) => {
 // Code area
 const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
 codeArea.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+  const _data = getApiResultArray<any>(res);
+  if (_data.length === 0) return;
 let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
@@ -324,8 +325,8 @@ let _list: Array<selectItem> = _data.map((item: any, i: number) => {
 // Code recipient
 const codeRecipient = $WebApiGet("/Code/GetCodeRecipientList");
 codeRecipient.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+  const _data = getApiResultArray<any>(res);
+  if (_data.length === 0) return;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName,
@@ -366,8 +367,8 @@ function SwitchRecipient(codeVal: any) {
 // Code income
 const codeIncome = $WebApiGet("/Code/GetCodeIncomeList");
 codeIncome.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+  const _data = getApiResultArray<any>(res);
+  if (_data.length === 0) return;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName,
@@ -402,8 +403,8 @@ function SwitchIncome(codeVal: any) {
 // Code identity
 const codeIdentity = $WebApiGet("/Code/GetCodeIdentityList");
 codeIdentity.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+  const _data = getApiResultArray<any>(res);
+  if (_data.length === 0) return;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName == '?券' ? '銝?' : item.codeName,
@@ -540,14 +541,14 @@ function SetDataInit(_q: any) {
     iFarePolicyList.splice(0);
     pageNums.splice(0);
 
-    if (error || !data?.result?.result) {
+    const list = getApiResultArray<any>(data);
+    if (error || list.length === 0) {
       hasError.value = true;
       errorMessage.value = getApiErrorMessage(error, '載入福利政策時發生錯誤');
       return;
     }
 
-    const _data = data.result.result;
-    let _newsList: Array<iFarePolicyItem> = _data.map(
+    let _newsList: Array<iFarePolicyItem> = list.map(
       (item: any, i: number) => {
         return {
           id: item.id,

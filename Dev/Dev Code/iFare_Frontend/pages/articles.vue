@@ -195,6 +195,7 @@ definePageMeta({
 const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
 const { formatDisplayDate } = useDateFormatter();
 const { getApiErrorMessage } = useApiErrorMessage();
+const { getApiResultArray } = useApiResult();
 
 const PAGEITEMMAX_WELFARE = 4;
 const PAGEITEMMAX_LAZY = 8;
@@ -238,9 +239,7 @@ const keywordSelectList = reactive<Array<selectItem>>([]);
 
 async function loadPolicyOptions() {
   const res: any = await $WebApiGet("/Code/GetCodePolicyList");
-  if (!res?.result?.result) return;
-
-  const nextList: Array<selectItem> = res.result.result.map((item: any) => ({
+  const nextList: Array<selectItem> = getApiResultArray<any>(res).map((item: any) => ({
     val: item.id,
     name: item.codeName,
   }));
@@ -252,9 +251,7 @@ async function loadPolicyOptions() {
 
 async function loadKeywordOptions() {
   const res: any = await $WebApiGet("/Code/GetCodeKeywordList");
-  if (!res?.result?.result) return;
-
-  const nextList: Array<selectItem> = res.result.result.map((item: any) => ({
+  const nextList: Array<selectItem> = getApiResultArray<any>(res).map((item: any) => ({
     val: item.id,
     name: item.codeName,
   }));
@@ -318,11 +315,12 @@ async function loadWelfareList() {
 
   try {
     const { data, error } = await $WebApiGetDetailed("/ArticlesWelfare/GetArticlesWelfareList");
-    if (error || !data?.result?.result) {
+    const list = getApiResultArray<any>(data);
+    if (error || list.length === 0) {
       throw error || new Error("Empty welfare response");
     }
 
-    const nextList: Array<welfareItem> = data.result.result.map((item: any) => ({
+    const nextList: Array<welfareItem> = list.map((item: any) => ({
       id: item.id,
       title: item.title,
       releaseTime: item.releaseTime,
@@ -405,11 +403,12 @@ async function loadLazyList() {
 
   try {
     const { data, error } = await $WebApiGetDetailed("/ArticlesLazy/GetArticlesLazyList");
-    if (error || !data?.result?.result) {
+    const list = getApiResultArray<any>(data);
+    if (error || list.length === 0) {
       throw error || new Error("Empty lazy response");
     }
 
-    const nextList: Array<lazyItem> = data.result.result.map((item: any) => ({
+    const nextList: Array<lazyItem> = list.map((item: any) => ({
       id: item.id,
       title: item.title,
       codeKeywords: item.codeKeywordList.map((_code: any) => ({

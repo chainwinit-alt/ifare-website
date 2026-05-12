@@ -1,9 +1,4 @@
 <template>
-  <!--
-    UIUX #136 — 聊天機器人浮動入口按鈕
-    全站右下角圓形按鈕，hover 顯示 tooltip。
-    Click 觸發 open 事件（之後由 #137 Welcome 視窗 mount 時接住此事件）。
-  -->
   <div class="chatbot-entry">
     <Transition name="tooltip">
       <span
@@ -18,15 +13,16 @@
       type="button"
       class="chatbot-entry-btn"
       :class="{ 'is-open': isOpen }"
-      :aria-label="isOpen ? '關閉長穩小幫手' : tooltipText"
+      :aria-label="isOpen ? '關閉智慧小幫手' : tooltipText"
       :aria-expanded="isOpen"
+      data-island="智慧小幫手"
+      data-island-style="button"
       @click="handleClick"
       @mouseenter="showTooltip = true"
       @mouseleave="showTooltip = false"
       @focus="showTooltip = true"
       @blur="showTooltip = false"
     >
-      <!-- 聊天泡泡 icon (open 時切換成 X) -->
       <svg
         v-if="!isOpen"
         class="chatbot-entry-icon"
@@ -68,10 +64,8 @@
 </template>
 
 <script setup lang="ts">
-const tooltipText = '需要幫忙嗎？';
+const tooltipText = '智慧小幫手';
 const showTooltip = ref(false);
-
-// v-model:open 雙向綁定，讓父層控制視窗開關狀態
 const isOpen = defineModel<boolean>('open', { default: false });
 
 const emit = defineEmits<{
@@ -81,91 +75,97 @@ const emit = defineEmits<{
 
 function handleClick() {
   isOpen.value = !isOpen.value;
+
   if (isOpen.value) {
     emit('open');
     showTooltip.value = false;
-  } else {
-    emit('close');
+    return;
   }
+
+  emit('close');
 }
 </script>
 
 <style lang="scss" scoped>
-$c-orange: #EA5504;
-$c-orange-dark: #C84804;
-$c-white: #FFFFFF;
-$c-black: #171818;
-
 .chatbot-entry {
   position: fixed;
   right: 24px;
-  bottom: 24px;
-  z-index: 999;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 1003;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
 .chatbot-entry-tooltip {
-  padding: 7px 14px;
-  background: $c-black;
-  color: $c-white;
-  font-size: 13px;
-  line-height: 1.4;
-  border-radius: 10px;
-  white-space: nowrap;
-  pointer-events: none;
-  box-shadow: 0 4px 12px rgba($c-black, 0.16);
   position: relative;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(23, 24, 24, 0.92);
+  box-shadow: 0 10px 24px rgba(23, 24, 24, 0.2);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
 
-  // 小箭頭指向按鈕
   &::after {
     content: '';
     position: absolute;
-    left: 100%;
     top: 50%;
+    left: 100%;
     transform: translateY(-50%);
     border: 6px solid transparent;
-    border-left-color: $c-black;
+    border-left-color: rgba(23, 24, 24, 0.92);
   }
 }
 
 .chatbot-entry-btn {
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   padding: 0;
-  border: none;
+  border: 0;
   border-radius: 50%;
-  background: $c-orange;
-  color: $c-white;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04)),
+    linear-gradient(145deg, #f36e21, #ea5504);
+  box-shadow:
+    0 18px 38px rgba(234, 85, 4, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.14) inset;
+  color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba($c-black, 0.18);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background 0.22s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  backdrop-filter: blur(20px);
 
   &:hover {
-    transform: translateY(-2px);
-    background: $c-orange-dark;
-    box-shadow: 0 12px 32px rgba($c-black, 0.24);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow:
+      0 22px 42px rgba(234, 85, 4, 0.34),
+      0 0 0 1px rgba(255, 255, 255, 0.18) inset;
   }
 
   &:focus-visible {
-    outline: 3px solid rgba($c-orange, 0.4);
-    outline-offset: 2px;
+    outline: 3px solid rgba(243, 110, 33, 0.32);
+    outline-offset: 3px;
   }
 
   &:active {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.98);
   }
 
   &.is-open {
-    background: $c-black;
-
-    &:hover {
-      background: lighten($c-black, 10%);
-    }
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04)),
+      linear-gradient(145deg, #212121, #111111);
+    box-shadow:
+      0 18px 34px rgba(17, 17, 17, 0.28),
+      0 0 0 1px rgba(255, 255, 255, 0.14) inset;
   }
 }
 
@@ -173,25 +173,23 @@ $c-black: #171818;
   pointer-events: none;
 }
 
-// Tooltip 進出動畫
 .tooltip-enter-active,
 .tooltip-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
+
 .tooltip-enter-from,
 .tooltip-leave-to {
   opacity: 0;
-  transform: translateX(8px);
+  transform: translateX(10px);
 }
 
 @media (max-width: 768px) {
   .chatbot-entry {
     right: 16px;
-    bottom: 16px;
-    gap: 8px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
   }
 
-  // 行動裝置 tooltip 隱藏（避免擋畫面，使用者點才知道）
   .chatbot-entry-tooltip {
     display: none;
   }

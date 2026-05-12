@@ -1,10 +1,16 @@
 <template>
   <div class="section-main-card card-fullsize card-table" :name="props.tbName">
     <div class="part-table">
+      <div class="table-toolbar">
+        <div class="table-toolbar__summary">
+          <strong>{{ totalRows }}</strong>
+          <span v-if="totalRows > 0">目前顯示 {{ currentRangeText }}</span>
+          <span v-else>目前沒有資料</span>
+        </div>
+        <span class="table-toolbar__meta" v-if="props.tbName">{{ props.tbName }}</span>
+      </div>
       <el-table
-        :data="
-          tbData.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-        "
+        :data="paginatedRows"
         stripe
       >
         <template v-for="column in columnInfoList">
@@ -94,6 +100,12 @@
             </template>
           </el-table-column>
         </template>
+        <template #empty>
+          <div class="table-empty">
+            <strong>目前沒有符合條件的資料</strong>
+            <span>可以調整搜尋條件，或新增第一筆內容。</span>
+          </div>
+        </template>
       </el-table>
     </div>
     <div class="part-page">
@@ -101,8 +113,8 @@
         v-model:current-page="currentPage"
         v-model:page-size="pageSize"
         :background="pageBg"
-        :page-sizes="[10, 50, 100]"
-        :total="tbData.length"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="totalRows"
         @current-change="currentPageChange"
         layout="total, prev, pager, next, jumper, sizes"
       />
@@ -178,6 +190,33 @@ const tbUpdateTime = computed({
 const currentPage = ref(1);
 const pageSize = ref(10);
 const pageBg = ref(false);
+
+const totalRows = computed(() => tbData.value.length);
+const paginatedRows = computed(() =>
+  tbData.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value),
+);
+const currentRangeText = computed(() => {
+  if (totalRows.value === 0) return "0 - 0";
+
+  const start = (currentPage.value - 1) * pageSize.value + 1;
+  const end = Math.min(currentPage.value * pageSize.value, totalRows.value);
+  return `${start} - ${end} / ${totalRows.value}`;
+});
+
+function clampCurrentPage() {
+  const maxPage = Math.max(1, Math.ceil(totalRows.value / pageSize.value));
+  if (currentPage.value > maxPage) {
+    currentPage.value = maxPage;
+  }
+}
+
+watch(totalRows, () => {
+  clampCurrentPage();
+});
+
+watch(pageSize, () => {
+  clampCurrentPage();
+});
 
 const currentPageChange = (page: any) => {
   console.log("page: ", page);
@@ -479,3 +518,54 @@ const deleteConfirm = (callApiName:string, _param:any) => {
   isDialogAlertVisible.value = false
 }
 </script>
+
+<style lang="scss" scoped>
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.table-toolbar__summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #606266;
+
+  strong {
+    font-size: 24px;
+    font-weight: 700;
+    color: #303133;
+  }
+
+  span {
+    font-size: 13px;
+  }
+}
+
+.table-toolbar__meta {
+  font-size: 12px;
+  color: #909399;
+}
+
+.table-empty {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #909399;
+
+  strong {
+    font-size: 15px;
+    color: #303133;
+  }
+
+  span {
+    font-size: 13px;
+  }
+}
+</style>

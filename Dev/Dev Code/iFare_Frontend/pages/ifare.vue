@@ -247,6 +247,7 @@ definePageMeta({
   toLink: "/",
 });
 const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
+const { getApiResultArray } = useApiResult();
 const { getApiErrorMessage } = useApiErrorMessage();
 const $router = useRouter();
 import CompSelect from "../components/CompSelect.vue";
@@ -308,8 +309,8 @@ function getSelectValue(type: string, val: string) {
 // Code Policy
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+  const _data = getApiResultArray<any>(res);
+  if (_data.length === 0) return;
 
 let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
@@ -324,8 +325,8 @@ let _list: Array<selectItem> = _data.map((item: any, i: number) => {
 // Code area
 const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
 codeArea.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+  const _data = getApiResultArray<any>(res);
+  if (_data.length === 0) return;
 
 let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
@@ -340,8 +341,8 @@ let _list: Array<selectItem> = _data.map((item: any, i: number) => {
 // Code recipient
 const codeRecipient = $WebApiGet("/Code/GetCodeRecipientList");
 codeRecipient.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+  const _data = getApiResultArray<any>(res);
+  if (_data.length === 0) return;
 
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
@@ -423,12 +424,12 @@ async function loadOfficeList() {
 
   try {
     const { data, error } = await $WebApiGetDetailed("/FareOfficeUnit/GetIFareOfficeUnitList");
-    if (error || !data?.result?.result) {
+    const list = getApiResultArray<any>(data);
+    if (error || list.length === 0) {
       throw error || new Error('Empty office response');
     }
 
-    const _data = data.result.result;
-    const _newsList: Array<OfficeUnitItem> = _data
+    const _newsList: Array<OfficeUnitItem> = list
       .filter((p: any) => p.id != 1)
       .map((item: any) => ({
         id: item.id,
@@ -521,12 +522,12 @@ async function loadQAList() {
 
   try {
     const { data, error } = await $WebApiGetDetailed("/FareQA/GetIFareQAList");
-    if (error || !data?.result?.result) {
+    const list = getApiResultArray<any>(data);
+    if (error || list.length === 0) {
       throw error || new Error('Empty QA response');
     }
 
-    const _data = data.result.result;
-    const _newsList: Array<QAItem> = _data
+    const _newsList: Array<QAItem> = list
       .filter((p: any) => p.id != 1)
       .map((item: any) => ({
         id: item.id,

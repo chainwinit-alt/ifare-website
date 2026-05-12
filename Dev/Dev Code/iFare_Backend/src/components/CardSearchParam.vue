@@ -2,6 +2,21 @@
   <!-- 搜尋條件卡片容器，name 屬性標記目前的搜尋模式 -->
   <div class="section-main-card card-fullsize card-search">
     <div class="card-info" :name="props.searchMode">
+      <div class="search-toolbar">
+        <div class="search-toolbar__summary">
+          <span class="search-toolbar__label">目前已套用</span>
+          <strong class="search-toolbar__count">{{ activeFilterCount }}</strong>
+          <span class="search-toolbar__label">個條件</span>
+        </div>
+        <button
+          type="button"
+          class="search-toolbar__reset"
+          :disabled="!hasActiveFilters"
+          @click="resetSearchParams"
+        >
+          清除全部
+        </button>
+      </div>
       <!-- 權限篩選（radioSelect_permission）：顯示條件視 searchMode 而定 -->
       <comp-radio-select
         v-model:radio-value="radioValue_permission"
@@ -126,6 +141,13 @@
         @click="SetSearchParams"
         >查詢</el-button
       >
+      <el-button
+        class="btn-search btn-search-reset"
+        plain
+        size="large"
+        :disabled="!hasActiveFilters"
+        @click="resetSearchParams"
+      >清除條件</el-button>
     </div>
   </div>
 </template>
@@ -160,6 +182,7 @@ import { useRouter } from "vue-router";
 const _router = useRouter()
 const props = defineProps(["searchMode", "defaultParams"]);
 const emits = defineEmits(["update:searchParams"]);
+const ALL_OPTION_LABEL = "不限";
 
 /* ========== 型別定義 ========== */
 
@@ -212,9 +235,9 @@ const datepicker_release = ref(props.defaultParams && props.defaultParams.releas
 const datepicker_discontinued = ref(props.defaultParams && props.defaultParams.discontinued ? props.defaultParams.discontinued.split('TO') : []);
 
 // 單選篩選條件，預設為「不限」
-const radioValue_dataState = ref(props.defaultParams && props.defaultParams.dataState ? props.defaultParams.dataState : "不限");
-const radioValue_permission = ref(props.defaultParams && props.defaultParams.permission ? props.defaultParams.permission : "不限");
-const radioValue_releaseState = ref(props.defaultParams && props.defaultParams.releaseState ? props.defaultParams.releaseState : "不限");
+const radioValue_dataState = ref(props.defaultParams && props.defaultParams.dataState ? props.defaultParams.dataState : ALL_OPTION_LABEL);
+const radioValue_permission = ref(props.defaultParams && props.defaultParams.permission ? props.defaultParams.permission : ALL_OPTION_LABEL);
+const radioValue_releaseState = ref(props.defaultParams && props.defaultParams.releaseState ? props.defaultParams.releaseState : ALL_OPTION_LABEL);
 
 // 下拉選單條件，預設為 null（未選擇）
 const selectValue_domicile = ref(props.defaultParams && props.defaultParams.domicile ? props.defaultParams.domicile : null);
@@ -227,6 +250,48 @@ const selectValue_imgManagerType = ref(props.defaultParams && props.defaultParam
 const inputValue_num = ref(props.defaultParams && props.defaultParams.num ? props.defaultParams.num : "")
 const inputValue_searchWord = ref(props.defaultParams && props.defaultParams.word ? props.defaultParams.word : "");
 const inputValue_searchAccount = ref(props.defaultParams && props.defaultParams.account ? props.defaultParams.account : "");
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+
+  const datepickers = [
+    datepicker_create.value,
+    datepicker_update.value,
+    datepicker_upload.value,
+    datepicker_release.value,
+    datepicker_discontinued.value,
+  ];
+  count += datepickers.filter((items) => Array.isArray(items) && items.length === 2).length;
+
+  const radioValues = [
+    radioValue_dataState.value,
+    radioValue_permission.value,
+    radioValue_releaseState.value,
+  ];
+  count += radioValues.filter((value) => value && value !== ALL_OPTION_LABEL).length;
+
+  const selectValues = [
+    selectValue_domicile.value,
+    selectValue_policy.value,
+    selectValue_imgManagerType.value,
+  ];
+  count += selectValues.filter((value) => Boolean(value)).length;
+
+  if (Array.isArray(selectValue_keyword.value) && selectValue_keyword.value.length > 0) {
+    count += 1;
+  }
+
+  const inputValues = [
+    inputValue_num.value,
+    inputValue_searchWord.value,
+    inputValue_searchAccount.value,
+  ];
+  count += inputValues.filter((value) => typeof value === "string" && value.trim().length > 0).length;
+
+  return count;
+});
+
+const hasActiveFilters = computed(() => activeFilterCount.value > 0);
 
 /**
  * checkCompToShow - 判斷指定搜尋元件是否應該顯示
@@ -343,6 +408,29 @@ function checkCompToShow(_compName: string) {
  * 4. 使用 router.replace 更新 URL（不產生歷史記錄）
  * 5. 透過 emit 將完整搜尋條件傳遞給父元件
  */
+function resetSearchParams() {
+  datepicker_create.value = [];
+  datepicker_update.value = [];
+  datepicker_upload.value = [];
+  datepicker_release.value = [];
+  datepicker_discontinued.value = [];
+
+  radioValue_dataState.value = ALL_OPTION_LABEL;
+  radioValue_permission.value = ALL_OPTION_LABEL;
+  radioValue_releaseState.value = ALL_OPTION_LABEL;
+
+  selectValue_domicile.value = null;
+  selectValue_policy.value = null;
+  selectValue_keyword.value = null;
+  selectValue_imgManagerType.value = null;
+
+  inputValue_num.value = "";
+  inputValue_searchWord.value = "";
+  inputValue_searchAccount.value = "";
+
+  SetSearchParams();
+}
+
 function SetSearchParams() {
   const searchParams = reactive<SearchParams>({
     datepicker: reactive<mdatepicker>({
@@ -407,9 +495,9 @@ function SetSearchParams() {
   }
 
   // 單選條件：若為「不限」則不加入 query
-  if (searchParams.radioSelect?.dataState && searchParams.radioSelect?.dataState != "不限") _query.dataState = searchParams.radioSelect?.dataState
-  if (searchParams.radioSelect?.permission && searchParams.radioSelect?.permission != "不限") _query.permission = searchParams.radioSelect?.permission
-  if (searchParams.radioSelect?.releaseState && searchParams.radioSelect?.releaseState != "不限") _query.releaseState = searchParams.radioSelect?.releaseState
+  if (searchParams.radioSelect?.dataState && searchParams.radioSelect?.dataState != ALL_OPTION_LABEL) _query.dataState = searchParams.radioSelect?.dataState
+  if (searchParams.radioSelect?.permission && searchParams.radioSelect?.permission != ALL_OPTION_LABEL) _query.permission = searchParams.radioSelect?.permission
+  if (searchParams.radioSelect?.releaseState && searchParams.radioSelect?.releaseState != ALL_OPTION_LABEL) _query.releaseState = searchParams.radioSelect?.releaseState
 
   // 下拉選單條件：有值才加入 query
   if (searchParams.itemSelect?.domicile) _query.domicile = searchParams.itemSelect?.domicile
@@ -429,3 +517,50 @@ function SetSearchParams() {
   emits("update:searchParams", searchParams);
 }
 </script>
+
+<style lang="scss" scoped>
+.search-toolbar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.search-toolbar__summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #606266;
+}
+
+.search-toolbar__label {
+  font-size: 13px;
+}
+
+.search-toolbar__count {
+  font-size: 22px;
+  font-weight: 700;
+  color: #303133;
+}
+
+.search-toolbar__reset {
+  border: 0;
+  background: transparent;
+  color: #ea5504;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+
+  &:disabled {
+    color: #c0c4cc;
+    cursor: not-allowed;
+  }
+}
+
+.btn-search-reset {
+  margin-left: 4px;
+}
+</style>

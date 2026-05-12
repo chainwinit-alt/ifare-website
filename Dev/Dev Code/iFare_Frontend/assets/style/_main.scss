@@ -233,22 +233,114 @@ h1, h2, h3, h4, h5, h6 {
 // .hover-lift utility 給任何想加效果的元素手動掛
 // 同時自動套到常見可點擊元素 (nav 連結、footer 按鈕、btn-icon、btn-social)
 // 既有自訂 hover (about morph 卡、news 浮起卡等) 不受影響
-.hover-lift,
-.app-header .part-nav ul li a,
-.app-footer .btn,
-.app-footer a:not(.no-userselect),
-.btn-social,
-.btn-icon,
-.btn:not(.btn-tag):not(.btn-reset):not(.btn-clear-query):not(.btn-clear-text):not(.btn-search) {
+:where(
+  .hover-lift,
+  [data-island],
+  .app-header .part-nav ul li a,
+  .app-footer .btn,
+  .app-footer a:not(.no-userselect),
+  .btn-social,
+  .btn-icon,
+  .btn:not(.btn-tag):not(.btn-reset):not(.btn-clear-query):not(.btn-clear-text):not(.btn-search),
+  .relation-links .relation-item,
+  .card-article,
+  .news-item,
+  .advance-link,
+  input:not([type='hidden']),
+  textarea,
+  select
+) {
+  --island-lift: 2px;
+  --island-scale: 1.012;
+  --island-shadow: 0 14px 28px -16px rgba(23, 24, 24, 0.22);
+  --island-border: rgba(234, 85, 4, 0.14);
+  transform: translateY(0) scale(1);
+  transform-origin: center;
+  backface-visibility: hidden;
+  will-change: transform;
   transition:
-    transform 0.22s cubic-bezier(0.32, 0.72, 0, 1),
-    box-shadow 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+    transform 0.24s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.24s cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 0.24s cubic-bezier(0.32, 0.72, 0, 1),
+    background 0.24s cubic-bezier(0.32, 0.72, 0, 1);
 
-  &:hover {
-    transform: translateY(-2px);
+  &:hover,
+  &:focus-visible {
+    transform: translateY(calc(var(--island-lift) * -1)) scale(var(--island-scale));
+    box-shadow: var(--island-shadow);
+    border-color: var(--island-border);
   }
 
   &:active {
-    transform: translateY(0);
+    transform: translateY(calc(var(--island-lift) * -0.45)) scale(1.002);
+    transition-duration: 0.16s;
+  }
+}
+
+:where(
+  [data-island-style='card'],
+  .relation-links .relation-item,
+  .card-article,
+  .news-item
+) {
+  --island-lift: 4px;
+  --island-scale: 1.018;
+  --island-shadow:
+    0 18px 40px -12px rgba(23, 24, 24, 0.16),
+    0 0 0 1px rgba(234, 85, 4, 0.12);
+  --island-border: rgba(234, 85, 4, 0.22);
+}
+
+:where(
+  [data-island-style='button'],
+  [data-island-style='link'],
+  .app-header .part-nav ul li a,
+  .app-footer .btn,
+  .app-footer a:not(.no-userselect),
+  .btn-social,
+  .btn-icon,
+  .btn:not(.btn-tag):not(.btn-reset):not(.btn-clear-query):not(.btn-clear-text):not(.btn-search),
+  .advance-link
+) {
+  --island-lift: 2px;
+  --island-scale: 1.014;
+  --island-shadow: 0 14px 28px -14px rgba(234, 85, 4, 0.24);
+  --island-border: rgba(234, 85, 4, 0.18);
+}
+
+:where(
+  [data-island-style='field'],
+  input:not([type='hidden']),
+  textarea,
+  select
+) {
+  --island-lift: 1px;
+  --island-scale: 1.003;
+  --island-shadow:
+    0 14px 30px -18px rgba(23, 24, 24, 0.16),
+    0 0 0 3px rgba(234, 85, 4, 0.12);
+  --island-border: rgba(234, 85, 4, 0.26);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(
+    .hover-lift,
+    [data-island],
+    .app-header .part-nav ul li a,
+    .app-footer .btn,
+    .app-footer a:not(.no-userselect),
+    .btn-social,
+    .btn-icon,
+    .btn:not(.btn-tag):not(.btn-reset):not(.btn-clear-query):not(.btn-clear-text):not(.btn-search),
+    .relation-links .relation-item,
+    .card-article,
+    .news-item,
+    .advance-link,
+    input:not([type='hidden']),
+    textarea,
+    select
+  ) {
+    transition: none;
+    transform: none !important;
   }
 }

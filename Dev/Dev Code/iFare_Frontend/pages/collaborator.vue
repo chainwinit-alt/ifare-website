@@ -119,6 +119,7 @@ definePageMeta({
 })
 const { $WebApiGetDetailed } = useNuxtApp()
 const { getApiErrorMessage } = useApiErrorMessage()
+const { getApiResultArray } = useApiResult()
 
 interface collaboratorItem {
     id: number,
@@ -205,14 +206,14 @@ async function LoadCollaborators() {
 
   try {
     const { data, error } = await $WebApiGetDetailed('/Collaborator/GetCollaboratorList');
-    if (error || !data?.result?.result) {
+    const list = getApiResultArray<any>(data);
+    if (error || list.length === 0) {
       hasError.value = true;
       errorMessage.value = getApiErrorMessage(error, '載入公益夥伴時發生錯誤');
       return;
     }
 
-    const _data = data.result.result;
-    const _collaboratorList: Array<collaboratorItem> = _data.map((item: any) => ({
+    const _collaboratorList: Array<collaboratorItem> = list.map((item: any) => ({
       id: item.id,
       title: item.title,
       serviceItem: item.serviceItem,

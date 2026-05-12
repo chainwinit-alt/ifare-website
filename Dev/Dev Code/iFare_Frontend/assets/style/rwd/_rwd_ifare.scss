@@ -473,30 +473,42 @@
 
             &[name=ifare-contact] {
                 .section-list {
-                    gap: 36px;
+                    gap: 32px;
                 }
                 .section-top {
                     flex-wrap: wrap;
-                    gap: 0;
+                    gap: 12px;
+
+                    &::after {
+                        left: 0;
+                        width: 100%;
+                    }
 
                     .date-group {
                         flex-direction: column;
                         padding-top: 0;
+                        padding-right: 0;
                         padding-left: 56px;
+                        gap: 4px;
                     }
                 }
         
                 .section-body {
                     flex-direction: column;
-                    gap: 48px;
-                    padding: 0 32px;
+                    gap: 36px;
+                    padding: 0 20px;
+
+                    &::after {
+                        display: none;
+                    }
 
                     // #13 — 手機版改成 chip 水平滑動列，與桌面一致；隱藏下拉
                     .part-areas {
                         display: block;
                         width: 100%;
-                        margin-bottom: 8px;
+                        margin: 0 -20px 4px;
 
+                        &::before,
                         &::after {
                             display: none;
                         }
@@ -508,46 +520,133 @@
         
                     .detail-list {
                         margin: 0;
+                        gap: 32px;
                     }
         
                     .detail-item {
+                        min-width: 0;
         
                         .detail-name {
+                            display: block;
                             position: relative;
                             border-bottom: 1px solid rgba(23, 24, 24, 0.05);
-                            padding: 24px 0;
+                            padding: 0 0 18px;
+                            margin-bottom: 8px;
+                            scroll-margin-top: 108px;
         
                             &::after {
-                                position: absolute;
-                                right: 0;
-                                bottom: 24px;
+                                content: none;
                             }
                         }
         
                         // #14: 手機版不全隱表頭，改顯示為小字標籤行 (保留語意 + 視覺輕量)
                         .detail-title {
-                            display: flex;
-                            flex-direction: row;
-                            gap: 12px;
-                            padding: 8px 0 4px;
-                            font-size: 12px;
-                            opacity: 0.55;
-                            border-top: 1px dashed rgba(23, 24, 24, 0.08);
+                            display: none;
                         }
 
                         .content-item {
                             flex-direction: column;
                             align-items: flex-start;
-                            justify-content: left;
-                            padding: 28px 0 24px;
-                            gap: 10px;
+                            justify-content: flex-start;
+                            padding: 20px 0;
+                            gap: 16px;
+
+                            &:first-child {
+                                padding-top: 8px;
+                            }
+
+                            &:last-child {
+                                padding-bottom: 0;
+                                border-bottom: none;
+                            }
+
+                            .content-value[name="unit"] {
+                                display: block;
+                                width: 100%;
+                                min-width: 0;
+                                max-width: none;
+                                word-break: break-word;
+
+                                &::before {
+                                    content: "單位";
+                                    display: block;
+                                    margin-bottom: 6px;
+                                    color: rgba($color-black, 0.45);
+                                    font-size: 12px;
+                                    font-weight: 400;
+                                    line-height: 18px;
+                                }
+                            }
         
                             .tel-item {
-                                justify-content: left;
-                                margin-top: 10px;
+                                display: flex;
+                                flex-wrap: wrap;
+                                align-items: flex-start;
+                                justify-content: flex-start;
+                                width: 100%;
+                                min-width: 0;
+                                max-width: none;
+                                gap: 8px;
+                                margin-top: 0;
+
+                                &::before {
+                                    content: "聯絡電話";
+                                    flex: 0 0 100%;
+                                    color: rgba($color-black, 0.45);
+                                    font-size: 12px;
+                                    font-weight: 400;
+                                    line-height: 18px;
+                                }
 
                                 .ic-tel {
                                     background: url("../img/Tel-orange.svg") $bg-init;
+                                    flex: 0 0 16px;
+                                    margin-top: 3px;
+                                }
+
+                                .content-value[name="tel"] {
+                                    flex: 1 1 0;
+                                    min-width: 0;
+                                    max-width: none;
+                                    width: auto;
+                                    word-break: break-word;
+                                }
+                            }
+
+                            .address-group {
+                                display: flex;
+                                flex-direction: column;
+                                width: 100%;
+                                min-width: 0;
+                                max-width: none;
+                                gap: 8px;
+
+                                &::before {
+                                    content: "聯絡地址";
+                                    color: rgba($color-black, 0.45);
+                                    font-size: 12px;
+                                    font-weight: 400;
+                                    line-height: 18px;
+                                }
+
+                                .address-item {
+                                    display: flex;
+                                    align-items: flex-start;
+                                    gap: 8px;
+                                    width: 100%;
+                                }
+
+                                .ic-location {
+                                    flex: 0 0 16px;
+                                    margin-top: 3px;
+                                }
+
+                                .content-value[name="address"] {
+                                    flex: 1 1 0;
+                                    min-width: 0;
+                                    max-width: none;
+                                    width: auto;
+                                    word-break: break-word;
                                 }
                             }
                         }
@@ -560,11 +659,12 @@
                         overflow-x: auto;
                         overflow-y: hidden;
                         gap: 8px;
-                        padding: 4px 4px 12px;
-                        margin: 0 -4px;
+                        padding: 4px 20px 12px;
+                        margin: 0;
                         scrollbar-width: thin;
                         scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
                         -webkit-overflow-scrolling: touch;
+                        scroll-snap-type: x proximity;
 
                         &::-webkit-scrollbar {
                             height: 4px;
@@ -573,6 +673,7 @@
                             background: rgba(0, 0, 0, 0.15);
                             border-radius: 2px;
                         }
+                        &::before,
                         &::after {
                             display: none;
                         }
@@ -583,6 +684,7 @@
                             padding: 0 18px;
                             border-radius: 999px;
                             background: rgba($color-primary-dark, 0.06);
+                            scroll-snap-align: start;
 
                             &.active,
                             &:hover {

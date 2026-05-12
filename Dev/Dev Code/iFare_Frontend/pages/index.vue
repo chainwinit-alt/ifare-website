@@ -126,6 +126,7 @@ useHead({
 const TOP_WELFARE_DISPLAY_COUNT = 3;
 
 const { $WebApiGet } = useNuxtApp();
+const { getApiResultArray } = useApiResult();
 const { formatDisplayDate } = useDateFormatter();
 
 interface newsItem {
@@ -154,7 +155,7 @@ const selectPolicy = ref(1);
 
 const topNews = $WebApiGet("/News/GetTopsNewsList");
 topNews.then((res: any) => {
-  const _data = res.result.result;
+  const _data = getApiResultArray<any>(res);
 
   let _newsList: Array<newsItem> = _data.map((item: any, i: number) => {
     return {
@@ -173,7 +174,7 @@ function SetWelfareData() {
     policyId: selectPolicy.value,
   });
   topWelfare.then((res: any) => {
-    const _data = res.result.result;
+    const _data = getApiResultArray<any>(res);
 
     let _list: Array<welfareItem> = _data
       .slice(0, TOP_WELFARE_DISPLAY_COUNT)
@@ -197,7 +198,7 @@ SetWelfareData();
 
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
-  const _data = res.result.result;
+  const _data = getApiResultArray<any>(res);
 
   let _list: Array<codeItem> = _data.map((item: any, i: number) => {
     return {

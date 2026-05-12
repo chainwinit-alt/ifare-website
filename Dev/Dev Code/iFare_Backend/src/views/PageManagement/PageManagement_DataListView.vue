@@ -11,7 +11,7 @@
         :icon="Upload"
         size="large"
         plain
-        @click="$refs.fileInput.click()"
+        @click="triggerImport"
       >匯入 JSON</el-button>
       <input
         ref="fileInput"
@@ -72,7 +72,7 @@
               <el-tag
                 :type="statusTag(row.status)"
                 size="small"
-              >{{ PAGE_STATUS_LABELS[row.status] }}</el-tag>
+              >{{ getStatusLabel(row.status) }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column prop="updateDate" label="最後修改" width="170">
@@ -147,6 +147,15 @@ function formatDate(iso: string): string {
 
 function goEdit(id: string) {
   router.push({ name: 'PageManagement_Edit', query: { id } });
+}
+
+function triggerImport() {
+  fileInput.value?.click();
+}
+
+function getStatusLabel(status: unknown) {
+  const key = status as PageStatus;
+  return PAGE_STATUS_LABELS[key] || String(status ?? '');
 }
 
 async function onDelete(row: any) {
