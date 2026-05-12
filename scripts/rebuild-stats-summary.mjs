@@ -129,7 +129,7 @@ setRow(wsStat, row, [
   backendStats.status.部分修正,
   backendStats.status.待處理,
   `${((backendStats.status.已修正 / backendStats.total) * 100).toFixed(1)}%`,
-  'Round 5-6 規劃完成 / 全待開始',
+  '含後台優化規劃與進階功能建議',
   '',
 ], [STYLE_CELL, STYLE_NUM, STYLE_GREEN, STYLE_YELLOW, STYLE_GRAY, STYLE_NUM, STYLE_CELL, STYLE_CELL]);
 row++;
@@ -158,6 +158,9 @@ const rounds = [
   ['Round 4', '2026-05-04', '切回 master + 開新分支 feat/uiux-round4 + 補做 (環境/補回/新功能)', 0, 8, 4, '-', 'cf47cfa+5dfbf91 補回 16 檔；devProxy/baseURL → 正式 API；nav 加未來規劃 + future.vue；News videoUrl wiring；tsconfig deprecation 清理；about hover bug 修；footer label 重複修'],
   ['Round 5', '2026-05-04', '前後台全面審查 — 後台 UX audit + 前台新 issue 掃描', 0, 26, 22, '-', '後台 22 個工程角度問題 (CRUD/驗證/錯誤處理)；前台 26 個新發現 (XSS/超時/console.log/無障礙/分頁元件重複)'],
   ['Round 6', '2026-05-04', '人性化主軸提案 — 5 主軸 + 16 後台項', 0, 0, 16, '+ Q 欄主軸', 'Dashboard 角色化 / 今日待辦 / KPI 分區；批次操作；軟刪除復原；audit log；危險操作預覽；錯誤訊息引導'],
+  ['Round 7', '2026-05-12', '後台進階功能建議補充', 0, 0, 8, '-', '補充 GA4 同步快取、任務中心、自動儲存與編輯鎖定、發布排程、審稿指派、內容健康檢查、通知中心、資產治理'],
+  ['Round 8', '2026-05-12', '後台首頁搜尋 + 表單欄位人性化快改', 0, 0, 0, '-', 'HomeView 新增搜尋 / 分組 / 最近使用；PageManagement 補上 URL 預覽、狀態說明、SEO 預覽、常用標籤建議、排程快捷鍵'],
+  ['Round 9', '2026-05-12', '前台 future 頁空狀態版面優化', 0, 2, 0, '-', 'future.vue 補強手機版主標換行、空狀態導引卡、上下留白與 footer CTA 銜接'],
 ];
 rounds.forEach(r => {
   setRow(wsStat, row, r, [STYLE_CELL, STYLE_CELL, STYLE_CELL, STYLE_NUM, STYLE_NUM, STYLE_NUM, STYLE_CELL, STYLE_CELL]);
@@ -243,7 +246,13 @@ row++;
 
 // 從 UIUX sheet 撈 已修正/部分修正 + 推斷 Round
 const uiuxRange = XLSX.utils.decode_range(wsUiux['!ref']);
-const byRound = { 'Round 1': { fixed: [], partial: [], date: '2026-04-28' }, 'Round 2': { fixed: [], partial: [], date: '2026-04-28' }, 'Round 3': { fixed: [], partial: [], date: '2026-04-28' }, 'Round 4': { fixed: [], partial: [], date: '2026-05-04' } };
+const byRound = {
+  'Round 1': { fixed: [], partial: [], date: '2026-04-28' },
+  'Round 2': { fixed: [], partial: [], date: '2026-04-28' },
+  'Round 3': { fixed: [], partial: [], date: '2026-04-28' },
+  'Round 4': { fixed: [], partial: [], date: '2026-05-04' },
+  'Round 9': { fixed: [], partial: [], date: '2026-05-12' },
+};
 
 for (let r = 2; r <= uiuxRange.e.r; r++) {
   const s = wsUiux[XLSX.utils.encode_cell({ r, c: 13 })]?.v;
@@ -251,7 +260,8 @@ for (let r = 2; r <= uiuxRange.e.r; r++) {
   const id = wsUiux[XLSX.utils.encode_cell({ r, c: 0 })]?.v;
   const date = wsUiux[XLSX.utils.encode_cell({ r, c: 14 })]?.v;
   let round;
-  if (id >= 98 && id <= 105) round = 'Round 4';
+  if (id === 164 || id === 165) round = 'Round 9';
+  else if (id >= 98 && id <= 105) round = 'Round 4';
   else if (id >= 91 && id <= 92) round = 'Round 2';
   else if (id >= 93 && id <= 97) round = 'Round 3';
   else if (id >= 88 && id <= 90) round = 'Round 1';
@@ -269,9 +279,10 @@ const roundHighlights = {
   'Round 2': 'Footer 整合 (LINE/FB 並列 .btn-social) + 觸控目標 44px',
   'Round 3': 'About 三大核心 morph 卡 + News 浮起卡 + 浮現動畫 + line-clamp + NEW pill + 社群 target="_blank"',
   'Round 4': 'cf47cfa+5dfbf91 補回 16 檔 + 環境設定 (devProxy/baseURL) + 未來規劃 nav + News videoUrl wiring + tsconfig + about hover bug + footer label 重複',
+  'Round 9': 'future.vue 補強手機版主標換行、空狀態導引卡與上下節奏，讓頁面在未上線時也有清楚下一步',
 };
 
-for (const round of ['Round 1', 'Round 2', 'Round 3', 'Round 4']) {
+for (const round of ['Round 1', 'Round 2', 'Round 3', 'Round 4', 'Round 9']) {
   const data = byRound[round];
   data.fixed.sort((a, b) => a - b);
   data.partial.sort((a, b) => a - b);

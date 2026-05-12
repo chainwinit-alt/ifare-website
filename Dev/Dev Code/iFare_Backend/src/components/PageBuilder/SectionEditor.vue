@@ -1,62 +1,93 @@
 <template>
-  <!--
-    UIUX 動態頁 CMS — 單一 section 編輯器 (v2 範本式)
-    依 section.type 切換到對應的範本表單
-  -->
   <div
     class="section-editor"
-    :class="[`type-${section.type}`, { 'is-empty': isEmpty }]"
+    :class="[
+      `type-${section.type}`,
+      {
+        'is-empty': isEmpty,
+        'is-selected': selected,
+        'is-collapsed': collapsed,
+      },
+    ]"
     :draggable="true"
+    @click="emit('select')"
     @dragstart="emit('dragstart', $event)"
     @dragover.prevent="emit('dragover', $event)"
     @dragend="emit('dragend', $event)"
     @drop.prevent="emit('drop', $event)"
   >
-    <!-- Toolbar -->
     <div class="section-toolbar">
-      <span class="section-handle" title="拖拉排序" aria-hidden="true">⋮⋮</span>
+      <span class="section-handle" title="拖曳排序" aria-hidden="true">⋮⋮</span>
+
       <div class="section-meta">
         <span class="meta-icon">{{ SECTION_TYPE_META[section.type].icon }}</span>
-        <span class="meta-label">{{ SECTION_TYPE_META[section.type].label }}</span>
-        <span v-if="isEmpty" class="empty-warn" title="此區段內容尚未填寫">⚠</span>
+        <div class="meta-copy">
+          <div class="meta-label-row">
+            <span class="meta-label">{{ SECTION_TYPE_META[section.type].label }}</span>
+            <span v-if="selected" class="meta-badge">編輯中</span>
+            <span v-else-if="isEmpty" class="meta-badge warn">待補內容</span>
+          </div>
+          <p class="meta-summary">{{ summaryText }}</p>
+        </div>
       </div>
+
       <div class="section-actions">
-        <el-button :icon="CopyDocument" size="small" circle plain @click="emit('duplicate')" title="複製" />
-        <el-button :icon="Top" size="small" circle :disabled="!canMoveUp" @click="emit('moveUp')" title="上移" />
-        <el-button :icon="Bottom" size="small" circle :disabled="!canMoveDown" @click="emit('moveDown')" title="下移" />
-        <el-button :icon="Delete" size="small" circle type="danger" plain @click="emit('remove')" title="刪除" />
+        <el-button
+          :icon="collapsed ? ArrowDown : ArrowUp"
+          size="small"
+          circle
+          plain
+          @click.stop="emit('toggleCollapse')"
+          :title="collapsed ? '展開編輯' : '收合區塊'"
+        />
+        <el-button :icon="CopyDocument" size="small" circle plain @click.stop="emit('duplicate')" title="複製區塊" />
+        <el-button :icon="Top" size="small" circle :disabled="!canMoveUp" @click.stop="emit('moveUp')" title="往上移動" />
+        <el-button
+          :icon="Bottom"
+          size="small"
+          circle
+          :disabled="!canMoveDown"
+          @click.stop="emit('moveDown')"
+          title="往下移動"
+        />
+        <el-button :icon="Delete" size="small" circle type="danger" plain @click.stop="emit('remove')" title="刪除區塊" />
       </div>
     </div>
 
-    <!-- ── Hero ── -->
-    <template v-if="section.type === 'hero'">
-      <div class="section-form">
-        <div class="item-row">
-          <label class="item-label">中文主標題</label>
-          <el-input v-model="section.title" placeholder="例：公益夥伴 / 最新消息" size="large" />
-        </div>
-        <div class="item-row">
-          <label class="item-label">英文陰影副標</label>
-          <el-input v-model="section.shadowText" placeholder="例：PARTNER / NEWS / ARTICLE" size="large" maxlength="20" />
-          <span class="item-hint">會以淡色大字呈現於主標題後方（裝飾用）</span>
-        </div>
-        <div class="item-row">
-          <label class="item-label">副標 (選填)</label>
-          <el-input v-model="section.subtitle" placeholder="例：找尋適合您的社會福利" />
-        </div>
-      </div>
-    </template>
+    <div v-if="collapsed" class="collapsed-note">
+      點一下展開這個區塊，或直接拖曳調整順序。
+    </div>
 
-    <!-- ── Text Section ── -->
-    <template v-else-if="section.type === 'text-section'">
-      <div class="section-form">
+    <div v-else class="section-form" @click.stop>
+      <template v-if="section.type === 'hero'">
         <div class="item-row">
-          <label class="item-label">區段標題 (h2)</label>
-          <el-input v-model="section.title" placeholder="例：關於我們、服務內容..." size="large" />
+          <label class="item-label">主標題</label>
+          <el-input v-model="section.title" placeholder="例如：公益夥伴、最新消息、關於我們" size="large" />
+        </div>
+        <div class="item-row">
+          <label class="item-label">大字陰影</label>
+          <el-input
+            v-model="section.shadowText"
+            placeholder="例如：PARTNER / NEWS / ABOUT"
+            size="large"
+            maxlength="20"
+          />
+          <span class="item-hint">這會顯示成背景大字，建議使用英文或短字詞。</span>
+        </div>
+        <div class="item-row">
+          <label class="item-label">副標文案</label>
+          <el-input v-model="section.subtitle" placeholder="補充一句簡短說明，可留空" />
+        </div>
+      </template>
+
+      <template v-else-if="section.type === 'text-section'">
+        <div class="item-row">
+          <label class="item-label">段落標題</label>
+          <el-input v-model="section.title" placeholder="例如：關於我們、服務內容、申請方式" size="large" />
         </div>
         <div class="paragraphs-list">
           <div v-for="(_, idx) in section.paragraphs" :key="idx" class="paragraph-row">
-            <span class="paragraph-num">{{ idx + 1 }}.</span>
+            <span class="paragraph-num">{{ idx + 1 }}</span>
             <el-input
               v-model="section.paragraphs[idx]"
               type="textarea"
@@ -71,27 +102,25 @@
               plain
               :disabled="section.paragraphs.length <= 1"
               @click="removeParagraph(idx)"
-              title="刪除此段"
+              title="刪除這一段"
             />
           </div>
         </div>
         <el-button :icon="Plus" size="small" plain @click="addParagraph">
-          新增段落
+          新增一段
         </el-button>
-      </div>
-    </template>
+      </template>
 
-    <!-- ── Four Card ── -->
-    <template v-else-if="section.type === 'four-card'">
-      <div class="section-form">
+      <template v-else-if="section.type === 'four-card'">
         <div class="item-row">
-          <label class="item-label">區段標題 (選填)</label>
-          <el-input v-model="section.title" placeholder="例：四個行動方向" />
+          <label class="item-label">區塊標題</label>
+          <el-input v-model="section.title" placeholder="例如：四個行動方向、我們正在做的事" />
         </div>
+
         <div class="cards-grid">
           <div v-for="(card, idx) in section.cards" :key="idx" class="card-edit">
             <div class="card-edit-header">
-              <span class="card-num">第 {{ idx + 1 }} 張</span>
+              <span class="card-num">卡片 {{ idx + 1 }}</span>
               <el-button
                 :icon="Delete"
                 size="small"
@@ -102,6 +131,7 @@
                 @click="removeCard(idx)"
               />
             </div>
+
             <div class="icon-picker">
               <button
                 v-for="opt in ICON_OPTIONS"
@@ -115,65 +145,67 @@
                 <span class="icon-svg" v-html="opt.svg" />
               </button>
             </div>
+
             <el-input v-model="card.title" placeholder="卡片標題" />
-            <el-input v-model="card.description" type="textarea" :rows="2" placeholder="卡片描述" />
+            <el-input v-model="card.description" type="textarea" :rows="2" placeholder="卡片說明文字" />
           </div>
         </div>
-        <el-button :icon="Plus" size="small" plain :disabled="section.cards.length >= 6" @click="addCard">
-          新增卡片（最多 6 張）
-        </el-button>
-      </div>
-    </template>
 
-    <!-- ── Image Text ── -->
-    <template v-else-if="section.type === 'image-text'">
-      <div class="section-form">
+        <el-button :icon="Plus" size="small" plain :disabled="section.cards.length >= 6" @click="addCard">
+          新增卡片
+        </el-button>
+      </template>
+
+      <template v-else-if="section.type === 'image-text'">
         <div class="item-row">
           <label class="item-label">圖片位置</label>
           <el-radio-group v-model="section.imagePosition" size="default">
-            <el-radio-button label="left">圖左 / 文右</el-radio-button>
-            <el-radio-button label="right">圖右 / 文左</el-radio-button>
+            <el-radio-button label="left">圖片在左</el-radio-button>
+            <el-radio-button label="right">圖片在右</el-radio-button>
           </el-radio-group>
         </div>
+
         <div class="item-row">
           <label class="item-label">圖片網址</label>
           <el-input v-model="section.imageSrc" placeholder="https://... 或 /img/..." />
         </div>
+
         <div class="item-row">
           <label class="item-label">圖片替代文字</label>
-          <el-input v-model="section.imageAlt" placeholder="無障礙必填" />
+          <el-input v-model="section.imageAlt" placeholder="提供給無障礙與 SEO 的說明文字" />
         </div>
+
         <div v-if="section.imageSrc" class="image-preview">
           <img :src="section.imageSrc" :alt="section.imageAlt" />
         </div>
+
         <div class="item-row">
-          <label class="item-label">標題</label>
-          <el-input v-model="section.title" placeholder="段落標題" size="large" />
+          <label class="item-label">段落標題</label>
+          <el-input v-model="section.title" placeholder="圖片旁的標題" size="large" />
         </div>
+
         <div class="item-row">
-          <label class="item-label">內文</label>
-          <el-input v-model="section.content" type="textarea" :rows="4" placeholder="段落內容" />
+          <label class="item-label">段落內容</label>
+          <el-input v-model="section.content" type="textarea" :rows="4" placeholder="圖片旁的說明文字" />
         </div>
+
         <div class="item-row two-col">
           <div>
-            <label class="item-label">CTA 文字 (選填)</label>
-            <el-input v-model="section.ctaText" placeholder="例：了解更多" />
+            <label class="item-label">按鈕文字</label>
+            <el-input v-model="section.ctaText" placeholder="例如：了解更多" />
           </div>
           <div>
-            <label class="item-label">CTA 連結 (選填)</label>
+            <label class="item-label">按鈕連結</label>
             <el-input v-model="section.ctaUrl" placeholder="/page 或 https://..." />
           </div>
         </div>
-      </div>
-    </template>
+      </template>
 
-    <!-- ── Cta Card ── -->
-    <template v-else-if="section.type === 'cta-card'">
-      <div class="section-form">
+      <template v-else-if="section.type === 'cta-card'">
         <div class="cta-cards-list">
           <div v-for="(card, idx) in section.cards" :key="idx" class="cta-card-edit">
             <div class="cta-card-header">
-              <span class="card-num">第 {{ idx + 1 }} 卡</span>
+              <span class="card-num">行動卡 {{ idx + 1 }}</span>
               <el-button
                 :icon="Delete"
                 size="small"
@@ -184,42 +216,48 @@
                 @click="removeCtaCard(idx)"
               />
             </div>
-            <el-input v-model="card.title" placeholder="說明文字" size="large" />
+
+            <el-input v-model="card.title" placeholder="卡片標題" size="large" />
             <div class="two-col">
-              <el-input v-model="card.ctaText" placeholder="按鈕文字 (例：前往 i-Fare)" />
-              <el-input v-model="card.ctaUrl" placeholder="連結 (/ifare)" />
+              <el-input v-model="card.ctaText" placeholder="按鈕文字" />
+              <el-input v-model="card.ctaUrl" placeholder="按鈕連結" />
             </div>
           </div>
         </div>
+
         <el-button :icon="Plus" size="small" plain :disabled="section.cards.length >= 3" @click="addCtaCard">
-          新增 CTA 卡（最多 3）
+          新增行動卡
         </el-button>
-      </div>
-    </template>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { ElButton, ElInput, ElRadioButton, ElRadioGroup } from 'element-plus';
 import {
-  ElButton,
-  ElInput,
-  ElRadioGroup,
-  ElRadioButton,
-} from 'element-plus';
-import { Top, Bottom, Delete, Plus, CopyDocument } from '@element-plus/icons-vue';
+  ArrowDown,
+  ArrowUp,
+  Bottom,
+  CopyDocument,
+  Delete,
+  Plus,
+  Top,
+} from '@element-plus/icons-vue';
 import {
-  type Section,
-  SECTION_TYPE_META,
   ICON_OPTIONS,
+  SECTION_TYPE_META,
   isSectionEmpty,
+  type Section,
 } from '@/composables/useDynamicPages';
 
-// Vue 3.3 不支援 defineModel — 用 props (Vue reactive proxy 允許巢狀 mutate)
 const props = defineProps<{
   modelValue: Section;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  selected: boolean;
+  collapsed: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -227,45 +265,99 @@ const emit = defineEmits<{
   (e: 'moveDown'): void;
   (e: 'duplicate'): void;
   (e: 'remove'): void;
+  (e: 'select'): void;
+  (e: 'toggleCollapse'): void;
   (e: 'dragstart', ev: DragEvent): void;
   (e: 'dragover', ev: DragEvent): void;
   (e: 'dragend', ev: DragEvent): void;
   (e: 'drop', ev: DragEvent): void;
 }>();
 
-// alias
 const section = computed(() => props.modelValue);
-
 const isEmpty = computed(() => isSectionEmpty(section.value));
 
-// ── Text Section ──
-function addParagraph() {
-  if (section.value.type === 'text-section') section.value.paragraphs.push('');
+const summaryText = computed(() => {
+  const current = section.value;
+
+  switch (current.type) {
+    case 'hero':
+      return joinFilled([
+        current.title || '尚未設定主標題',
+        current.shadowText ? `背景大字：${current.shadowText}` : '',
+        current.subtitle || '',
+      ]);
+
+    case 'text-section': {
+      const firstParagraph = current.paragraphs.find((paragraph) => paragraph.trim());
+      return joinFilled([
+        current.title || '尚未設定段落標題',
+        firstParagraph || `共 ${current.paragraphs.length} 段文字`,
+      ]);
+    }
+
+    case 'four-card': {
+      const filledCards = current.cards.filter((card) => card.title.trim()).length;
+      return joinFilled([
+        current.title || '四欄卡片區塊',
+        `${filledCards || current.cards.length} 張卡片`,
+      ]);
+    }
+
+    case 'image-text':
+      return joinFilled([
+        current.title || '尚未設定段落標題',
+        current.imageSrc ? `圖片在${current.imagePosition === 'left' ? '左側' : '右側'}` : '尚未設定圖片',
+        current.ctaText ? `按鈕：${current.ctaText}` : '',
+      ]);
+
+    case 'cta-card': {
+      const filledCards = current.cards.filter((card) => card.title.trim()).length;
+      return joinFilled([
+        `${filledCards || current.cards.length} 張行動卡`,
+        current.cards.map((card) => card.title).find((title) => title.trim()) || '',
+      ]);
+    }
+  }
+});
+
+function joinFilled(values: string[]) {
+  const filled = values
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  return filled.length > 0 ? filled.join(' / ') : '尚未設定內容';
 }
+
+function addParagraph() {
+  if (section.value.type === 'text-section') {
+    section.value.paragraphs.push('');
+  }
+}
+
 function removeParagraph(idx: number) {
   if (section.value.type === 'text-section' && section.value.paragraphs.length > 1) {
     section.value.paragraphs.splice(idx, 1);
   }
 }
 
-// ── Four Card ──
 function addCard() {
   if (section.value.type === 'four-card' && section.value.cards.length < 6) {
     section.value.cards.push({ icon: 'star', title: '', description: '' });
   }
 }
+
 function removeCard(idx: number) {
   if (section.value.type === 'four-card' && section.value.cards.length > 1) {
     section.value.cards.splice(idx, 1);
   }
 }
 
-// ── Cta Card ──
 function addCtaCard() {
   if (section.value.type === 'cta-card' && section.value.cards.length < 3) {
     section.value.cards.push({ title: '', ctaText: '', ctaUrl: '' });
   }
 }
+
 function removeCtaCard(idx: number) {
   if (section.value.type === 'cta-card' && section.value.cards.length > 1) {
     section.value.cards.splice(idx, 1);
@@ -277,65 +369,140 @@ function removeCtaCard(idx: number) {
 .section-editor {
   position: relative;
   margin-bottom: 12px;
-  padding: 14px 16px;
-  border: 1px solid #E4E7ED;
-  border-radius: 8px;
-  background: #FFFFFF;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  padding: 16px 18px;
+  border: 1px solid #e4e7ed;
+  border-radius: 14px;
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 
   &:hover {
-    border-color: #EA5504;
-    box-shadow: 0 2px 8px rgba(234, 85, 4, 0.08);
+    border-color: #ea5504;
+    box-shadow: 0 8px 18px -14px rgba(234, 85, 4, 0.45);
+    transform: translateY(-1px);
   }
 
   &.is-empty {
-    border-color: #E6A23C;
-    background: #FDF6EC;
+    border-color: #e6a23c;
+    background: #fffaf2;
+  }
+
+  &.is-selected {
+    border-color: #ea5504;
+    box-shadow: 0 12px 28px -18px rgba(234, 85, 4, 0.5);
+  }
+
+  &.is-collapsed {
+    padding-bottom: 12px;
   }
 }
 
 .section-toolbar {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px dashed #E4E7ED;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .section-handle {
   cursor: grab;
-  color: #C0C4CC;
-  font-size: 12px;
+  color: #c0c4cc;
+  font-size: 14px;
+  line-height: 1;
   letter-spacing: -2px;
   user-select: none;
-  &:active { cursor: grabbing; }
+  padding-top: 6px;
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .section-meta {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.meta-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(234, 85, 4, 0.08);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.meta-copy {
+  min-width: 0;
+}
+
+.meta-label-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 4px;
+}
 
-  .meta-icon { font-size: 16px; }
-  .meta-label {
-    font-size: 14px;
-    color: #303133;
-    font-weight: 500;
+.meta-label {
+  font-size: 15px;
+  color: #303133;
+  font-weight: 600;
+}
+
+.meta-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(234, 85, 4, 0.08);
+  color: #ea5504;
+  font-size: 12px;
+  font-weight: 600;
+
+  &.warn {
+    background: rgba(230, 162, 60, 0.12);
+    color: #c98512;
   }
-  .empty-warn { color: #E6A23C; font-size: 14px; }
+}
+
+.meta-summary {
+  margin: 0;
+  color: #909399;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .section-actions {
   display: flex;
   gap: 4px;
+  flex-shrink: 0;
+}
+
+.collapsed-note {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #ebeef5;
+  color: #909399;
+  font-size: 13px;
 }
 
 .section-form {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #ebeef5;
 }
 
 .item-row {
@@ -345,7 +512,7 @@ function removeCtaCard(idx: number) {
 
   &.two-col {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 }
@@ -353,143 +520,151 @@ function removeCtaCard(idx: number) {
 .item-label {
   font-size: 13px;
   color: #606266;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .item-hint {
   font-size: 12px;
   color: #909399;
+  line-height: 1.6;
 }
 
-.paragraphs-list {
+.paragraphs-list,
+.cta-cards-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .paragraph-row {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
+}
 
-  .paragraph-num {
-    flex-shrink: 0;
-    width: 24px;
-    text-align: right;
-    color: #909399;
-    font-size: 14px;
-    line-height: 32px;
-  }
+.paragraph-num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #f5f7fa;
+  color: #606266;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .cards-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
-.card-edit {
-  padding: 10px 12px;
-  border: 1px solid #E4E7ED;
-  border-radius: 6px;
-  background: #FAFBFC;
+.card-edit,
+.cta-card-edit {
+  padding: 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 12px;
+  background: #fafbfc;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
 
-  .card-edit-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
+.card-edit-header,
+.cta-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-  .card-num {
-    font-size: 12px;
-    color: #909399;
-  }
+.card-num {
+  color: #909399;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .icon-picker {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
+}
 
-  .icon-btn {
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border: 1px solid #DCDFE6;
-    background: #FFFFFF;
-    border-radius: 6px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #606266;
-    transition: all 0.2s ease;
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #dcdfe6;
+  background: #ffffff;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #606266;
+  transition: all 0.2s ease;
 
-    &:hover { border-color: #EA5504; color: #EA5504; }
-    &.active {
-      border-color: #EA5504;
-      background: rgba(234, 85, 4, 0.1);
-      color: #EA5504;
-    }
-
-    .icon-svg :deep(svg) {
-      width: 18px;
-      height: 18px;
-    }
+  &:hover {
+    border-color: #ea5504;
+    color: #ea5504;
   }
+
+  &.active {
+    border-color: #ea5504;
+    background: rgba(234, 85, 4, 0.1);
+    color: #ea5504;
+  }
+}
+
+.icon-svg :deep(svg) {
+  width: 18px;
+  height: 18px;
 }
 
 .image-preview {
-  padding: 8px;
-  border: 1px dashed #DCDFE6;
-  border-radius: 4px;
-  background: #F5F7FA;
+  padding: 10px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 12px;
+  background: #f5f7fa;
   text-align: center;
-
-  img { max-width: 100%; max-height: 200px; object-fit: contain; }
 }
 
-.cta-cards-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.cta-card-edit {
-  padding: 12px;
-  border: 1px solid #E4E7ED;
-  border-radius: 6px;
-  background: #FAFBFC;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-
-  .cta-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .card-num {
-    font-size: 12px;
-    color: #909399;
-  }
+.image-preview img {
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: contain;
 }
 
 .two-col {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 @media (max-width: 768px) {
+  .section-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .section-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
   .cards-grid,
   .two-col,
   .item-row.two-col {
     grid-template-columns: 1fr;
+  }
+
+  .paragraph-row {
+    flex-wrap: wrap;
+  }
+
+  .paragraph-num {
+    width: 32px;
   }
 }
 </style>

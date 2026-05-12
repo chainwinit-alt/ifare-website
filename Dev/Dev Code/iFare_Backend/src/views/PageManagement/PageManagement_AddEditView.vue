@@ -56,6 +56,7 @@
                   @input="errors.title = ''"
                   @blur="onTitleBlur"
                 />
+                <span v-if="!errors.title" class="input-hint">這個名稱會作為後台辨識主標題，通常也是前台頁面標題的基礎。</span>
                 <span v-if="errors.title" class="field-error" role="alert">{{ errors.title }}</span>
               </div>
 
@@ -74,7 +75,11 @@
                   </template>
                 </el-input>
                 <span v-if="errors.slug" class="field-error" role="alert">{{ errors.slug }}</span>
-                <span v-else class="input-hint">可使用英文字、數字、`-`、`_`、`/`。</span>
+                <span v-else class="input-hint">通常不用手動重打，可先輸入頁面名稱再按右側按鈕自動產生。</span>
+                <div class="url-preview">
+                  <span class="preview-label">前台網址預覽</span>
+                  <code>{{ pageUrlPreview }}</code>
+                </div>
               </div>
 
               <div class="item-group" :class="{ 'has-error': errors.status }">
@@ -84,6 +89,10 @@
                   <el-radio-button label="published">已發布</el-radio-button>
                   <el-radio-button label="unpublished">已下架</el-radio-button>
                 </el-radio-group>
+                <div class="status-explainer" :class="`is-${form.status}`">
+                  <strong>{{ statusSummaryTitle }}</strong>
+                  <p>{{ statusSummaryDescription }}</p>
+                </div>
                 <span v-if="errors.status" class="field-error" role="alert">{{ errors.status }}</span>
               </div>
             </div>
@@ -133,6 +142,12 @@
                     maxlength="200"
                     show-word-limit
                   />
+                  <div class="seo-preview">
+                    <span class="preview-label">搜尋結果預覽</span>
+                    <strong>{{ seoPreviewTitle }}</strong>
+                    <code>{{ pageUrlPreview }}</code>
+                    <p>{{ seoPreviewDescription }}</p>
+                  </div>
                 </div>
 
                 <div class="item-group">
@@ -142,6 +157,20 @@
                     placeholder="用逗號分隔，例如：公益, 志工, 服務"
                     @update:model-value="onTagsInput"
                   />
+                  <div class="tag-suggestions">
+                    <span class="preview-label">常用標籤</span>
+                    <div class="tag-suggestion-list">
+                      <button
+                        v-for="tag in suggestedTags"
+                        :key="tag"
+                        type="button"
+                        class="tag-suggestion-chip"
+                        @click="applySuggestedTag(tag)"
+                      >
+                        + {{ tag }}
+                      </button>
+                    </div>
+                  </div>
                   <div v-if="form.tags?.length" class="tags-preview">
                     <el-tag v-for="tag in form.tags" :key="tag" closable size="small" @close="removeTag(tag)">
                       {{ tag }}
@@ -188,6 +217,11 @@
                       size="large"
                       clearable
                     />
+                    <div class="quick-action-row">
+                      <button type="button" class="quick-action-chip" @click="setPublishNow">立即發布</button>
+                      <button type="button" class="quick-action-chip" @click="setPublishAtHour(18)">今天 18:00</button>
+                      <button type="button" class="quick-action-chip" @click="setPublishTomorrowMorning">明天 09:00</button>
+                    </div>
                   </div>
 
                   <div class="item-group">
@@ -201,7 +235,17 @@
                       size="large"
                       clearable
                     />
+                    <div class="quick-action-row">
+                      <button type="button" class="quick-action-chip" @click="clearUnpublishTime">不設定下架</button>
+                      <button type="button" class="quick-action-chip" @click="setUnpublishAfterDays(7)">7 天後</button>
+                      <button type="button" class="quick-action-chip" @click="setUnpublishAfterDays(30)">30 天後</button>
+                    </div>
                   </div>
+                </div>
+
+                <div class="schedule-summary">
+                  <strong>{{ publishStatusHeadline }}</strong>
+                  <p>{{ publishStatusDescription }}</p>
                 </div>
               </div>
             </div>
@@ -285,6 +329,7 @@ const advancedOpen = ref(false);
 const selectedPresetKey = ref<PagePresetKey | null>(isAdd ? 'blank' : null);
 // 優化 A — 必填欄位 inline 錯誤訊息（field name → error message）
 const errors = ref<Record<string, string>>({});
+const suggestedTags = ['基金會介紹', '活動公告', '志工招募', '補助資訊', '常見問題', '專案成果'];
 
 const publishTimeModel = computed<string | undefined>({
   get: () => form.publishTime ?? undefined,
@@ -298,6 +343,55 @@ const unpublishTimeModel = computed<string | undefined>({
   set: (value) => {
     form.unpublishTime = value ?? null;
   },
+});
+
+const pageUrlPreview = computed(() => `/${(form.slug || 'your-page-slug').replace(/^\/+/, '')}`);
+
+const statusSummaryTitle = computed(() => {
+  switch (form.status) {
+    case 'published':
+      return '目前設定為前台可見';
+    case 'unpublished':
+      return '目前設定為前台隱藏';
+    default:
+      return '目前先存為草稿';
+  }
+});
+
+const statusSummaryDescription = computed(() => {
+  switch (form.status) {
+    case 'published':
+      return '適合已確認內容的頁面。若同時設定開始 / 結束時間，前台會依排程顯示。';
+    case 'unpublished':
+      return '頁面內容保留在後台，但前台不顯示。適合暫時下架或活動結束後保留資料。';
+    default:
+      return '草稿不會直接顯示在前台，適合先整理內容、等確認後再發布。';
+  }
+});
+
+const seoPreviewTitle = computed(() => form.title.trim() || '頁面標題會顯示在這裡');
+const seoPreviewDescription = computed(() => {
+  if (form.metaDescription.trim()) return form.metaDescription.trim();
+  return '尚未填寫 SEO 描述。建議補一段 50-160 字摘要，方便搜尋結果與分享卡片顯示。';
+});
+
+const publishStatusHeadline = computed(() => {
+  if (form.status === 'draft') return '前台目前不會顯示這頁';
+  if (form.publishTime && form.unpublishTime) return '這頁會依照開始與結束時間自動上下架';
+  if (form.publishTime) return '這頁已設定預計上線時間';
+  if (form.unpublishTime) return '這頁已設定預計下架時間';
+  if (form.status === 'published') return '這頁目前會持續顯示在前台';
+  return '這頁目前是手動下架狀態';
+});
+
+const publishStatusDescription = computed(() => {
+  if (form.status === 'draft') {
+    return '適合還在編輯中的內容。完成後可改成已發布，或直接設定未來上線時間。';
+  }
+
+  const start = form.publishTime ? formatDate(form.publishTime) : '未設定';
+  const end = form.unpublishTime ? formatDate(form.unpublishTime) : '未設定';
+  return `開始發布：${start}；結束發布：${end}。如果兩者都不設定，系統會依目前狀態直接顯示或隱藏。`;
 });
 
 function buildHeroSection(title: string, shadowText: string, subtitle = ''): Section {
@@ -544,6 +638,12 @@ function onTagsInput(value: string) {
     .filter((item) => item.length > 0);
 }
 
+function applySuggestedTag(tag: string) {
+  const currentTags = form.tags || [];
+  if (currentTags.includes(tag)) return;
+  form.tags = [...currentTags, tag];
+}
+
 function removeTag(tag: string) {
   form.tags = (form.tags || []).filter((item) => item !== tag);
 }
@@ -555,6 +655,48 @@ function formatDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function toDatetimeValue(date: Date) {
+  const local = new Date(date);
+  local.setSeconds(0, 0);
+  const year = local.getFullYear();
+  const month = String(local.getMonth() + 1).padStart(2, '0');
+  const day = String(local.getDate()).padStart(2, '0');
+  const hours = String(local.getHours()).padStart(2, '0');
+  const minutes = String(local.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:00`;
+}
+
+function setPublishNow() {
+  publishTimeModel.value = toDatetimeValue(new Date());
+  if (form.status === 'draft') form.status = 'published';
+}
+
+function setPublishAtHour(hour: number) {
+  const next = new Date();
+  next.setHours(hour, 0, 0, 0);
+  publishTimeModel.value = toDatetimeValue(next);
+  if (form.status === 'draft') form.status = 'published';
+}
+
+function setPublishTomorrowMorning() {
+  const next = new Date();
+  next.setDate(next.getDate() + 1);
+  next.setHours(9, 0, 0, 0);
+  publishTimeModel.value = toDatetimeValue(next);
+  if (form.status === 'draft') form.status = 'published';
+}
+
+function clearUnpublishTime() {
+  unpublishTimeModel.value = undefined;
+}
+
+function setUnpublishAfterDays(days: number) {
+  const base = publishTimeModel.value ? new Date(publishTimeModel.value) : new Date();
+  base.setDate(base.getDate() + days);
+  base.setHours(23, 59, 0, 0);
+  unpublishTimeModel.value = toDatetimeValue(base);
 }
 
 async function onCancel() {
@@ -831,6 +973,45 @@ function onSave() {
   color: #909399;
 }
 
+.url-preview,
+.seo-preview,
+.schedule-summary {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fafbfc;
+  border: 1px solid rgba(15, 76, 92, 0.08);
+}
+
+.preview-label {
+  color: #909399;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.url-preview code,
+.seo-preview code {
+  color: #0f4c5c;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.seo-preview strong,
+.schedule-summary strong {
+  color: #303133;
+  font-size: 14px;
+}
+
+.seo-preview p,
+.schedule-summary p {
+  margin: 0;
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
 // 優化 A — 必填欄位 inline 紅字 + el-input 紅框 + label 變紅
 .field-error {
   display: block;
@@ -853,6 +1034,40 @@ function onSave() {
 
   .input-title {
     color: #f56c6c;
+  }
+}
+
+.status-explainer {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 76, 92, 0.08);
+  background: #fafbfc;
+
+  strong {
+    display: block;
+    margin-bottom: 4px;
+    color: #303133;
+    font-size: 14px;
+  }
+
+  p {
+    margin: 0;
+    color: #606266;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  &.is-draft {
+    background: linear-gradient(135deg, rgba(15, 76, 92, 0.06), rgba(255, 255, 255, 1));
+  }
+
+  &.is-published {
+    background: linear-gradient(135deg, rgba(106, 153, 78, 0.08), rgba(255, 255, 255, 1));
+  }
+
+  &.is-unpublished {
+    background: linear-gradient(135deg, rgba(188, 71, 73, 0.08), rgba(255, 255, 255, 1));
   }
 }
 
@@ -950,6 +1165,40 @@ function onSave() {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
+}
+
+.tag-suggestions {
+  margin-top: 10px;
+}
+
+.tag-suggestion-list,
+.quick-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tag-suggestion-chip,
+.quick-action-chip {
+  border: 1px solid rgba(234, 85, 4, 0.16);
+  border-radius: 999px;
+  background: #ffffff;
+  padding: 7px 12px;
+  color: #ea5504;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.2s ease;
+
+  &:hover {
+    border-color: rgba(234, 85, 4, 0.32);
+    background: #fff7f0;
+    transform: translateY(-1px);
+  }
 }
 
 .cover-preview {
