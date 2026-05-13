@@ -84,7 +84,7 @@
               ></i>
               <span>篩選</span>
             </button>
-            <button class="btn btn-filter" @click="Search" :disabled="!canSearch || isLoading">
+            <button class="btn btn-filter" @click="Search" :disabled="!isClientReady || !canSearch || isLoading">
               <span>搜尋</span>
               <i class="icon ic-search"></i>
             </button>
@@ -134,7 +134,7 @@
                 @is-opened="isSelectOpen"
                 @update:select-items="getSelectItems"
                 />
-              <button class="btn-filter" @click="Search" :disabled="!canSearch || isLoading">
+              <button class="btn-filter" @click="Search" :disabled="!isClientReady || !canSearch || isLoading">
                 <span></span>
                 <i class="icon ic-search"></i>
               </button>
@@ -148,53 +148,69 @@
       </section>
       <section class="section-result">
         <div class="part-list">
-          <span class="result-total">{{ storageiFarePolicyList.length }}</span>
-          <div class="result-loading" v-if="isLoading">載入中...</div>
-          <div class="result-loading result-error" v-else-if="hasError">
-            <p>{{ errorMessage }}</p>
-            <button class="btn btn-filter" type="button" @click="RetryLoad">重新載入</button>
-          </div>
-          <div class="result-loading result-empty" v-else-if="!isLoading && iFarePolicyList.length === 0" role="status">
-            <div class="empty-illustration" aria-hidden="true">
-              <i class="icon ic-search"></i>
+          <ClientOnly>
+            <IfareSummaryCard
+              :query="appliedSearchQuery"
+              :cases="storageiFarePolicyList"
+              :provider="llmProvider"
+              :search-context="appliedSummarySearchContext"
+              :summary-trigger-key="summaryTriggerKey"
+              :summary-cache-key="routeSearchSignature"
+              :summary-reset-key="summaryResetKey"
+            />
+            <span class="result-total">{{ storageiFarePolicyList.length }}</span>
+            <div class="result-loading" v-if="isLoading">載入中...</div>
+            <div class="result-loading result-error" v-else-if="hasError">
+              <p>{{ errorMessage }}</p>
+              <button class="btn btn-filter" type="button" @click="RetryLoad">重新載入</button>
             </div>
-            <p class="empty-title">沒有找到符合條件的福利</p>
-            <p class="empty-hint">試試放寬篩選條件、調整關鍵字，或看看所有福利政策。</p>
-            <div class="empty-actions">
-              <button class="btn btn-filter" type="button" @click="ScrollToFilter">
-                <span>修改搜尋條件</span>
-              </button>
-              <button class="btn btn-reset" type="button" @click="ResetParam">
-                <span>看全部福利</span>
-              </button>
+            <div class="result-loading result-empty" v-else-if="iFarePolicyList.length === 0" role="status">
+              <div class="empty-illustration" aria-hidden="true">
+                <i class="icon ic-search"></i>
+              </div>
+              <p class="empty-title">沒有找到符合條件的福利</p>
+              <p class="empty-hint">試試放寬篩選條件、調整關鍵字，或看看所有福利政策。</p>
+              <div class="empty-actions">
+                <button class="btn btn-filter" type="button" @click="ScrollToFilter">
+                  <span>修改搜尋條件</span>
+                </button>
+                <button class="btn btn-reset" type="button" @click="ResetParam">
+                  <span>看全部福利</span>
+                </button>
+              </div>
             </div>
-          </div>
-          <ul class="list-unstyled result-list" v-else>
-            <li
-              class="result-item transition-general"
-              v-for="_item in iFarePolicyList"
-              :key="_item.id"
-            >
-              <NuxtLink :to="{ path: '/ifare/info', query: { id: _item.id } }">
-                <h4 class="result-title">{{ _item.title }}</h4>
-                <div class="result-item-bottom">
-                  <div class="result-filter">
-                    <label class="result-filter-area">{{ _item.area }}</label>
-                    <label class="result-filter-qualify">
-                      <span :class="{ remark: _item.hasRecipient }">{{ _item.hasRecipient ? '有' : '無' }}</span>年齡限制、
-                      <span :class="{ remark: _item.hasIncome }">{{ _item.hasIncome ? '有' : '無' }}</span>經濟限制、
-                      <span :class="{ remark: _item.hasIndentity }">{{ _item.hasIndentity ? '有' : '無' }}</span>特殊身分
-                    </label>
+            <ul class="list-unstyled result-list" v-else>
+              <li
+                class="result-item transition-general"
+                v-for="_item in iFarePolicyList"
+                :key="_item.id"
+              >
+                <NuxtLink :to="{ path: '/ifare/info', query: { id: _item.id } }">
+                  <h4 class="result-title">{{ _item.title }}</h4>
+                  <div class="result-item-bottom">
+                    <div class="result-filter">
+                      <label class="result-filter-area">{{ _item.area }}</label>
+                      <label class="result-filter-qualify">
+                        <span :class="{ remark: _item.hasRecipient }">{{ _item.hasRecipient ? '有' : '無' }}</span>年齡限制、
+                        <span :class="{ remark: _item.hasIncome }">{{ _item.hasIncome ? '有' : '無' }}</span>經濟限制、
+                        <span :class="{ remark: _item.hasIndentity }">{{ _item.hasIndentity ? '有' : '無' }}</span>特殊身分
+                      </label>
+                    </div>
+                    <i class="ic-arrow-right link-url transition-general"></i>
                   </div>
-                  <i class="ic-arrow-right link-url transition-general"></i>
-                </div>
-              </NuxtLink>
-            </li>
-          </ul>
+                </NuxtLink>
+              </li>
+            </ul>
+            <template #fallback>
+              <div class="result-loading">載入中...</div>
+            </template>
+          </ClientOnly>
         </div>
-        <div class="part-pages" v-show="!isLoading">
-          <CompPage :page-list="pageNums" @change-page="PageChange"/>
-        </div>
+        <ClientOnly>
+          <div class="part-pages" v-show="!isLoading">
+            <CompPage :page-list="pageNums" @change-page="PageChange"/>
+          </div>
+        </ClientOnly>
       </section>
     </div>
   </div>
@@ -215,15 +231,19 @@ definePageMeta({
   toLinkName: "i-Fare",
   toLink: "/ifare",
 });
-const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
+const { $WebApiGet } = useNuxtApp();
 const { getApiResultArray } = useApiResult();
 const { getApiErrorMessage } = useApiErrorMessage();
 import CompSelect from "../components/CompSelect.vue";
 import CompSelectRecipient from "../components/CompSelectRecipient.vue";
 import CompSelectElse from "~/components/CompSelectElse.vue";
 import CompPage from "../components/CompPage.vue"
+import IfareSummaryCard from "~/components/IfareSummaryCard.vue";
 
 const isOpts = ref(false);
+const llmProvider = "gemini" as const;
+const SEARCH_CACHE_KEY_PREFIX = "ifare-search-cache:";
+const SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
 
 // interface selectItem {
 //   name: string;
@@ -257,15 +277,82 @@ const showResetFeedback = ref(false);
 const RESET_FEEDBACK_MS = 1800;
 let resetFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 let lastQuery: any = {};
-const canSearch = computed(() => {
-  return Boolean(
-    codeSelect_policy.value ||
-    codeSelectRecipient.value ||
-    codeSelect_area.value ||
-    searchQuery.value.trim()
-  );
+const isClientReady = ref(false);
+const $route = useRoute();
+const $router = useRouter();
+const appliedSearchParams = ref<Record<string, any>>({});
+const routeSearchParams = computed(() => buildQueryFromRoute($route.query as Record<string, any>));
+const routeSearchSignature = computed(() => {
+  return Object.keys(routeSearchParams.value || {})
+    .sort()
+    .map((key) => `${key}=${normalizeCacheValue(routeSearchParams.value[key])}`)
+    .join("&");
+});
+const effectiveAppliedSearchParams = computed(() => {
+  return Object.keys(appliedSearchParams.value || {}).length > 0
+    ? appliedSearchParams.value
+    : routeSearchParams.value;
 });
 
+function getSelectLabel(list: Array<selectItem>, value: string, isAllValue?: (value: any) => boolean) {
+  if (!value) return "";
+  if (isAllValue?.(value)) return "";
+  return list.find((item) => String(item.val) === String(value))?.name || "";
+}
+
+const summarySearchContext = computed(() => ({
+  policy: getSelectLabel(policySelectList, codeSelect_policy.value, isAllPolicyValue),
+  recipient: getSelectLabel(recipientSelectList, codeSelectRecipient.value),
+  area: getSelectLabel(areaSelectList, codeSelect_area.value, isAllAreaValue),
+  query: searchQuery.value.trim(),
+}));
+
+const appliedSearchQuery = computed(() => String(effectiveAppliedSearchParams.value.Query || ""));
+
+const appliedSearchSignature = computed(() => {
+  return Object.keys(effectiveAppliedSearchParams.value || {})
+    .sort()
+    .map((key) => `${key}=${normalizeCacheValue(effectiveAppliedSearchParams.value[key])}`)
+    .join("&");
+});
+
+const appliedSummarySearchContext = computed(() => ({
+  policy: getSelectLabel(policySelectList, String(effectiveAppliedSearchParams.value.CodePolicy || ""), isAllPolicyValue),
+  recipient: getSelectLabel(recipientSelectList, String(effectiveAppliedSearchParams.value.CodeRecipient || "")),
+  area: getSelectLabel(areaSelectList, String(effectiveAppliedSearchParams.value.CodeDomicile || ""), isAllAreaValue),
+  income: getSelectLabel(incomeSelectList, String(effectiveAppliedSearchParams.value.CodeIncome || "")),
+  identity: Array.isArray(effectiveAppliedSearchParams.value.CodeIdentities)
+    ? effectiveAppliedSearchParams.value.CodeIdentities
+        .map((item: any) => identitySelectList.find((option) => String(option.val) === String(item))?.name)
+        .filter(Boolean)
+        .join("、")
+    : "",
+  query: String(effectiveAppliedSearchParams.value.Query || ""),
+}));
+
+function isAllPolicyValue(value: any) {
+  return value == ALL_POLICY_VALUE || value == "全部";
+}
+
+function isAllAreaValue(value: any) {
+  return value == ALL_AREA_VALUE || value == "全國";
+}
+
+function buildFarePolicyApiQuery() {
+  let query: any = {};
+  if (codeSelect_policy.value && !isAllPolicyValue(codeSelect_policy.value)) query.CodePolicy = codeSelect_policy.value;
+  if (codeSelectRecipient.value) query.CodeRecipient = codeSelectRecipient.value;
+  if (codeSelect_area.value && !isAllAreaValue(codeSelect_area.value)) query.CodeDomicile = codeSelect_area.value;
+  if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
+  if (searchQuery.value.trim()) query.Query = searchQuery.value.trim();
+  if (codeSelectIdentity.value.length > 0) query.CodeIdentities = codeSelectIdentity.value;
+  return query;
+}
+const canSearch = computed(() => {
+  const formQuery = buildFarePolicyApiQuery();
+  const routeQuery = buildQueryFromRoute($route.query as Record<string, any>);
+  return Object.keys({ ...routeQuery, ...formQuery }).length > 0;
+});
 function getSelectValue(type: string, val: string) {
   if (type == "policy") {
     codeSelect_policy.value = val;
@@ -292,6 +379,59 @@ function getSelectItems(type: string, items: any) {
   } else {
     codeSelectIdentity.value.splice(0)
   }
+}
+
+function parseIdentityQuery(value: any) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean);
+  }
+
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function buildQueryFromRoute(routeQuery: Record<string, any>) {
+  const nextQuery: any = {};
+  if (routeQuery.policy && !isAllPolicyValue(routeQuery.policy)) nextQuery.CodePolicy = routeQuery.policy;
+  if (routeQuery.recipient) nextQuery.CodeRecipient = routeQuery.recipient;
+  if (routeQuery.area && !isAllAreaValue(routeQuery.area)) nextQuery.CodeDomicile = routeQuery.area;
+  if (routeQuery.income) nextQuery.CodeIncome = routeQuery.income;
+  if (routeQuery.query) nextQuery.Query = routeQuery.query;
+  if (routeQuery.identity) nextQuery.CodeIdentities = parseIdentityQuery(routeQuery.identity);
+  return nextQuery;
+}
+
+function syncFilterStateFromRoute(routeQuery: Record<string, any>) {
+  codeSelect_policy.value = typeof routeQuery.policy == "string" ? routeQuery.policy : "";
+  codeSelect_area.value = typeof routeQuery.area == "string" ? routeQuery.area : "";
+  codeSelectRecipient.value = typeof routeQuery.recipient == "string" ? routeQuery.recipient : "";
+  codeSelectIncome.value = typeof routeQuery.income == "string" ? routeQuery.income : "";
+  searchQuery.value = typeof routeQuery.query == "string" ? routeQuery.query : "";
+
+  const routeIdentities = parseIdentityQuery(routeQuery.identity);
+  codeSelectIdentity.value.splice(0);
+  codeSelectIdentity.value.push(...routeIdentities);
+
+  recipientSelectList.forEach((item) => {
+    item.isActive = String(item.val) === String(codeSelectRecipient.value);
+  });
+
+  incomeSelectList.forEach((item) => {
+    item.isActive = String(item.val) === String(codeSelectIncome.value);
+  });
+
+  identitySelectList.forEach((item) => {
+    item.isActive = routeIdentities.includes(String(item.val));
+  });
+}
+
+function hydrateFromRoute(routeQuery: Record<string, any>) {
+  syncFilterStateFromRoute(routeQuery);
+  const nextQuery = buildQueryFromRoute(routeQuery);
+  SetDataInit(nextQuery);
 }
 
 // Code Policy
@@ -377,6 +517,9 @@ codeIncome.then((res: any) => {
     };
   });
   incomeSelectList.push(..._list);
+  if (typeof $route.query.income === "string") {
+    SwitchIncome($route.query.income);
+  }
 });
 
 function SwitchIncome(codeVal: any) {
@@ -413,6 +556,14 @@ codeIdentity.then((res: any) => {
     };
   });
   identitySelectList.push(..._list);
+  const routeIdentities = parseIdentityQuery($route.query.identity);
+  if (routeIdentities.length > 0) {
+    codeSelectIdentity.value.splice(0);
+    codeSelectIdentity.value.push(...routeIdentities);
+    identitySelectList.forEach((item: any) => {
+      item.isActive = routeIdentities.includes(String(item.val));
+    });
+  }
 });
 
 function SwitchIdentity(codeVal: any) {
@@ -447,66 +598,24 @@ function SwitchIdentity(codeVal: any) {
 
 function Search() {
   if (!canSearch.value) return false;
-  let query: any = {};
-  if (codeSelect_policy.value && codeSelect_policy.value != ALL_POLICY_VALUE) query.CodePolicy = codeSelect_policy.value;
-  if (codeSelectRecipient.value)
-    query.CodeRecipient = codeSelectRecipient.value;
-  if (codeSelect_area.value && codeSelect_area.value != ALL_AREA_VALUE) query.CodeDomicile = codeSelect_area.value;
-  if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
-  if (searchQuery.value.trim()) query.Query = searchQuery.value.trim();
-  if (codeSelectIdentity.value.length > 0)
-    query.CodeIdentities = codeSelectIdentity.value;
-  SetDataInit(query);
-}
+  summaryResetKey.value += 1;
+  const nextQuery = buildFarePolicyApiQuery();
+  lastQuery = { ...nextQuery };
+  const currentQuery = buildQueryFromRoute($route.query as Record<string, any>);
+  const nextSignature = JSON.stringify(nextQuery);
+  const currentSignature = JSON.stringify(currentQuery);
 
-function RetryLoad() {
-  SetDataInit(lastQuery);
-}
-
-function ScrollToFilter() {
-  if (typeof window === 'undefined') return
-  const el = document.querySelector('.section-filter')
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
-function clearResetFeedbackTimer() {
-  if (!resetFeedbackTimer) {
-    return;
+  if (nextSignature === currentSignature) {
+    SetDataInit(nextQuery);
+    return true;
   }
 
-  clearTimeout(resetFeedbackTimer);
-  resetFeedbackTimer = null;
-}
-
-function triggerResetFeedback() {
-  clearResetFeedbackTimer();
-  showResetFeedback.value = false;
-  nextTick(() => {
-    showResetFeedback.value = true;
-    resetFeedbackTimer = setTimeout(() => {
-      showResetFeedback.value = false;
-    }, RESET_FEEDBACK_MS);
-  });
+  syncRouteQueryFromSearch(nextQuery);
+  return true;
 }
 
 // iFare Policy
 const PAGEITEMMAX = 10;
-const $route = useRoute();
-
-// Init filter default value.
-codeSelect_policy.value = typeof $route.query.policy == "string" ? $route.query.policy : ""
-codeSelect_area.value = typeof $route.query.area == "string" ? $route.query.area : ""
-codeSelectRecipient.value = typeof $route.query.recipient == "string" ? $route.query.recipient : ""
-searchQuery.value = typeof $route.query.query == "string" ? $route.query.query : ""
-
-const _query: any = {};
-
-if (Object.keys($route.query).length > 0) {
-  if ($route.query.policy && $route.query.policy != ALL_POLICY_VALUE) _query.CodePolicy = $route.query.policy;
-  if ($route.query.recipient) _query.CodeRecipient = $route.query.recipient;
-  if ($route.query.area && $route.query.area != ALL_AREA_VALUE) _query.CodeDomicile = $route.query.area;
-  if ($route.query.query) _query.Query = $route.query.query;
-}
 
 interface iFarePolicyItem {
   id: number;
@@ -527,28 +636,111 @@ interface pageNum {
 const iFarePolicyList = reactive<Array<iFarePolicyItem>>([]);
 const storageiFarePolicyList = reactive<Array<iFarePolicyItem>>([]);
 const pageNums = reactive<Array<pageNum>>([]);
+const summaryTriggerKey = ref(0);
+const summaryResetKey = ref(0);
 
-SetDataInit(_query);
+function normalizeCacheValue(value: any): string {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).sort().join(",");
+  }
+
+  if (value === undefined || value === null || value === "") {
+    return "";
+  }
+
+  return String(value);
+}
+
+function buildSearchCacheKey(query: Record<string, any>) {
+  const normalizedQuery = Object.keys(query)
+    .sort()
+    .map((key) => `${key}=${normalizeCacheValue(query[key])}`)
+    .join("&");
+
+  return `${SEARCH_CACHE_KEY_PREFIX}${normalizedQuery || "default"}`;
+}
+
+function readSearchCache(query: Record<string, any>) {
+  if (!process.client) return null;
+
+  const raw = sessionStorage.getItem(buildSearchCacheKey(query));
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      savedAt?: number;
+      items?: iFarePolicyItem[];
+    };
+
+    if (!parsed?.savedAt || Date.now() - parsed.savedAt > SEARCH_CACHE_TTL_MS) {
+      sessionStorage.removeItem(buildSearchCacheKey(query));
+      return null;
+    }
+
+    return Array.isArray(parsed.items) ? parsed.items : null;
+  } catch {
+    sessionStorage.removeItem(buildSearchCacheKey(query));
+    return null;
+  }
+}
+
+function writeSearchCache(query: Record<string, any>, items: iFarePolicyItem[]) {
+  if (!process.client) return;
+
+  sessionStorage.setItem(
+    buildSearchCacheKey(query),
+    JSON.stringify({
+      savedAt: Date.now(),
+      items,
+    })
+  );
+}
+
+function applyPolicyList(items: iFarePolicyItem[]) {
+  storageiFarePolicyList.splice(0);
+  iFarePolicyList.splice(0);
+  pageNums.splice(0);
+
+  storageiFarePolicyList.push(...items);
+  iFarePolicyList.push(...items.slice(0, Math.min(PAGEITEMMAX, items.length)));
+  summaryTriggerKey.value += 1;
+
+  if (storageiFarePolicyList.length <= 0) return;
+
+  for (let n = 0; n < storageiFarePolicyList.length / PAGEITEMMAX; n++) {
+    pageNums.push({
+      num: n + 1,
+      isActive: n == 0,
+      isHide: false
+    });
+  }
+
+}
 
 function SetDataInit(_q: any) {
   lastQuery = { ..._q };
-  isLoading.value = true;
   hasError.value = false;
   errorMessage.value = '載入福利政策時發生錯誤';
-  const listNews = $WebApiGetDetailed("/FarePolicy/GetIFarePolicyList", _q);
-  listNews.then(({ data, error }: any) => {
-    storageiFarePolicyList.splice(0);
-    iFarePolicyList.splice(0);
-    pageNums.splice(0);
+  appliedSearchParams.value = { ..._q };
 
-    const list = getApiResultArray<any>(data);
-    if (error || list.length === 0) {
-      hasError.value = true;
-      errorMessage.value = getApiErrorMessage(error, '載入福利政策時發生錯誤');
+  const cachedItems = readSearchCache(_q);
+  if (cachedItems) {
+    applyPolicyList(cachedItems);
+    hasError.value = false;
+    isLoading.value = false;
+    return;
+  }
+
+  isLoading.value = true;
+  const listNews = $WebApiGet("/FarePolicy/GetIFarePolicyList", _q);
+  listNews.then((res: any) => {
+    const _data = getApiResultArray<any>(res);
+    if (_data.length === 0) {
+      applyPolicyList([]);
+      writeSearchCache(_q, []);
       return;
     }
-
-    let _newsList: Array<iFarePolicyItem> = list.map(
+    let _newsList: Array<iFarePolicyItem> = _data.map(
       (item: any, i: number) => {
         return {
           id: item.id,
@@ -562,29 +754,31 @@ function SetDataInit(_q: any) {
       }
     );
 
-    storageiFarePolicyList.push(..._newsList);
-    iFarePolicyList.push(
-      ..._newsList.slice(
-        0,
-        _newsList.length > PAGEITEMMAX ? PAGEITEMMAX : _newsList.length
-      )
-    );
-
-    if (storageiFarePolicyList.length <= 0) return;
-
-    // Num page init.
-    for (let n = 0; n < storageiFarePolicyList.length / PAGEITEMMAX; n++) {
-      pageNums.push({
-        num: n + 1,
-        isActive: n == 0,
-        isHide: false
-      });
-    }
+    applyPolicyList(_newsList);
+    writeSearchCache(_q, _newsList);
   }).catch((error: any) => {
     hasError.value = true;
     errorMessage.value = getApiErrorMessage(error, '載入福利政策時發生錯誤');
   }).finally(() => {
     isLoading.value = false;
+  });
+}
+
+function syncRouteQueryFromSearch(query: Record<string, any>) {
+  const nextRouteQuery: Record<string, string> = {};
+
+  if (query.CodePolicy) nextRouteQuery.policy = String(query.CodePolicy);
+  if (query.CodeRecipient) nextRouteQuery.recipient = String(query.CodeRecipient);
+  if (query.CodeDomicile) nextRouteQuery.area = String(query.CodeDomicile);
+  if (query.CodeIncome) nextRouteQuery.income = String(query.CodeIncome);
+  if (query.Query) nextRouteQuery.query = String(query.Query);
+  if (Array.isArray(query.CodeIdentities) && query.CodeIdentities.length > 0) {
+    nextRouteQuery.identity = query.CodeIdentities.map((item: any) => String(item)).join(",");
+  }
+
+  $router.push({
+    path: "/ifare/result",
+    query: nextRouteQuery,
   });
 }
 
@@ -629,9 +823,54 @@ function ResetParam() {
   SwitchRecipient("reset")
   SwitchIncome("reset")
   SwitchIdentity("reset")
-  SetDataInit({})
+  summaryResetKey.value += 1;
+  lastQuery = {};
+  syncRouteQueryFromSearch({});
   triggerResetFeedback()
 }
+
+function RetryLoad() {
+  summaryResetKey.value += 1;
+  SetDataInit(lastQuery);
+}
+
+function ScrollToFilter() {
+  if (typeof window === 'undefined') return
+  const el = document.querySelector('.section-filter')
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function clearResetFeedbackTimer() {
+  if (!resetFeedbackTimer) {
+    return;
+  }
+
+  clearTimeout(resetFeedbackTimer);
+  resetFeedbackTimer = null;
+}
+
+function triggerResetFeedback() {
+  clearResetFeedbackTimer();
+  showResetFeedback.value = false;
+  nextTick(() => {
+    showResetFeedback.value = true;
+    resetFeedbackTimer = setTimeout(() => {
+      showResetFeedback.value = false;
+    }, RESET_FEEDBACK_MS);
+  });
+}
+
+watch(
+  () => $route.fullPath,
+  () => {
+    hydrateFromRoute($route.query as Record<string, any>);
+  },
+  { immediate: true }
+);
+
+onMounted(() => {
+  isClientReady.value = true;
+});
 
 onBeforeUnmount(() => {
   clearResetFeedbackTimer()

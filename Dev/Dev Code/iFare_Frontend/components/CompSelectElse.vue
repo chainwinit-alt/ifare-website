@@ -140,7 +140,7 @@
       })
     }
 
-    emits("update:selectItems", props.selectType, selectItems);
+    emits("update:select-items", props.selectType, selectItems);
     // ToggleSelectDialog()
   }
 
@@ -156,14 +156,14 @@
     "selectType",
     "selectTitle"
   ]);
-  const emits = defineEmits(["update:selectItems", "isOpened"]);
+  const emits = defineEmits(["update:select-items", "isOpened"]);
   
   const modelValue = computed({
     get() {
       return props.selectItems;
     },
-    set() {
-      emits("update:selectItems", selectItems);
+  set() {
+      emits("update:select-items", selectItems);
     },
   });
   </script>
