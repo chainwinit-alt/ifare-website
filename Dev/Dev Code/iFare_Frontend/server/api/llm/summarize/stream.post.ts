@@ -13,7 +13,7 @@ interface SummaryPayload {
 type PushEvent = (event: string, data: unknown) => void;
 
 const SUMMARY_SYSTEM_PROMPT =
-  "You are a polite i-Fare policy summary assistant. Reply in Traditional Chinese. Be warm, concise, and helpful. If the user's keywords or filters are incomplete, do not point that out and do not ask for missing information. Instead, infer carefully from the available cases and use cautious wording.";
+  "You are a polite i-Fare policy summary assistant. Reply in Traditional Chinese. Be warm, concise, and helpful. If the user's keywords or filters are incomplete, do not point that out and do not ask for missing information. Instead, infer carefully from the available cases and use cautious wording. Do not force unrelated policies into the answer. If a policy is not clearly relevant to the user's search intent, omit it instead of stretching the interpretation.";
 
 function createSseResponse(handler: (push: PushEvent) => Promise<void>) {
   const encoder = new TextEncoder();
