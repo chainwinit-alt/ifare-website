@@ -42,7 +42,19 @@
             </div>
             <div class="filter-group">
               <label class="filter-title">關鍵字</label>
-              <input v-model="searchQuery" class="input-query" type="text" placeholder="請輸入關鍵字" />
+              <div class="query-action-row">
+                <div class="query-field">
+                  <IfareSearchAutocomplete
+                    v-model="searchQuery"
+                    :filters="autocompleteFilters"
+                    @submit="Search"
+                  />
+                </div>
+                <button class="btn btn-filter btn-query-submit" @click="Search" :disabled="!isClientReady || !canSearch || isLoading">
+                  <span>搜尋</span>
+                  <i class="icon ic-search"></i>
+                </button>
+              </div>
             </div>
           </div>
           <div class="part-bottom" v-show="isOpts">
@@ -83,10 +95,6 @@
                 :class="{ 'ic-options': !isOpts, 'ic-arrow-simple-up': isOpts }"
               ></i>
               <span>篩選</span>
-            </button>
-            <button class="btn btn-filter" @click="Search" :disabled="!isClientReady || !canSearch || isLoading">
-              <span>搜尋</span>
-              <i class="icon ic-search"></i>
             </button>
           </div>
           <div class="part-reset">
@@ -239,11 +247,13 @@ import CompSelectRecipient from "../components/CompSelectRecipient.vue";
 import CompSelectElse from "~/components/CompSelectElse.vue";
 import CompPage from "../components/CompPage.vue"
 import IfareSummaryCard from "~/components/IfareSummaryCard.vue";
+import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
 
 const isOpts = ref(false);
 const llmProvider = "gemini" as const;
 const SEARCH_CACHE_KEY_PREFIX = "ifare-search-cache:";
 const SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
+const SEARCH_CACHE_MAX_ITEMS = 120;
 
 // interface selectItem {
 //   name: string;
@@ -353,6 +363,13 @@ const canSearch = computed(() => {
   const routeQuery = buildQueryFromRoute($route.query as Record<string, any>);
   return Object.keys({ ...routeQuery, ...formQuery }).length > 0;
 });
+const autocompleteFilters = computed(() => ({
+  CodePolicy: codeSelect_policy.value && !isAllPolicyValue(codeSelect_policy.value) ? codeSelect_policy.value : undefined,
+  CodeRecipient: codeSelectRecipient.value || undefined,
+  CodeDomicile: codeSelect_area.value && !isAllAreaValue(codeSelect_area.value) ? codeSelect_area.value : undefined,
+  CodeIncome: codeSelectIncome.value || undefined,
+  CodeIdentities: codeSelectIdentity.value.length > 0 ? [...codeSelectIdentity.value] : undefined,
+}));
 function getSelectValue(type: string, val: string) {
   if (type == "policy") {
     codeSelect_policy.value = val;
@@ -687,13 +704,50 @@ function readSearchCache(query: Record<string, any>) {
 function writeSearchCache(query: Record<string, any>, items: iFarePolicyItem[]) {
   if (!process.client) return;
 
-  sessionStorage.setItem(
-    buildSearchCacheKey(query),
-    JSON.stringify({
-      savedAt: Date.now(),
-      items,
-    })
-  );
+  const cacheKey = buildSearchCacheKey(query);
+  const payload = JSON.stringify({
+    savedAt: Date.now(),
+    items: items.slice(0, SEARCH_CACHE_MAX_ITEMS),
+  });
+
+  try {
+    sessionStorage.setItem(cacheKey, payload);
+  } catch (error) {
+    if (!isStorageQuotaExceeded(error)) {
+      return;
+    }
+
+    clearIfareSearchCache();
+
+    try {
+      sessionStorage.setItem(cacheKey, payload);
+    } catch {
+    }
+  }
+}
+
+function clearIfareSearchCache() {
+  if (!process.client) return;
+
+  const keysToRemove: string[] = [];
+  for (let index = 0; index < sessionStorage.length; index += 1) {
+    const key = sessionStorage.key(index);
+    if (key?.startsWith(SEARCH_CACHE_KEY_PREFIX)) {
+      keysToRemove.push(key);
+    }
+  }
+
+  keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+}
+
+function isStorageQuotaExceeded(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.name === "QuotaExceededError" ||
+    error.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+    error.message.includes("exceeded the quota");
 }
 
 function applyPolicyList(items: iFarePolicyItem[]) {

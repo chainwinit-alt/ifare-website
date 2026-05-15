@@ -197,9 +197,23 @@
           }
 
           .filter-group {
-            display: inline-flex;
+            display: flex;
             flex-direction: column;
             gap: 12px;
+            width: 100%;
+          }
+
+          .query-action-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            width: 100%;
+          }
+
+          .query-field {
+            flex: 1 1 auto;
+            min-width: 0;
+            width: 100%;
           }
 
           .input-query {
@@ -247,6 +261,11 @@
           .btn-filter {
             width: 102px;
             height: 40px;
+          }
+
+          .btn-query-submit {
+            flex: 0 0 auto;
+            align-self: flex-start;
           }
 
           .part-reset {

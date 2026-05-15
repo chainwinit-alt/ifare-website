@@ -83,37 +83,27 @@
           </div>
           <div class="item item-query">
             <label class="filter-name">關鍵字</label>
-            <div class="query-input-wrap">
-              <input
-                v-model="searchQuery"
-                class="input-query"
-                type="text"
-                maxlength="50"
-                placeholder="請輸入關鍵字"
-              />
+            <div class="query-action-row">
+              <div class="query-field">
+                <IfareSearchAutocomplete
+                  v-model="searchQuery"
+                  :filters="autocompleteFilters"
+                  @submit="Search"
+                />
+              </div>
               <button
-                v-show="searchQuery.trim()"
-                class="btn-clear-query transition-general"
-                type="button"
-                aria-label="清空關鍵字"
-                @click="ClearSearchQuery"
+                class="btn-filter transition-general btn-query-submit"
+                type="submit"
+                @click="Search"
+                :disabled="!canSearch"
+                :aria-disabled="!canSearch"
               >
-                <i class="icon ic-close" aria-hidden="true"></i>
+                <span>搜尋</span>
+                <i class="icon ic-search" aria-hidden="true"></i>
               </button>
-              <div class="query-count" aria-live="polite">{{ searchQuery.length }}/50</div>
             </div>
           </div>
           <div class="item item-bottom">
-            <button
-              class="btn-filter transition-general"
-              type="submit"
-              @click="Search"
-              :disabled="!canSearch"
-              :aria-disabled="!canSearch"
-            >
-              <span>搜尋</span>
-              <i class="icon ic-search" aria-hidden="true"></i>
-            </button>
             <p
               v-if="hasAttemptedSearch && !canSearch"
               class="search-error"
@@ -253,6 +243,7 @@ const $router = useRouter();
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue"
 import CompPageNum from "../components/CompPageNum.vue";
+import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
 
 interface selectItem {
   name: string;
@@ -291,6 +282,11 @@ const canSearch = computed(() => {
     searchQuery.value.trim()
   );
 });
+const autocompleteFilters = computed(() => ({
+  CodePolicy: codeSelect_policy.value && codeSelect_policy.value !== ALL_POLICY_VALUE ? codeSelect_policy.value : undefined,
+  CodeRecipient: codeSelectRecipient.value || undefined,
+  CodeDomicile: codeSelect_area.value && codeSelect_area.value !== ALL_AREA_VALUE ? codeSelect_area.value : undefined,
+}));
 
 // #1 — 篩選不完整時錯誤訊息。使用者點過搜尋且 canSearch 仍為 false 時顯示
 const hasAttemptedSearch = ref(false);
@@ -388,10 +384,6 @@ function Search() {
   });
   codeSelect_area.value = ""
   searchQuery.value = ""
-}
-
-function ClearSearchQuery() {
-  searchQuery.value = "";
 }
 
 // Office Unit

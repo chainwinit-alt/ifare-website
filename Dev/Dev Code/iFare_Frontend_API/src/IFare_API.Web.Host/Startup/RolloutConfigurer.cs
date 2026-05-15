@@ -1,46 +1,59 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 
-namespace IFare_API.Web.Host.Startup 
+namespace IFare_API.Web.Host.Startup
 {
     public static class RolloutConfigurer
     {
-        public static void Configure(IConfiguration _appConfiguration, IWebHostEnvironment _env)
+        public static void Configure(IConfiguration appConfiguration, IWebHostEnvironment env)
         {
-            var isDev = _env.EnvironmentName == "Development";
-            var version = _appConfiguration["RolloutSetting:TargetVersion"];
-            var docTitle = _appConfiguration["RolloutSetting:Swagger:DocTitle"];
-            
+            var isDev = env.EnvironmentName == "Development";
+            var version = appConfiguration["RolloutSetting:TargetVersion"];
+            var docTitle = appConfiguration["RolloutSetting:Swagger:DocTitle"];
+
+            if (string.IsNullOrWhiteSpace(version))
+            {
+                version = isDev ? "Local" : "Release";
+                appConfiguration["RolloutSetting:TargetVersion"] = version;
+            }
+
+            if (string.IsNullOrWhiteSpace(docTitle))
+            {
+                docTitle = "iFare API";
+                appConfiguration["RolloutSetting:Swagger:DocTitle"] = docTitle;
+            }
 
             if (!isDev)
             {
-                if (version.ToLowerInvariant() == "local")
+                if (string.Equals(version, "local", System.StringComparison.OrdinalIgnoreCase))
                 {
-                    _appConfiguration["RolloutSetting:TargetVersion"] = "Release";
+                    appConfiguration["RolloutSetting:TargetVersion"] = "Release";
                 }
             }
-            else 
+            else
             {
-                if (version.ToLowerInvariant() != "local")
+                if (!string.Equals(version, "local", System.StringComparison.OrdinalIgnoreCase))
                 {
-                    _appConfiguration["RolloutSetting:TargetVersion"] = "Local";
+                    appConfiguration["RolloutSetting:TargetVersion"] = "Local";
                 }
 
-                _appConfiguration["ConnectionStrings:Default"] = _appConfiguration["ConnectionStrings:Local_Default"];
-                _appConfiguration["ConnectionStrings:IFare"] = _appConfiguration["ConnectionStrings:Local_IFare"];
+                appConfiguration["ConnectionStrings:Default"] = appConfiguration["ConnectionStrings:Local_Default"];
+                appConfiguration["ConnectionStrings:IFare"] = appConfiguration["ConnectionStrings:Local_IFare"];
             }
-            version = _appConfiguration["RolloutSetting:TargetVersion"];
-            SetVersionComponment(_appConfiguration, version, docTitle);
+
+            version = appConfiguration["RolloutSetting:TargetVersion"];
+            SetVersionComponent(appConfiguration, version, docTitle);
         }
 
-        private static void SetVersionComponment(IConfiguration _appConfiguration, string ver, string docTitle)
+        private static void SetVersionComponent(IConfiguration appConfiguration, string version, string docTitle)
         {
-            var _ver = ver.ToLowerInvariant();
-            var _docTitle = docTitle.ToLowerInvariant();
+            var normalizedVersion = string.IsNullOrWhiteSpace(version) ? "release" : version.ToLowerInvariant();
+            var normalizedTitle = string.IsNullOrWhiteSpace(docTitle) ? "ifare api" : docTitle.ToLowerInvariant();
 
-            if (_docTitle.IndexOf(_ver) < 0)
+            if (normalizedTitle.IndexOf(normalizedVersion) < 0)
             {
-                _appConfiguration["RolloutSetting:Swagger:DocTitle"] = $"【{ver}】IFare API";
+                appConfiguration["RolloutSetting:Swagger:DocTitle"] =
+                    $"{char.ToUpperInvariant(normalizedVersion[0])}{normalizedVersion.Substring(1)} iFare API";
             }
         }
     }
