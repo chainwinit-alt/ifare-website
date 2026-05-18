@@ -95,12 +95,12 @@
               >下架</el-button>
               <el-button size="small" type="danger" link @click="onDelete(row)">刪除</el-button>
               <el-button
-                v-if="row.status === 'published'"
                 size="small"
                 type="info"
                 link
+                :disabled="row.status !== 'published'"
+                :title="row.status === 'published' ? '在新分頁開啟前端網址' : '草稿狀態，發布後才能預覽'"
                 @click="openInFrontend(row)"
-                title="在新分頁開啟前端網址"
               >看前端</el-button>
             </template>
           </el-table-column>
