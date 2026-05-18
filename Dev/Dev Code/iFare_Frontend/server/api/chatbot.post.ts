@@ -3,6 +3,8 @@ type ChatHistoryItem = {
   content: string;
 };
 
+type ChatbotRequestMode = 'ai' | 'hybrid';
+
 type ChatbotErrorCode =
   | 'gemini_timeout'
   | 'gemini_auth'
@@ -88,14 +90,23 @@ const KNOWLEDGE_BLOCK = KNOWLEDGE_BASE.map(
   (entry, index) => `${index + 1}. ${entry.title}: ${entry.answer}`,
 ).join('\n');
 
-const FIXED_FALLBACK_REPLY =
-  '目前聊天小幫手先使用固定問答模式。你可以試著詢問 i-Fare、公益夥伴、捐款合作、聯絡方式、最新消息或文章資訊；若需要真人協助，也可以直接使用 LINE 或電話聯絡基金會。';
+const API_UNAVAILABLE_FALLBACK_REPLY =
+  '目前智慧小幫手暫時無法連到 AI 服務。你可以先查看 i-Fare、公益夥伴、最新消息、文章專區或聯絡基金會真人協助。';
 
-const SYSTEM_PROMPT = [
+const AI_ONLY_SYSTEM_PROMPT = [
+  '你是 i-Fare 網站上的智慧小幫手。',
+  '你的任務是用自然語言整理使用者問題，並協助使用者找到下一步方向。',
+  '如果你不確定，不要編造不存在的方案、金額、資格與聯絡方式。',
+  '不要輸出 HTML 標籤，也不要輸出 Markdown 連結；站內入口請用純文字路徑，例如「站內入口：/ifare」。',
+  '回答要清楚、具體、偏向引導，不要只回覆單一句話。',
+].join('\n');
+
+const HYBRID_SYSTEM_PROMPT = [
   '你是 i-Fare 網站上的智慧小幫手。',
   '你的任務是整理站內資訊、引導使用者前往正確頁面，避免過度推測。',
   '回答時優先使用下列固定知識庫；若知識庫無法支撐結論，就明確說明你不確定，並引導使用者到對應頁面或真人客服。',
   '不要編造不存在的方案、金額、資格與聯絡方式。',
+  '不要輸出 HTML 標籤，也不要輸出 Markdown 連結；站內入口請用純文字路徑，例如「站內入口：/ifare」。',
   '若問題與福利政策、公益夥伴、文章、最新消息、聯絡方式相關，盡量附上站內入口。',
   '固定知識庫如下：',
   KNOWLEDGE_BLOCK,
@@ -103,6 +114,10 @@ const SYSTEM_PROMPT = [
 
 function normalizeMessage(value: unknown) {
   return typeof value === 'string' ? value.trim().slice(0, MAX_MESSAGE_LENGTH) : '';
+}
+
+function normalizeRequestMode(value: unknown): ChatbotRequestMode {
+  return value === 'ai' ? 'ai' : 'hybrid';
 }
 
 function normalizeHistory(value: unknown): ChatHistoryItem[] {
@@ -222,6 +237,15 @@ function extractResponseText(data: any) {
   return parts.join('\n').trim();
 }
 
+function normalizeReplyText(text: string) {
+  return text
+    .replace(/<a\b[^>]*>(.*?)<\/a>/gis, '$1')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>\s*<p[^>]*>/gi, '\n')
+    .replace(/<\/?[^>]+>/g, '')
+    .trim();
+}
+
 function matchKnowledgeEntry(message: string) {
   const text = message.toLowerCase();
 
@@ -230,9 +254,34 @@ function matchKnowledgeEntry(message: string) {
   );
 }
 
+function isBroadWelfareQuery(message: string) {
+  return /福利|補助|資格|申請|政策|ifare/i.test(message);
+}
+
+function getBroadWelfareGuidanceReply() {
+  return [
+    '福利政策範圍很大，建議先從這 4 類開始選：',
+    '1. 老人 / 長照',
+    '2. 生育 / 育兒',
+    '3. 身心障礙',
+    '4. 低收入 / 急難 / 就學補助',
+    '如果你告訴我「對象」或「情境」，我可以直接幫你縮小到更精準的搜尋方向。',
+    '站內入口：/ifare',
+  ].join('\n');
+}
+
+function looksTooGeneric(reply: string) {
+  return !/(老人|長照|生育|育兒|身心障礙|低收入|急難|就學|補助)/.test(reply);
+}
+
+function getSystemPrompt(mode: ChatbotRequestMode) {
+  return mode === 'ai' ? AI_ONLY_SYSTEM_PROMPT : HYBRID_SYSTEM_PROMPT;
+}
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
   const message = normalizeMessage(body?.message);
+  const requestMode = normalizeRequestMode(body?.mode);
 
   if (!message) {
     throw createError({
@@ -246,28 +295,23 @@ export default defineEventHandler(async (event) => {
     setHeader(event, 'Retry-After', String(rateLimit.retryAfter));
     return {
       configured: true,
+      mode: requestMode,
       errorCode: 'local_rate_limit',
       retryable: true,
       reply: getFriendlyErrorReply('local_rate_limit'),
     };
   }
 
-  const knowledgeMatch = matchKnowledgeEntry(message);
+  const knowledgeMatch = requestMode === 'hybrid' ? matchKnowledgeEntry(message) : null;
   if (knowledgeMatch) {
     return {
       configured: true,
+      mode: requestMode,
       source: 'knowledge_base',
       reply: knowledgeMatch.answer,
     };
   }
 
-  return {
-    configured: false,
-    source: 'fixed_faq_fallback',
-    reply: FIXED_FALLBACK_REPLY,
-  };
-
-  /*
   const history = normalizeHistory(body?.history);
   const transcript = buildTranscript(message, history);
   const config = useRuntimeConfig();
@@ -277,8 +321,12 @@ export default defineEventHandler(async (event) => {
   if (!apiKey) {
     return {
       configured: false,
-      reply:
-        '目前智慧小幫手沒有啟用外部 AI 金鑰，但你仍可直接查看 i-Fare、公益夥伴、最新消息、文章專區，或聯絡基金會取得協助。',
+      mode: requestMode,
+      source: 'fixed_faq_fallback',
+      model,
+      retryable: false,
+      errorCode: 'gemini_auth',
+      reply: API_UNAVAILABLE_FALLBACK_REPLY,
     };
   }
 
@@ -297,7 +345,7 @@ export default defineEventHandler(async (event) => {
         },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: SYSTEM_PROMPT }],
+            parts: [{ text: getSystemPrompt(requestMode) }],
           },
           contents: [
             {
@@ -319,6 +367,7 @@ export default defineEventHandler(async (event) => {
 
       return {
         configured: true,
+        mode: requestMode,
         model,
         errorCode,
         retryable: errorCode !== 'gemini_auth' && errorCode !== 'gemini_bad_request',
@@ -327,14 +376,20 @@ export default defineEventHandler(async (event) => {
     }
 
     const data = await response.json();
-    const reply = extractResponseText(data);
+    const reply = normalizeReplyText(extractResponseText(data));
+    const shouldApplyBroadWelfareFallback =
+      requestMode === 'hybrid' &&
+      isBroadWelfareQuery(message) &&
+      (!reply || looksTooGeneric(reply));
+    const finalReply = shouldApplyBroadWelfareFallback ? getBroadWelfareGuidanceReply() : reply;
 
     return {
       configured: true,
+      mode: requestMode,
       model,
       source: 'gemini',
       reply:
-        reply ||
+        finalReply ||
         '我目前沒有足夠把握直接回答這題，建議你改從 i-Fare、公益夥伴、文章專區或基金會聯絡方式繼續查找。',
     };
   } catch (error: any) {
@@ -345,6 +400,7 @@ export default defineEventHandler(async (event) => {
 
     return {
       configured: true,
+      mode: requestMode,
       model,
       errorCode,
       retryable: true,
@@ -353,5 +409,4 @@ export default defineEventHandler(async (event) => {
   } finally {
     clearTimeout(timeout);
   }
-  */
 });

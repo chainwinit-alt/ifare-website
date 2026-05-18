@@ -2,12 +2,21 @@
   <!-- 最外層容器，撐滿整個視窗 -->
   <el-container class="section-app">
     <!-- 側邊欄：登入頁面不顯示，傳入目前路由資訊供選單高亮使用 -->
-    <AppAside v-if="$route.name != 'Login'" :route="$route"></AppAside>
+    <AppAside
+      v-if="$route.name != 'Login'"
+      :route="$route"
+      :collapsed="isSidebarCollapsed"
+    ></AppAside>
 
     <!-- 右側主要區域（垂直排列：頁首 + 主內容） -->
     <el-container class="section-container is-vertical">
       <!-- 頁首導航列：登入頁面不顯示 -->
-      <AppHeader v-if="$route.name != 'Login'" :route="$route"></AppHeader>
+      <AppHeader
+        v-if="$route.name != 'Login'"
+        :route="$route"
+        :collapsed="isSidebarCollapsed"
+        @toggle-sidebar="toggleSidebar"
+      ></AppHeader>
 
       <!-- 主內容區：登入頁面套用 main-Login 樣式（無內距），一般頁面套用 section-main -->
       <el-main
@@ -81,6 +90,7 @@
  * 定義整體版面結構：側邊欄（AppAside）、頁首（AppHeader）、主內容（RouterView）
  * 登入頁面會隱藏側邊欄與頁首，呈現全頁登入畫面
  */
+import { ref, watch } from "vue";
 import { RouterLink, RouterView } from "vue-router";
 import { ElContainer, ElMain, ElScrollbar } from "element-plus";
 // 側邊欄選單元件
@@ -89,4 +99,13 @@ import AppAside from "./components/AppAside.vue";
 import AppHeader from "./components/AppHeader.vue";
 // 品牌 Logo SVG 元件（用作背景裝飾）
 import logo from "@/components/icons/IconLogo.vue";
+
+const SIDEBAR_STORAGE_KEY = "ifare-backend:sidebar-collapsed";
+const isSidebarCollapsed = ref(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1");
+watch(isSidebarCollapsed, (v) => {
+  localStorage.setItem(SIDEBAR_STORAGE_KEY, v ? "1" : "0");
+});
+function toggleSidebar() {
+  isSidebarCollapsed.value = !isSidebarCollapsed.value;
+}
 </script>

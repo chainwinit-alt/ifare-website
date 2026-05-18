@@ -1,8 +1,16 @@
 <template>
   <!-- 頂部標題列容器 -->
   <el-header class="section-header">
-    <!-- 左側：麵包屑導覽列，顯示目前所在的頁面路徑 -->
+    <!-- 左側：sidebar 收放按鈕 + 麵包屑導覽列 -->
     <div class="section-part part-left">
+      <el-button
+        class="btn-sidebar-toggle"
+        :icon="collapsed ? Expand : Fold"
+        circle
+        plain
+        :title="collapsed ? '展開選單' : '收合選單'"
+        @click="emit('toggle-sidebar')"
+      />
       <el-breadcrumb separator="/">
         <!-- 依照 pageRouters 陣列動態產生麵包屑項目 -->
         <el-breadcrumb-item
@@ -28,6 +36,10 @@
 .section-header {
     padding: 0 $padding-LR-header;
     background: #ffffff;
+}
+.btn-sidebar-toggle {
+  margin-right: 12px;
+  flex-shrink: 0;
 }
 .user-group {
   display: inline-flex;
@@ -60,11 +72,13 @@ import {
   ElBreadcrumb,
   ElBreadcrumbItem,
 } from "element-plus";
+import { Expand, Fold, User } from "@element-plus/icons-vue";
 import type { PageRoute } from "@/interface/AppHeader";
 import { useUserStore } from "@/stores/user";
 
-// 接收父層傳入的路由資訊
-const props = defineProps(["route"]);
+// 接收父層傳入的路由資訊 + sidebar 收合狀態；對外發出 toggle-sidebar 事件
+const props = defineProps(["route", "collapsed"]);
+const emit = defineEmits(["toggle-sidebar"]);
 // 取得全域注入的共用工具庫
 const app = getCurrentInstance();
 const $commonLib = app?.appContext.config.globalProperties.$CommonLib;

@@ -19,14 +19,6 @@
       <div class="edit-pane">
         <div class="section-main-card card-fullsize">
           <div class="card-info">
-            <div class="quick-start-head">
-              <div>
-                <h4 class="section-title no-border">快速開始</h4>
-                <p class="section-note">先挑常用模板，再填頁面名稱，最後微調區塊內容。</p>
-              </div>
-              <span class="flow-badge">3 Steps</span>
-            </div>
-
             <div class="preset-grid">
               <button
                 v-for="preset in pagePresets"
@@ -75,7 +67,7 @@
                   </template>
                 </el-input>
                 <span v-if="errors.slug" class="field-error" role="alert">{{ errors.slug }}</span>
-                <span v-else class="input-hint">通常不用手動重打，可先輸入頁面名稱再按右側按鈕自動產生。</span>
+                <span v-else class="input-hint" :class="{ 'is-success': slugStatus === 'available' }">{{ slugHintText }}</span>
                 <div class="url-preview">
                   <span class="preview-label">前台網址預覽</span>
                   <code>{{ pageUrlPreview }}</code>
@@ -89,10 +81,6 @@
                   <el-radio-button label="published">已發布</el-radio-button>
                   <el-radio-button label="unpublished">已下架</el-radio-button>
                 </el-radio-group>
-                <div class="status-explainer" :class="`is-${form.status}`">
-                  <strong>{{ statusSummaryTitle }}</strong>
-                  <p>{{ statusSummaryDescription }}</p>
-                </div>
                 <span v-if="errors.status" class="field-error" role="alert">{{ errors.status }}</span>
               </div>
             </div>
@@ -263,7 +251,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, reactive, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import {
   ElButton,
   ElDatePicker,
@@ -303,6 +291,19 @@ interface PagePresetOption {
   buildSections: () => Section[];
 }
 
+interface DraftSnapshot {
+  form: DynamicPage;
+  selectedPresetKey: PagePresetKey | null;
+  savedAt: string;
+}
+
+type DraftState = 'idle' | 'saving' | 'saved' | 'restored';
+
+const AUTOSAVE_DELAY_MS = 1200;
+const SLUG_CHECK_DELAY_MS = 300;
+const DRAFT_STORAGE_PREFIX = 'ifare:page-management:draft:v1';
+const SLUG_PATTERN = /^[a-zA-Z0-9/_-]+$/;
+
 const app = getCurrentInstance();
 const $commonLib = app?.appContext.config.globalProperties.$CommonLib;
 const route = useRoute();
@@ -330,6 +331,42 @@ const selectedPresetKey = ref<PagePresetKey | null>(isAdd ? 'blank' : null);
 // 優化 A — 必填欄位 inline 錯誤訊息（field name → error message）
 const errors = ref<Record<string, string>>({});
 const suggestedTags = ['基金會介紹', '活動公告', '志工招募', '補助資訊', '常見問題', '專案成果'];
+const slugStatus = ref<'idle' | 'checking' | 'available'>('idle');
+const draftState = ref<DraftState>('idle');
+const draftSavedAt = ref('');
+
+const draftStorageKey = computed(() => `${DRAFT_STORAGE_PREFIX}:${isAdd ? 'new' : recordId.value || 'new'}`);
+const slugHintText = computed(() => {
+  if (!form.slug.trim()) return '通常不用手動重打，可先輸入頁面名稱再按右側按鈕自動產生。';
+  if (slugStatus.value === 'checking') return '正在檢查這個網址是否已被其他頁面使用。';
+  if (slugStatus.value === 'available') return '這個 slug 目前可使用。';
+  return '通常不用手動重打，可先輸入頁面名稱再按右側按鈕自動產生。';
+});
+const draftStatusTitle = computed(() => {
+  switch (draftState.value) {
+    case 'saving':
+      return '正在自動暫存草稿';
+    case 'saved':
+      return '草稿已自動暫存';
+    case 'restored':
+      return '已還原暫存草稿';
+    default:
+      return '離開前會自動暫存草稿';
+  }
+});
+const draftStatusDescription = computed(() => {
+  if (draftState.value === 'saving') return '系統會在你停止輸入後自動保存，避免新增頁內容遺失。';
+  if (draftSavedAt.value) {
+    const savedAtLabel = formatDate(draftSavedAt.value);
+    if (draftState.value === 'restored') return `目前使用 ${savedAtLabel} 的暫存版本，可直接接著編輯。`;
+    if (draftState.value === 'saved') return `最近一次暫存時間：${savedAtLabel}，正式儲存後會自動清除。`;
+  }
+  return '若未正式儲存就離開頁面，系統會保留一份草稿供下次繼續。';
+});
+
+let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+let slugCheckTimer: ReturnType<typeof setTimeout> | null = null;
+let isDraftReady = false;
 
 const publishTimeModel = computed<string | undefined>({
   get: () => form.publishTime ?? undefined,
@@ -535,8 +572,20 @@ watch(
   () => form,
   () => {
     isDirty.value = JSON.stringify(form) !== originalSnapshot;
+    queueDraftSave();
   },
   { deep: true },
+);
+
+watch(selectedPresetKey, () => {
+  queueDraftSave();
+});
+
+watch(
+  () => form.slug,
+  (value) => {
+    scheduleSlugCheck(value);
+  },
 );
 
 function beforeUnloadHandler(event: BeforeUnloadEvent) {
@@ -546,7 +595,185 @@ function beforeUnloadHandler(event: BeforeUnloadEvent) {
   }
 }
 
-window.addEventListener('beforeunload', beforeUnloadHandler);
+function clearAutosaveTimer() {
+  if (autosaveTimer) {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+  }
+}
+
+function clearSlugCheckTimer() {
+  if (slugCheckTimer) {
+    clearTimeout(slugCheckTimer);
+    slugCheckTimer = null;
+  }
+}
+
+function resetDraftStatus() {
+  draftState.value = 'idle';
+  draftSavedAt.value = '';
+}
+
+function removeDraftStorage() {
+  clearAutosaveTimer();
+  localStorage.removeItem(draftStorageKey.value);
+  resetDraftStatus();
+}
+
+function normalizeDraftPage(snapshot: Partial<DynamicPage>): DynamicPage {
+  const parsed = JSON.parse(JSON.stringify(snapshot || {})) as Partial<DynamicPage>;
+  return {
+    id: parsed.id || '',
+    ...createDefaultPage(),
+    createDate: parsed.createDate || '',
+    updateDate: parsed.updateDate || '',
+    ...parsed,
+    tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+    sections: Array.isArray(parsed.sections) ? parsed.sections : [],
+  };
+}
+
+function hasMeaningfulContent() {
+  return Boolean(
+    form.title.trim() ||
+      form.slug.trim() ||
+      form.metaDescription.trim() ||
+      form.coverImage?.trim() ||
+      form.tags?.length ||
+      form.sections.some((section) => !isSectionEmpty(section)),
+  );
+}
+
+function persistDraft() {
+  clearAutosaveTimer();
+
+  if (!isDraftReady || saving.value) return;
+
+  if (!isDirty.value || !hasMeaningfulContent()) {
+    removeDraftStorage();
+    return;
+  }
+
+  const snapshot: DraftSnapshot = {
+    form: normalizeDraftPage(form),
+    selectedPresetKey: selectedPresetKey.value,
+    savedAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem(draftStorageKey.value, JSON.stringify(snapshot));
+  draftSavedAt.value = snapshot.savedAt;
+  draftState.value = 'saved';
+}
+
+function queueDraftSave() {
+  if (!isDraftReady || saving.value) return;
+
+  clearAutosaveTimer();
+
+  if (!isDirty.value || !hasMeaningfulContent()) {
+    if (localStorage.getItem(draftStorageKey.value)) removeDraftStorage();
+    return;
+  }
+
+  draftState.value = 'saving';
+  autosaveTimer = setTimeout(() => {
+    persistDraft();
+  }, AUTOSAVE_DELAY_MS);
+}
+
+function getSlugValidationMessage(value: string) {
+  const slug = value.trim();
+  if (!slug) return '';
+  if (!SLUG_PATTERN.test(slug)) {
+    return 'URL Slug 只能使用英文、數字、斜線（/）、底線（_）與連字號（-）。';
+  }
+  if (isSlugConflict(slug, isAdd ? undefined : form.id)) {
+    return `URL Slug 已被使用：${slug}`;
+  }
+  return '';
+}
+
+function scheduleSlugCheck(value: string) {
+  clearSlugCheckTimer();
+
+  const slug = value.trim();
+  if (!slug) {
+    slugStatus.value = 'idle';
+    if (errors.value.slug?.startsWith('URL Slug')) errors.value.slug = '';
+    return;
+  }
+
+  slugStatus.value = 'checking';
+  slugCheckTimer = setTimeout(() => {
+    const validationMessage = getSlugValidationMessage(slug);
+    if (validationMessage) {
+      errors.value.slug = validationMessage;
+      slugStatus.value = 'idle';
+      return;
+    }
+
+    errors.value.slug = '';
+    slugStatus.value = 'available';
+  }, SLUG_CHECK_DELAY_MS);
+}
+
+async function restoreDraftIfNeeded() {
+  const raw = localStorage.getItem(draftStorageKey.value);
+  if (!raw) return;
+
+  let snapshot: DraftSnapshot;
+  try {
+    snapshot = JSON.parse(raw) as DraftSnapshot;
+  } catch {
+    removeDraftStorage();
+    return;
+  }
+
+  if (!snapshot?.form) {
+    removeDraftStorage();
+    return;
+  }
+
+  const savedAtLabel = snapshot.savedAt ? formatDate(snapshot.savedAt) : '稍早';
+
+  try {
+    await ElMessageBox.confirm(
+      `偵測到 ${savedAtLabel} 的暫存草稿，要繼續編輯這份內容嗎？`,
+      '還原暫存草稿',
+      {
+        type: 'info',
+        confirmButtonText: '還原草稿',
+        cancelButtonText: '捨棄草稿',
+      },
+    );
+  } catch {
+    removeDraftStorage();
+    return;
+  }
+
+  Object.assign(form, normalizeDraftPage(snapshot.form));
+  selectedPresetKey.value = snapshot.selectedPresetKey ?? selectedPresetKey.value;
+  draftSavedAt.value = snapshot.savedAt || '';
+  draftState.value = 'restored';
+
+  ElMessage({
+    type: 'success',
+    message: '已還原暫存草稿',
+  });
+}
+
+onMounted(async () => {
+  window.addEventListener('beforeunload', beforeUnloadHandler);
+  await restoreDraftIfNeeded();
+  scheduleSlugCheck(form.slug);
+  isDraftReady = true;
+});
+
+onUnmounted(() => {
+  clearAutosaveTimer();
+  clearSlugCheckTimer();
+  window.removeEventListener('beforeunload', beforeUnloadHandler);
+});
 
 onBeforeRouteLeave(async (_to, _from, next) => {
   if (!isDirty.value) {
@@ -566,23 +793,13 @@ onBeforeRouteLeave(async (_to, _from, next) => {
       },
     );
 
+    removeDraftStorage();
     window.removeEventListener('beforeunload', beforeUnloadHandler);
     next();
   } catch {
     next(false);
   }
 });
-
-function hasMeaningfulContent() {
-  return Boolean(
-    form.title.trim() ||
-      form.slug.trim() ||
-      form.metaDescription.trim() ||
-      form.coverImage?.trim() ||
-      form.tags?.length ||
-      form.sections.some((section) => !isSectionEmpty(section)),
-  );
-}
 
 function assignPreset(preset: PagePresetOption) {
   form.sections = preset.buildSections();
@@ -714,6 +931,8 @@ async function onCancel() {
     } catch {
       return;
     }
+
+    removeDraftStorage();
   }
 
   router.go(-1);
@@ -763,6 +982,7 @@ function onSave() {
     saving.value = false;
     isDirty.value = false;
     originalSnapshot = JSON.stringify(form);
+    removeDraftStorage();
     ElMessage({ type: 'success', message: '頁面已新增' });
     window.removeEventListener('beforeunload', beforeUnloadHandler);
     $commonLib?.GuideToPage('PageManagement_DataList');
@@ -773,6 +993,7 @@ function onSave() {
   saving.value = false;
   isDirty.value = false;
   originalSnapshot = JSON.stringify(form);
+  removeDraftStorage();
   ElMessage({ type: 'success', message: '頁面已更新' });
   window.removeEventListener('beforeunload', beforeUnloadHandler);
   router.back();
@@ -792,8 +1013,9 @@ function onSave() {
 }
 
 .preview-pane-wrap {
-  width: 720px;
-  flex-shrink: 0;
+  flex: 1 1 360px;
+  max-width: 720px;
+  min-width: 360px;
 }
 
 .preview-sticky {
@@ -806,13 +1028,16 @@ function onSave() {
   height: 100%;
 }
 
-@media (max-width: 1380px) {
+@media (max-width: 1440px) {
   .layout.preview-open {
     flex-direction: column;
   }
 
   .preview-pane-wrap {
+    flex: 1 1 auto;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .preview-sticky {
@@ -828,6 +1053,38 @@ function onSave() {
   gap: 16px;
   align-items: flex-start;
   margin-bottom: 18px;
+}
+
+.draft-status {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fafbfc;
+  border: 1px solid rgba(15, 76, 92, 0.08);
+
+  strong {
+    color: #303133;
+    font-size: 13px;
+  }
+
+  span {
+    color: #606266;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  &.is-saving {
+    border-color: rgba(234, 85, 4, 0.2);
+    background: #fff7f0;
+  }
+
+  &.is-saved,
+  &.is-restored {
+    border-color: rgba(103, 194, 58, 0.22);
+    background: #f5fbf0;
+  }
 }
 
 .flow-badge {
@@ -887,6 +1144,14 @@ function onSave() {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 20px;
+}
+
+.preset-grid > *,
+.basic-grid > *,
+.item-group-list > * {
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .preset-card {
@@ -971,6 +1236,10 @@ function onSave() {
   margin-top: 6px;
   font-size: 12px;
   color: #909399;
+
+  &.is-success {
+    color: #67c23a;
+  }
 }
 
 .url-preview,
@@ -1216,7 +1485,7 @@ function onSave() {
   object-fit: contain;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1024px) {
   .quick-start-head {
     flex-direction: column;
   }
@@ -1233,6 +1502,12 @@ function onSave() {
 
   .toggle-hint {
     display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .layout {
+    gap: 12px;
   }
 }
 </style>

@@ -1,6 +1,10 @@
 <template>
   <!-- 側邊欄容器，使用 Element Plus 的 el-aside 元件，套用線性漸層背景樣式 -->
-  <el-aside class="section-aside">
+  <el-aside
+    class="section-aside"
+    :class="{ 'is-collapsed': collapsed }"
+    :width="asideWidth"
+  >
     <!-- 使用滾動條包裝，避免選單項目過多時超出視窗 -->
     <el-scrollbar>
       <!-- Logo 區塊，顯示系統品牌標題 -->
@@ -47,6 +51,8 @@
 .section-aside {
   @include linearBgColor;
   height: 100vh;
+  transition: width 0.25s ease;
+  overflow: hidden;
 }
 
 .part-home-logo {
@@ -78,7 +84,7 @@
  * Props：
  * - route：當前路由物件，用於同步選單高亮狀態
  */
-import { ref, reactive, watch } from "vue";
+import { ref, reactive, watch, computed } from "vue";
 import {
   ElScrollbar,
   ElAside,
@@ -92,9 +98,12 @@ import type { AsideMenu } from "@/interface/AppAside";
 import data_AsideMenu from "@/data/AsideMenu.json";
 import { useUserStore } from "@/stores/user";
 
-// 接收父層傳入的路由資訊
-const props = defineProps(["route"]);
+// 接收父層傳入的路由資訊 + sidebar 收合狀態
+const props = defineProps(["route", "collapsed"]);
 const userStore = useUserStore();
+
+// 收合 = 寬度 0；展開 = 300px（el-aside 預設）
+const asideWidth = computed(() => (props.collapsed ? "0px" : "300px"));
 
 // 深複製原始選單設定，避免直接修改原始資料
 let _asideMenu = JSON.parse(JSON.stringify(data_AsideMenu))
