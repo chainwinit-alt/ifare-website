@@ -22,7 +22,7 @@
 **後台（iFare_Backend）**
 
 - `src/views/PageManagement/PageManagement_DataListView.vue`
-  - 每列操作新增「複製 JSON」按鈕（v2 仍保留作離線備援）
+  - 每列操作原本的「複製 JSON」按鈕在 Day2-fix 之後拿掉，改成「發布 / 下架」直接切 status（呼叫 update() 觸發 writeAll → 自動 sync）
 
 **前端（iFare_Frontend）**
 
@@ -101,7 +101,7 @@
 
 - 後台仍可儲存（localStorage 依然寫入）
 - 後台 devtools console 看到 `[frontend-sync] 同步到前端失敗`，不影響儲存體驗
-- 啟動前端後若要把現有資料補進去：用「複製 JSON」按鈕 → 後台再儲存一次（重新觸發 sync）
+- 啟動前端後若要把現有資料補進去：對任一筆 page 點「發布」或「下架」（或進編輯頁存一次），會觸發 writeAll 重新整批 sync
 
 ---
 

@@ -75,11 +75,24 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="260" align="center" fixed="right">
+          <el-table-column label="操作" width="240" align="center" fixed="right">
             <template #default="{ row }">
               <el-button size="small" type="primary" link @click="goEdit(row.id)">編輯</el-button>
               <el-button size="small" type="success" link @click="duplicateFromRow(row)">複製新增</el-button>
-              <el-button size="small" link :icon="CopyDocument" @click="copyPageJson(row)" title="複製此頁 JSON（PoC：可貼到前端 localStorage 顯示）">複製 JSON</el-button>
+              <el-button
+                v-if="row.status !== 'published'"
+                size="small"
+                type="success"
+                link
+                @click="togglePublish(row, true)"
+              >發布</el-button>
+              <el-button
+                v-else
+                size="small"
+                type="warning"
+                link
+                @click="togglePublish(row, false)"
+              >下架</el-button>
               <el-button size="small" type="danger" link @click="onDelete(row)">刪除</el-button>
             </template>
           </el-table-column>
@@ -162,7 +175,7 @@ import {
   ElTableColumn,
   ElTag,
 } from 'element-plus';
-import { CopyDocument, Download, Plus, Upload } from '@element-plus/icons-vue';
+import { Download, Plus, Upload } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import MainHeader from '@/components/MainHeader.vue';
 import { PAGE_STATUS_LABELS, slugify, useDynamicPages, type PageStatus } from '@/composables/useDynamicPages';
@@ -211,7 +224,7 @@ const pagePresets: QuickPreset[] = [
 
 const router = useRouter();
 
-const { drafts, exportJson, importJson, pages, published, reload, remove, total } = useDynamicPages();
+const { drafts, exportJson, importJson, pages, published, reload, remove, total, update } = useDynamicPages();
 const { success, error: showError } = useFeedback();
 const fileInput = ref<HTMLInputElement | null>(null);
 const quickCreateOpen = ref(false);
@@ -299,13 +312,12 @@ async function onDelete(row: any) {
   }
 }
 
-async function copyPageJson(row: any) {
-  try {
-    const json = JSON.stringify(row, null, 2);
-    await navigator.clipboard.writeText(json);
-    success(`已複製「${row.title || row.slug}」JSON 到剪貼簿`);
-  } catch (err) {
-    showError('複製失敗，請手動使用「匯出 JSON」', err);
+function togglePublish(row: any, publish: boolean) {
+  const ok = update(row.id, { status: publish ? 'published' : 'draft' });
+  if (ok) {
+    success(publish ? `已發布「${row.title || row.slug}」` : `已下架「${row.title || row.slug}」`);
+  } else {
+    showError('更新失敗');
   }
 }
 
