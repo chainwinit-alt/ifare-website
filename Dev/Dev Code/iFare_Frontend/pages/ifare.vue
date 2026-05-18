@@ -34,6 +34,24 @@
             <span>找尋適合您的社會福利</span>
           </h3>
         </div>
+        <div class="life-event-guide" aria-labelledby="life-event-title">
+          <div class="life-event-guide__top">
+            <h2 id="life-event-title">從人生事件開始找福利</h2>
+            <p>不用先懂政策分類，先選目前遇到的情境。</p>
+          </div>
+          <div class="life-event-list">
+            <button
+              v-for="event in welfareLifeEvents"
+              :key="event.key"
+              class="life-event-card transition-general"
+              type="button"
+              @click="SearchByLifeEvent(event)"
+            >
+              <span class="life-event-card__name">{{ event.name }}</span>
+              <span class="life-event-card__desc">{{ event.description }}</span>
+            </button>
+          </div>
+        </div>
         <div class="card-ifare-filter" role="search" aria-labelledby="ifare-search-title">
           <span id="ifare-search-title" class="sr-only">i-Fare 福利搜尋表單</span>
           <div class="item item-policy">
@@ -249,6 +267,8 @@ definePageMeta({
 const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
 const { getApiResultArray } = useApiResult();
 const { getApiErrorMessage } = useApiErrorMessage();
+const { welfareLifeEvents } = useWelfareLifeEvents();
+const { loadWelfareProfile, saveWelfareProfile } = useWelfareProfile();
 const $router = useRouter();
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue"
@@ -283,6 +303,7 @@ const searchQuery = ref("");
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient = ref("");
 const isVisibleRecipient = ref(false)
+const selectedLifeEvent = ref("");
 const canSearch = computed(() => {
   return Boolean(
     codeSelect_policy.value ||
@@ -379,6 +400,14 @@ function Search() {
   if (codeSelectRecipient.value) query.recipient = codeSelectRecipient.value;
   if (codeSelect_area.value) query.area = codeSelect_area.value;
   if (searchQuery.value.trim()) query.query = searchQuery.value.trim();
+  if (selectedLifeEvent.value) query.event = selectedLifeEvent.value;
+  saveWelfareProfile({
+    policy: codeSelect_policy.value,
+    recipient: codeSelectRecipient.value,
+    area: codeSelect_area.value,
+    query: searchQuery.value.trim(),
+    lifeEvent: selectedLifeEvent.value,
+  });
   $router.push({ path: "/ifare/result", query: query });
   // Init value.
   codeSelect_policy.value = ""
@@ -388,10 +417,27 @@ function Search() {
   });
   codeSelect_area.value = ""
   searchQuery.value = ""
+  selectedLifeEvent.value = ""
 }
 
 function ClearSearchQuery() {
   searchQuery.value = "";
+}
+
+function SearchByLifeEvent(event: any) {
+  selectedLifeEvent.value = event.key;
+  searchQuery.value = event.query;
+  saveWelfareProfile({
+    query: event.query,
+    lifeEvent: event.key,
+  });
+  $router.push({
+    path: "/ifare/result",
+    query: {
+      query: event.query,
+      event: event.key,
+    },
+  });
 }
 
 // Office Unit
@@ -640,4 +686,97 @@ const currentPage_QA = ref(1);
 
 loadOfficeList();
 loadQAList();
+
+onMounted(() => {
+  const profile = loadWelfareProfile();
+  if (!profile) return;
+
+  if (!codeSelect_policy.value && profile.policy) {
+    codeSelect_policy.value = profile.policy;
+    isVisibleRecipient.value = true;
+  }
+  if (!codeSelect_area.value && profile.area) codeSelect_area.value = profile.area;
+  if (!codeSelectRecipient.value && profile.recipient) codeSelectRecipient.value = profile.recipient;
+  if (!searchQuery.value && profile.query) searchQuery.value = profile.query;
+  if (!selectedLifeEvent.value && profile.lifeEvent) selectedLifeEvent.value = profile.lifeEvent;
+});
 </script>
+
+<style scoped>
+.life-event-guide {
+  width: min(100%, 980px);
+  margin: 0 auto 24px;
+}
+
+.life-event-guide__top {
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.life-event-guide__top h2 {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  line-height: 1.35;
+}
+
+.life-event-guide__top p {
+  margin: 0;
+  color: #52616b;
+  line-height: 1.6;
+}
+
+.life-event-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.life-event-card {
+  display: flex;
+  min-height: 94px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid rgba(44, 80, 97, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 10px 24px rgba(27, 55, 70, 0.08);
+  color: #1f3640;
+  text-align: left;
+  cursor: pointer;
+}
+
+.life-event-card:hover,
+.life-event-card:focus-visible {
+  border-color: #f08a24;
+  transform: translateY(-2px);
+}
+
+.life-event-card__name {
+  font-weight: 700;
+  font-size: 1.08rem;
+}
+
+.life-event-card__desc {
+  color: #52616b;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 768px) {
+  .life-event-guide {
+    padding: 0 16px;
+  }
+
+  .life-event-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .life-event-list {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

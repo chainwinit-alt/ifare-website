@@ -241,6 +241,32 @@
     <div
       class="section-main-card card-fullsize card-ifare-policy card-input-format"
     >
+      <div class="card-info policy-health">
+        <div class="policy-health__head">
+          <div>
+            <h3>前台功能支援檢核</h3>
+            <p>檢查這筆政策是否足夠支援申請助手、文件清單、期限提醒與比較功能。</p>
+          </div>
+          <span class="policy-health__status" :class="{ 'is-pass': policyHealthMissingCount === 0 }">
+            {{ policyHealthLabel }}
+          </span>
+        </div>
+        <ul class="policy-health__list">
+          <li
+            v-for="item in policyHealthItems"
+            :key="item.title"
+            :class="{ 'is-pass': item.pass }"
+          >
+            <span>{{ item.pass ? '已具備' : '待補' }}</span>
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.description }}</p>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div
+      class="section-main-card card-fullsize card-ifare-policy card-input-format"
+    >
       <div class="card-info">
         <div class="item-group textarea">
           <label class="input-title">備註</label>
@@ -258,7 +284,7 @@
   </el-scrollbar>
 </template>
 <script setup lang="ts">
-import { ref, reactive, getCurrentInstance } from "vue";
+import { ref, reactive, getCurrentInstance, computed } from "vue";
 import {
   ElInput,
   ElButton,
@@ -321,6 +347,65 @@ const codeIncomeIDs = ref()
 const codeIdentityIDs = ref()
 const codeKeywordIDs = ref()
 const fareOfficeUnitID = ref()
+
+function normalizeText(value: any) {
+  return String(value ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hasSelectedItems(value: any) {
+  return Array.isArray(value) && value.length > 0;
+}
+
+const policyHealthItems = computed(() => {
+  const qualificationText = normalizeText(input_qualification.value);
+  const evidenceText = normalizeText(input_evidence.value);
+  const welfareText = normalizeText(editorValue.value);
+  const hasOffice = Boolean(
+    fareOfficeUnitID.value &&
+    (fareOfficeUnitID.value !== 1 || input_officeInfo.value || input_officeTel.value)
+  );
+
+  return [
+    {
+      title: "申請條件",
+      pass: qualificationText.length >= 20,
+      description: "申請路徑助手與常見錯誤引導會依賴這段條件說明。",
+    },
+    {
+      title: "應備文件",
+      pass: evidenceText.length >= 10,
+      description: "文件清單產生器會從應備證件資料整理可勾選清單。",
+    },
+    {
+      title: "福利內容",
+      pass: welfareText.length >= 20,
+      description: "比較頁需要足夠內容讓使用者看出方案差異。",
+    },
+    {
+      title: "承辦窗口",
+      pass: hasOffice,
+      description: "申請路徑助手需要洽辦單位、補充窗口或電話。",
+    },
+    {
+      title: "期限提醒",
+      pass: Boolean(datepicker_discontinued.value),
+      description: "下架日期可支援前台近期截止提醒。",
+    },
+    {
+      title: "推薦與比較分類",
+      pass: Boolean(codePolicyID.value && codeDomicileID.value && hasSelectedItems(codeKeywordIDs.value)),
+      description: "政策類別、地區與關鍵字會影響相關政策推薦與比較辨識。",
+    },
+  ];
+});
+const policyHealthMissingCount = computed(() => policyHealthItems.value.filter((item) => !item.pass).length);
+const policyHealthLabel = computed(() =>
+  policyHealthMissingCount.value === 0 ? "前台支援完整" : `尚有 ${policyHealthMissingCount.value} 項待補`
+);
 
 function GetCodePoliceList(callback:any){
   $WebAPI.GetCodePolicy(
@@ -791,3 +876,113 @@ function SaveAction() {
   }
 }
 </script>
+<style scoped>
+.policy-health {
+  display: grid;
+  gap: 18px;
+}
+
+.policy-health__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.policy-health__head h3 {
+  margin: 0 0 6px;
+  color: #171818;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.policy-health__head p {
+  margin: 0;
+  color: rgba(23, 24, 24, 0.62);
+  line-height: 1.7;
+}
+
+.policy-health__status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #fff5df;
+  color: #8a5700;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.policy-health__status.is-pass {
+  background: #eef6f4;
+  color: #235447;
+}
+
+.policy-health__list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.policy-health__list li {
+  display: grid;
+  gap: 6px;
+  min-height: 126px;
+  padding: 14px;
+  border: 1px solid rgba(234, 85, 4, 0.18);
+  border-radius: 8px;
+  background: #fff9f3;
+}
+
+.policy-health__list li.is-pass {
+  border-color: rgba(35, 84, 71, 0.18);
+  background: #f4faf8;
+}
+
+.policy-health__list span {
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: #8a5700;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.policy-health__list li.is-pass span {
+  color: #235447;
+}
+
+.policy-health__list strong {
+  color: #171818;
+  font-size: 15px;
+}
+
+.policy-health__list p {
+  margin: 0;
+  color: rgba(23, 24, 24, 0.62);
+  line-height: 1.65;
+}
+
+@media (max-width: 1180px) {
+  .policy-health__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .policy-health__head {
+    flex-direction: column;
+  }
+
+  .policy-health__list {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
