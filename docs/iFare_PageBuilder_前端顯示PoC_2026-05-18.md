@@ -40,6 +40,10 @@
 - `src/composables/useDynamicPages.ts`（line 180-186 改動）
   - `writeAll()` 在 localStorage.setItem 後加 `syncPagesToFrontend(pages)` — 不 await
   - 所有 mutation（insert/update/remove/importJson）共用此函式，**改一處全 cover**
+- `src/composables/useDynamicPages.ts:271 createDefaultPage()`（Day2-fix）
+  - 預設 `status: 'draft'` → `'published'`
+  - 符合「按下新增就到前端」直覺體驗
+  - 想當草稿仍可主動切「草稿」儲存（toast 會 warning 提示不會在前端顯示）
 - `src/composables/useFeedback.ts`
   - 新增 `successWithLink(options)` — 用 ElNotification + h() 渲染可點擊連結
 - `src/views/PageManagement/PageManagement_AddEditView.vue`
@@ -83,8 +87,9 @@
 1. **啟動後台**：`Dev/Dev Code/iFare_Backend` → `npm run dev`（預設 `http://localhost:5173`）
 2. **啟動前端**：`Dev/Dev Code/iFare_Frontend` → `npm run dev`（預設 `http://localhost:3000`）
 3. **後台新增**：開後台 → 「頁面管理」→ 「快速新增頁面」→ 選範本 → 進編輯
-   - 必填欄位填妥，**狀態切「已發布」**，存檔
+   - 必填欄位填妥，**狀態預設「已發布」直接存檔**（PoC v2 Day2-fix 起改的預設）
    - 儲存成功 toast 顯示「頁面已新增 · 已同步到前端 · 前往前端預覽」
+   - 若把狀態主動切「草稿」儲存 → toast 顯示 warning「前端不會顯示」
 4. **前往前端**：點 toast 的「前往前端預覽」連結（或自己訪問 `http://localhost:3000/<slug>`）
    - 直接看到 PageBuilder 編出來的內容（**不需要再手動貼 localStorage**）
 5. **驗證邊界**：
@@ -112,6 +117,7 @@
 | slug 衝突 | ❌ | ❌ | 後台沒擋 slug 跟靜態路由（about / news 等）撞 |
 | 多人協作 | ❌ | ❌ | PUT 是整批覆蓋，後台多開分頁同時編輯會互蓋 |
 | prod 後端 | ❌ | ❌ | Nuxt server JSON 檔只是 dev 中介層，prod 要換 .NET API |
+| 預設 status | draft | published | PoC v2 Day2-fix：新增頁面預設「已發布」配合 Emma「按下新增就到前端」期望。工程化時應改回 draft + 加審核流程 |
 
 ---
 

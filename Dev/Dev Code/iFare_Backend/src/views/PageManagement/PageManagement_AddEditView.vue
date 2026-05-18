@@ -979,12 +979,16 @@ function onSave() {
     isDirty.value = false;
     originalSnapshot = JSON.stringify(form);
     removeDraftStorage();
-    successWithLink({
-      title: '頁面已新增',
-      message: '已同步到前端',
-      linkLabel: '前往前端預覽',
-      linkHref: `${FRONTEND_PREVIEW_BASE}/${form.slug}`,
-    });
+    if (form.status === 'published') {
+      successWithLink({
+        title: '頁面已新增',
+        message: '已同步到前端',
+        linkLabel: '前往前端預覽',
+        linkHref: `${FRONTEND_PREVIEW_BASE}/${form.slug}`,
+      });
+    } else {
+      warning('頁面已暫存為草稿，前端不會顯示。要上線請切「已發布」再儲存。', 6000);
+    }
     window.removeEventListener('beforeunload', beforeUnloadHandler);
     $commonLib?.GuideToPage('PageManagement_DataList');
     return;
@@ -995,12 +999,16 @@ function onSave() {
   isDirty.value = false;
   originalSnapshot = JSON.stringify(form);
   removeDraftStorage();
-  successWithLink({
-    title: '頁面已更新',
-    message: '已同步到前端',
-    linkLabel: '前往前端預覽',
-    linkHref: `${FRONTEND_PREVIEW_BASE}/${form.slug}`,
-  });
+  if (form.status === 'published') {
+    successWithLink({
+      title: '頁面已更新',
+      message: '已同步到前端',
+      linkLabel: '前往前端預覽',
+      linkHref: `${FRONTEND_PREVIEW_BASE}/${form.slug}`,
+    });
+  } else {
+    warning('頁面已暫存為草稿，前端不會顯示。要上線請切「已發布」再儲存。', 6000);
+  }
   window.removeEventListener('beforeunload', beforeUnloadHandler);
   router.back();
 }

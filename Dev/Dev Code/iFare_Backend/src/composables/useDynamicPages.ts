@@ -268,7 +268,9 @@ export function createDefaultPage(): Omit<DynamicPage, 'id' | 'createDate' | 'up
     tags: [],
     author: '',
     sections: [],
-    status: 'draft',
+    // PoC v2 Day2-fix：預設「已發布」，符合「按下新增就到前端」體驗
+    // 想當草稿仍可主動切回；工程化時應改回 draft 並補審核流程
+    status: 'published',
   };
 }
 
