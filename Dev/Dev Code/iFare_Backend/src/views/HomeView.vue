@@ -119,7 +119,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { ElButton, ElInput, ElMessage, ElScrollbar } from "element-plus";
+import { ElButton, ElInput, ElScrollbar } from "element-plus";
+import { useFeedback } from "@/composables/useFeedback";
 import { Search } from "@element-plus/icons-vue";
 import { useRouter } from "vue-router";
 import MainHeader from "@/components/MainHeader.vue";
@@ -136,6 +137,7 @@ interface ShortcutItem {
 const RECENT_SHORTCUTS_KEY = "ifare-backend-recent-shortcuts";
 const router = useRouter();
 const userStore = useUserStore();
+const { error: showError } = useFeedback();
 const searchInputRef = ref<InstanceType<typeof ElInput> | null>(null);
 const searchQuery = ref("");
 const activeGroup = ref("全部");
@@ -278,10 +280,7 @@ const tokenCheckTask = window.setInterval(() => {
   if (new Date() > new Date(userStore.tokenExpiredTime)) {
     userStore.logout();
     router.push({ name: "Login" });
-    ElMessage({
-      message: "登入憑證已過期，請重新登入。",
-      type: "error",
-    });
+    showError("登入憑證已過期，請重新登入。");
     window.clearInterval(tokenCheckTask);
   }
 }, 1000 * 60 * 3);

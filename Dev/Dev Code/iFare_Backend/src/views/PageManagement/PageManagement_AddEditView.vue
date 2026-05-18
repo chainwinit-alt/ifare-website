@@ -256,13 +256,13 @@ import {
   ElButton,
   ElDatePicker,
   ElInput,
-  ElMessage,
   ElMessageBox,
   ElRadioButton,
   ElRadioGroup,
   ElScrollbar,
   ElTag,
 } from 'element-plus';
+import { useFeedback } from '@/composables/useFeedback';
 import { Check, Close, Refresh, View } from '@element-plus/icons-vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import MainHeader from '@/components/MainHeader.vue';
@@ -310,6 +310,7 @@ const route = useRoute();
 const router = useRouter();
 
 const { getById, insert, isSlugConflict, update } = useDynamicPages();
+const { success, error: showError, info, warning } = useFeedback();
 
 const routeNameType = route?.name?.toString().toLocaleLowerCase() || '';
 const isAdd = routeNameType.includes('add');
@@ -544,7 +545,7 @@ if (!isAdd && recordId.value) {
     Object.assign(form, JSON.parse(JSON.stringify(existing)));
     if (!Array.isArray(form.sections)) form.sections = [];
   } else {
-    ElMessage({ type: 'error', message: '找不到要編輯的頁面' });
+    showError('找不到要編輯的頁面');
     router.replace({ name: 'PageManagement_DataList' });
   }
 }
@@ -756,10 +757,7 @@ async function restoreDraftIfNeeded() {
   draftSavedAt.value = snapshot.savedAt || '';
   draftState.value = 'restored';
 
-  ElMessage({
-    type: 'success',
-    message: '已還原暫存草稿',
-  });
+  success('已還原暫存草稿');
 }
 
 onMounted(async () => {
@@ -831,15 +829,12 @@ async function applyPreset(preset: PagePresetOption) {
 
   assignPreset(preset);
 
-  ElMessage({
-    type: 'success',
-    message: `已套用 ${preset.label}`,
-  });
+  success(`已套用 ${preset.label}`);
 }
 
 function regenerateSlug() {
   form.slug = slugify(form.title);
-  ElMessage({ type: 'info', message: `已更新 slug：${form.slug}` });
+  info(`已更新 slug：${form.slug}`);
 }
 
 function onTitleBlur() {
@@ -950,13 +945,12 @@ function onSave() {
     });
 
     const firstError = validationErrors[0];
-    ElMessage({
-      type: 'warning',
-      message: validationErrors.length === 1
+    warning(
+      validationErrors.length === 1
         ? firstError.message
         : `${firstError.message}，另外還有 ${validationErrors.length - 1} 個欄位需要處理`,
-      duration: 4000,
-    });
+      4000,
+    );
     return;
   }
 
@@ -983,7 +977,7 @@ function onSave() {
     isDirty.value = false;
     originalSnapshot = JSON.stringify(form);
     removeDraftStorage();
-    ElMessage({ type: 'success', message: '頁面已新增' });
+    success('頁面已新增');
     window.removeEventListener('beforeunload', beforeUnloadHandler);
     $commonLib?.GuideToPage('PageManagement_DataList');
     return;
@@ -994,7 +988,7 @@ function onSave() {
   isDirty.value = false;
   originalSnapshot = JSON.stringify(form);
   removeDraftStorage();
-  ElMessage({ type: 'success', message: '頁面已更新' });
+  success('頁面已更新');
   window.removeEventListener('beforeunload', beforeUnloadHandler);
   router.back();
 }

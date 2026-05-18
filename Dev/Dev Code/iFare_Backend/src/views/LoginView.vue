@@ -130,7 +130,8 @@ $padding-section-login: 40px;
  *  5. 導向首頁 (Home)
  */
 import { reactive, ref, getCurrentInstance } from 'vue'
-import { type FormInstance, type FormRules, ElMessage } from 'element-plus';
+import { type FormInstance, type FormRules } from 'element-plus';
+import { useFeedback } from '@/composables/useFeedback';
 import type { RuleForm } from '@/interface/Login';
 import logo from "../components/icons/IconLogo.vue";
 import logoTitle from "../components/icons/IconLogoTitle.vue";
@@ -142,6 +143,7 @@ const $commonLib = app?.appContext.config.globalProperties.$CommonLib
 const $WebAPI = app?.appContext.config.globalProperties.$WebAPI
 const $Message = app?.appContext.config.globalProperties.$message;
 const userStore = useUserStore()
+const { error: showError } = useFeedback();
 
 const act = ref("")
 const pwd = ref("")
@@ -196,20 +198,14 @@ const sendActPwd = (formEl: FormInstance | undefined) => {
         errMsg = `[Error_401]: 帳密有誤`
       }
 
-      ElMessage({
-        message: errMsg,
-        type: 'error'
-      })
+      showError(errMsg)
       return false
     }
 
     // 處理網路層或其他 Error 物件
     if (res.name && res.name.toLowerCase().indexOf('error') >= 0) {
       isLoading.value = false
-      ElMessage({
-        message: `[Error_${res.code}]: ${res.message}`,
-        type: 'error'
-      })
+      showError(`[Error_${res.code}]: ${res.message}`)
       return false
     }
 

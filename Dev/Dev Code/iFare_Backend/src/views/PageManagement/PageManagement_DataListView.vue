@@ -75,10 +75,11 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="180" align="center" fixed="right">
+          <el-table-column label="操作" width="260" align="center" fixed="right">
             <template #default="{ row }">
               <el-button size="small" type="primary" link @click="goEdit(row.id)">編輯</el-button>
               <el-button size="small" type="success" link @click="duplicateFromRow(row)">複製新增</el-button>
+              <el-button size="small" link :icon="CopyDocument" @click="copyPageJson(row)" title="複製此頁 JSON（PoC：可貼到前端 localStorage 顯示）">複製 JSON</el-button>
               <el-button size="small" type="danger" link @click="onDelete(row)">刪除</el-button>
             </template>
           </el-table-column>
@@ -155,17 +156,17 @@ import {
   ElButton,
   ElDialog,
   ElInput,
-  ElMessage,
   ElMessageBox,
   ElScrollbar,
   ElTable,
   ElTableColumn,
   ElTag,
 } from 'element-plus';
-import { Download, Plus, Upload } from '@element-plus/icons-vue';
+import { CopyDocument, Download, Plus, Upload } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import MainHeader from '@/components/MainHeader.vue';
 import { PAGE_STATUS_LABELS, slugify, useDynamicPages, type PageStatus } from '@/composables/useDynamicPages';
+import { useFeedback } from '@/composables/useFeedback';
 
 type PagePresetKey = 'blank' | 'story' | 'service' | 'campaign';
 
@@ -211,6 +212,7 @@ const pagePresets: QuickPreset[] = [
 const router = useRouter();
 
 const { drafts, exportJson, importJson, pages, published, reload, remove, total } = useDynamicPages();
+const { success, error: showError } = useFeedback();
 const fileInput = ref<HTMLInputElement | null>(null);
 const quickCreateOpen = ref(false);
 const quickCreateForm = reactive({
@@ -291,9 +293,19 @@ async function onDelete(row: any) {
       },
     );
     remove(row.id);
-    ElMessage({ type: 'success', message: '頁面已刪除' });
+    success('頁面已刪除');
   } catch {
     /* user cancelled */
+  }
+}
+
+async function copyPageJson(row: any) {
+  try {
+    const json = JSON.stringify(row, null, 2);
+    await navigator.clipboard.writeText(json);
+    success(`已複製「${row.title || row.slug}」JSON 到剪貼簿`);
+  } catch (err) {
+    showError('複製失敗，請手動使用「匯出 JSON」', err);
   }
 }
 
@@ -306,7 +318,7 @@ function onExport() {
   anchor.download = `dynamic-pages-${new Date().toISOString().slice(0, 10)}.json`;
   anchor.click();
   URL.revokeObjectURL(url);
-  ElMessage({ type: 'success', message: '已匯出 JSON' });
+  success('已匯出 JSON');
 }
 
 function onImport(event: Event) {
@@ -318,10 +330,10 @@ function onImport(event: Event) {
     const result = importJson(String(reader.result));
 
     if (result.ok) {
-      ElMessage({ type: 'success', message: `已匯入 ${result.count} 筆頁面` });
+      success(`已匯入 ${result.count} 筆頁面`);
       reload();
     } else {
-      ElMessage({ type: 'error', message: `匯入失敗：${result.error}` });
+      showError(`匯入失敗：${result.error}`);
     }
 
     if (fileInput.value) fileInput.value.value = '';
