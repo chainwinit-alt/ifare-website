@@ -222,6 +222,7 @@
                       value-format="YYYY-MM-DDTHH:mm:00"
                       size="large"
                       clearable
+                      :disabled-date="disablePastUnpublishDate"
                     />
                     <div class="quick-action-row">
                       <button type="button" class="quick-action-chip" @click="clearUnpublishTime">不設定下架</button>
@@ -315,7 +316,7 @@ const FRONTEND_PREVIEW_BASE =
   (import.meta.env.VITE_FRONTEND_BASE as string | undefined) || 'http://localhost:3000';
 
 const routeNameType = route?.name?.toString().toLocaleLowerCase() || '';
-const isAdd = routeNameType.includes('add');
+const isAdd = ref(routeNameType.includes('add'));
 const recordId = computed(() => (route.query.id ? String(route.query.id) : ''));
 
 const form = reactive<DynamicPage>({
@@ -330,7 +331,7 @@ const isDirty = ref(false);
 const saving = ref(false);
 const isPreviewOpen = ref(true);
 const advancedOpen = ref(false);
-const selectedPresetKey = ref<PagePresetKey | null>(isAdd ? 'blank' : null);
+const selectedPresetKey = ref<PagePresetKey | null>(isAdd.value ? 'blank' : null);
 // 優化 A — 必填欄位 inline 錯誤訊息（field name → error message）
 const errors = ref<Record<string, string>>({});
 const suggestedTags = ['基金會介紹', '活動公告', '志工招募', '補助資訊', '常見問題', '專案成果'];
@@ -338,7 +339,7 @@ const slugStatus = ref<'idle' | 'checking' | 'available'>('idle');
 const draftState = ref<DraftState>('idle');
 const draftSavedAt = ref('');
 
-const draftStorageKey = computed(() => `${DRAFT_STORAGE_PREFIX}:${isAdd ? 'new' : recordId.value || 'new'}`);
+const draftStorageKey = computed(() => `${DRAFT_STORAGE_PREFIX}:${isAdd.value ? 'new' : recordId.value || 'new'}`);
 const slugHintText = computed(() => {
   if (!form.slug.trim()) return '通常不用手動重打，可先輸入頁面名稱再按右側按鈕自動產生。';
   if (slugStatus.value === 'checking') return '正在檢查這個網址是否已被其他頁面使用。';
@@ -540,7 +541,7 @@ const presetMap = new Map<PagePresetKey, PagePresetOption>(
   pagePresets.map((preset) => [preset.key, preset]),
 );
 
-if (!isAdd && recordId.value) {
+if (!isAdd.value && recordId.value) {
   const existing = getById(recordId.value);
 
   if (existing) {
@@ -552,7 +553,7 @@ if (!isAdd && recordId.value) {
   }
 }
 
-if (isAdd) {
+if (isAdd.value) {
   const presetKey = String(route.query.preset || '') as PagePresetKey;
   const preset = presetMap.get(presetKey);
   const queryTitle = String(route.query.title || '').trim();
@@ -690,7 +691,7 @@ function getSlugValidationMessage(value: string) {
   if (!SLUG_PATTERN.test(slug)) {
     return 'URL Slug 只能使用英文、數字、斜線（/）、底線（_）與連字號（-）。';
   }
-  if (isSlugConflict(slug, isAdd ? undefined : form.id)) {
+  if (isSlugConflict(slug, isAdd.value ? undefined : form.id)) {
     return `URL Slug 已被使用：${slug}`;
   }
   return '';
@@ -803,8 +804,8 @@ onBeforeRouteLeave(async (_to, _from, next) => {
 
 function assignPreset(preset: PagePresetOption) {
   form.sections = preset.buildSections();
-  if (!form.title.trim() || isAdd) form.title = preset.suggestedTitle;
-  if (!form.slug.trim() || isAdd) form.slug = slugify(form.title || preset.suggestedSlug);
+  if (!form.title.trim() || isAdd.value) form.title = preset.suggestedTitle;
+  if (!form.slug.trim() || isAdd.value) form.slug = slugify(form.title || preset.suggestedSlug);
 
   selectedPresetKey.value = preset.key;
   isPreviewOpen.value = true;
@@ -840,7 +841,7 @@ function regenerateSlug() {
 }
 
 function onTitleBlur() {
-  if (isAdd && !form.slug.trim() && form.title.trim()) {
+  if (isAdd.value && !form.slug.trim() && form.title.trim()) {
     form.slug = slugify(form.title);
   }
 }
@@ -906,6 +907,14 @@ function clearUnpublishTime() {
   unpublishTimeModel.value = undefined;
 }
 
+function disablePastUnpublishDate(time: Date): boolean {
+  if (!publishTimeModel.value) return false;
+  const pub = new Date(publishTimeModel.value);
+  // 比較到「日」層級，同一天讓使用者自由選時間（time 部分由 validatePage 在送出時擋）
+  pub.setHours(0, 0, 0, 0);
+  return time.getTime() < pub.getTime();
+}
+
 function setUnpublishAfterDays(days: number) {
   const base = publishTimeModel.value ? new Date(publishTimeModel.value) : new Date();
   base.setDate(base.getDate() + days);
@@ -936,7 +945,7 @@ async function onCancel() {
 }
 
 function onSave() {
-  const validationErrors = validatePage(form, isSlugConflict, isAdd ? undefined : form.id);
+  const validationErrors = validatePage(form, isSlugConflict, isAdd.value ? undefined : form.id);
 
   // 優化 A — 先清空既有 inline errors，再依 validation 結果重填
   errors.value = {};
@@ -973,15 +982,19 @@ function onSave() {
     status: form.status,
   };
 
-  if (isAdd) {
-    insert(payload);
+  if (isAdd.value) {
+    const newPage = insert(payload);
+    form.id = newPage.id;
+    isAdd.value = false;
     saving.value = false;
     isDirty.value = false;
     originalSnapshot = JSON.stringify(form);
     removeDraftStorage();
+    // 留頁體驗：改 query 不切 route name，避免 unmount 重新初始化
+    router.replace({ query: { ...route.query, id: newPage.id } });
     if (form.status === 'published') {
       successWithLink({
-        title: '頁面已新增',
+        title: '頁面已新增，可繼續編輯',
         message: '已同步到前端',
         linkLabel: '前往前端預覽',
         linkHref: `${FRONTEND_PREVIEW_BASE}/${form.slug}`,
@@ -989,8 +1002,6 @@ function onSave() {
     } else {
       warning('頁面已暫存為草稿，前端不會顯示。要上線請切「已發布」再儲存。', 6000);
     }
-    window.removeEventListener('beforeunload', beforeUnloadHandler);
-    $commonLib?.GuideToPage('PageManagement_DataList');
     return;
   }
 
