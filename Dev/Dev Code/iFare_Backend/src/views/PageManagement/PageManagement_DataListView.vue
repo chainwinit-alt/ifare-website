@@ -75,7 +75,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="240" align="center" fixed="right">
+          <el-table-column label="操作" width="300" align="center" fixed="right">
             <template #default="{ row }">
               <el-button size="small" type="primary" link @click="goEdit(row.id)">編輯</el-button>
               <el-button size="small" type="success" link @click="duplicateFromRow(row)">複製新增</el-button>
@@ -94,6 +94,14 @@
                 @click="togglePublish(row, false)"
               >下架</el-button>
               <el-button size="small" type="danger" link @click="onDelete(row)">刪除</el-button>
+              <el-button
+                v-if="row.status === 'published'"
+                size="small"
+                type="info"
+                link
+                @click="openInFrontend(row)"
+                title="在新分頁開啟前端網址"
+              >看前端</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -226,6 +234,8 @@ const router = useRouter();
 
 const { drafts, exportJson, importJson, pages, published, reload, remove, total, update } = useDynamicPages();
 const { success, error: showError } = useFeedback();
+const FRONTEND_PREVIEW_BASE =
+  (import.meta.env.VITE_FRONTEND_BASE as string | undefined) || 'http://localhost:3000';
 const fileInput = ref<HTMLInputElement | null>(null);
 const quickCreateOpen = ref(false);
 const quickCreateForm = reactive({
@@ -319,6 +329,10 @@ function togglePublish(row: any, publish: boolean) {
   } else {
     showError('更新失敗');
   }
+}
+
+function openInFrontend(row: any) {
+  window.open(`${FRONTEND_PREVIEW_BASE}/${row.slug}`, '_blank', 'noopener,noreferrer');
 }
 
 function onExport() {
