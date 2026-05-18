@@ -13,7 +13,8 @@
  *   3. error() 同時印 console.error 保留 stack，避免錯誤被 ElMessage swallow。
  */
 
-import { ElLoading, ElMessage } from 'element-plus';
+import { h } from 'vue';
+import { ElLoading, ElMessage, ElNotification } from 'element-plus';
 
 interface RunAsyncOptions {
   /** 顯示 loading mask 的文案；不傳則不開 mask */
@@ -47,6 +48,36 @@ export function useFeedback() {
     ElMessage({ type: 'warning', message, ...(duration ? { duration } : {}) });
   }
 
+  /**
+   * 成功 + 可點擊連結（Day2 升級）
+   * 用 ElNotification 而非 ElMessage，因為 ElMessage 不支援多元素 message
+   */
+  function successWithLink(options: {
+    title: string;
+    message?: string;
+    linkLabel: string;
+    linkHref: string;
+  }) {
+    ElNotification({
+      type: 'success',
+      title: options.title,
+      message: h('span', [
+        options.message ? `${options.message} · ` : '',
+        h(
+          'a',
+          {
+            href: options.linkHref,
+            target: '_blank',
+            rel: 'noopener noreferrer',
+            style: 'color: #67c23a; text-decoration: underline; cursor: pointer;',
+          },
+          options.linkLabel,
+        ),
+      ]),
+      duration: 5000,
+    });
+  }
+
   async function runAsync<T>(
     fn: () => Promise<T> | T,
     options: RunAsyncOptions,
@@ -69,5 +100,5 @@ export function useFeedback() {
     }
   }
 
-  return { success, error, info, warning, runAsync };
+  return { success, error, info, warning, successWithLink, runAsync };
 }

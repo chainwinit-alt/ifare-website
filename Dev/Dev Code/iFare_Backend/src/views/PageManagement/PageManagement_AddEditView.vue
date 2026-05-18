@@ -310,7 +310,9 @@ const route = useRoute();
 const router = useRouter();
 
 const { getById, insert, isSlugConflict, update } = useDynamicPages();
-const { success, error: showError, info, warning } = useFeedback();
+const { success, error: showError, info, warning, successWithLink } = useFeedback();
+const FRONTEND_PREVIEW_BASE =
+  (import.meta.env.VITE_FRONTEND_BASE as string | undefined) || 'http://localhost:3000';
 
 const routeNameType = route?.name?.toString().toLocaleLowerCase() || '';
 const isAdd = routeNameType.includes('add');
@@ -977,7 +979,12 @@ function onSave() {
     isDirty.value = false;
     originalSnapshot = JSON.stringify(form);
     removeDraftStorage();
-    success('頁面已新增');
+    successWithLink({
+      title: '頁面已新增',
+      message: '已同步到前端',
+      linkLabel: '前往前端預覽',
+      linkHref: `${FRONTEND_PREVIEW_BASE}/${form.slug}`,
+    });
     window.removeEventListener('beforeunload', beforeUnloadHandler);
     $commonLib?.GuideToPage('PageManagement_DataList');
     return;
@@ -988,7 +995,12 @@ function onSave() {
   isDirty.value = false;
   originalSnapshot = JSON.stringify(form);
   removeDraftStorage();
-  success('頁面已更新');
+  successWithLink({
+    title: '頁面已更新',
+    message: '已同步到前端',
+    linkLabel: '前往前端預覽',
+    linkHref: `${FRONTEND_PREVIEW_BASE}/${form.slug}`,
+  });
   window.removeEventListener('beforeunload', beforeUnloadHandler);
   router.back();
 }

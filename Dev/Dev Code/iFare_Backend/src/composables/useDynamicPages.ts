@@ -13,6 +13,7 @@
  */
 
 import { ref, computed } from 'vue';
+import { syncPagesToFrontend } from '@/utils/frontendSync';
 
 // ============================================================
 // 類型定義
@@ -179,6 +180,9 @@ function migrateV1ToV2(v1Page: any): DynamicPage {
 
 function writeAll(pages: DynamicPage[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(pages));
+  // Day2 升級：fire-and-forget 把整批 pages 同步到前端 Nuxt server
+  // 失敗只 console.warn，不影響後台儲存體驗（前端未啟動 / 離線時仍可儲存）
+  syncPagesToFrontend(pages);
 }
 
 function uuid(): string {
