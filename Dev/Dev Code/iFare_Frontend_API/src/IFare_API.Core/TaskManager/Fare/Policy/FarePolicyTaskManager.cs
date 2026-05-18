@@ -127,6 +127,7 @@ namespace IFare_API.TaskManager.Fare.Policy
             {
                 var normalizedQuery = TraditionalChineseFuzzyMatcher.Normalize(param.Query);
                 var queryTokens = TraditionalChineseFuzzyMatcher.TokenizeForBm25(param.Query);
+                var queryHotBoost = GetSearchQueryHotBoost(normalizedQuery);
                 var searchCorpus = list
                     .Select(item =>
                     {
@@ -174,20 +175,30 @@ namespace IFare_API.TaskManager.Fare.Policy
                         return new
                         {
                             Item = item.Item,
+                            AutocompletePriority = GetAutocompleteMatchPriority(normalizedQuery, item.Item),
                             FuzzyScore = fuzzyScore,
                             Bm25Score = bm25Score
                         };
                     })
                     .ToList();
 
-                list = searchScores
+                var rankedResults = searchScores
                     .Select(result => new
                     {
                         result.Item,
-                        Score = GetHybridSearchScore(result.FuzzyScore, result.Bm25Score, maxBm25Score)
+                        result.AutocompletePriority,
+                        Score = GetHybridSearchScore(result.FuzzyScore, result.Bm25Score, maxBm25Score) +
+                            ComputeHotBoostScore(normalizedQuery, result.Item, result.FuzzyScore, queryHotBoost)
                     })
-                    .Where(result => result.Score > 0.08d)
+                    .Where(result => result.Score > 0.08d || result.AutocompletePriority > 0)
+                    .ToList();
+
+                var hasAutocompleteMatches = rankedResults.Any(result => result.AutocompletePriority > 0);
+
+                list = rankedResults
+                    .Where(result => !hasAutocompleteMatches || result.AutocompletePriority > 0)
                     .OrderByDescending(result => result.Score)
+                    .ThenByDescending(result => result.AutocompletePriority)
                     .ThenByDescending(result => result.Item.ReleaseTime)
                     .ThenByDescending(result => result.Item.CreateTime)
                     .Select(result => result.Item)
@@ -361,6 +372,110 @@ namespace IFare_API.TaskManager.Fare.Policy
                 : 0d;
 
             return (fuzzyScore * 0.68d) + (normalizedBm25Score * 0.32d);
+        }
+
+        private static int GetAutocompleteMatchPriority(string normalizedQuery, FarePolicyData item)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedQuery) || item == null)
+            {
+                return 0;
+            }
+
+            var fields = EnumerateAutocompleteFields(item).ToList();
+
+            if (fields.Any(field => string.Equals(field, normalizedQuery, StringComparison.Ordinal)))
+            {
+                return 3;
+            }
+
+            if (fields.Any(field => field.StartsWith(normalizedQuery, StringComparison.Ordinal)))
+            {
+                return 2;
+            }
+
+            if (fields.Any(field =>
+                    TraditionalChineseFuzzyMatcher.TokenizeTerms(field)
+                        .Any(token => token.StartsWith(normalizedQuery, StringComparison.Ordinal))))
+            {
+                return 1;
+            }
+
+            return 0;
+        }
+
+        private static double ComputeHotBoostScore(string normalizedQuery, FarePolicyData item, double fuzzyScore, double queryHotBoost)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedQuery) || queryHotBoost <= 0d || fuzzyScore < 0.18d || item == null)
+            {
+                return 0d;
+            }
+
+            double matchStrength = 0d;
+
+            if (TraditionalChineseFuzzyMatcher.Normalize(item.Title).Contains(normalizedQuery, StringComparison.Ordinal))
+            {
+                matchStrength = Math.Max(matchStrength, 1.00d);
+            }
+
+            if (TraditionalChineseFuzzyMatcher.Normalize(item.CodePolicy_LabelName).Contains(normalizedQuery, StringComparison.Ordinal))
+            {
+                matchStrength = Math.Max(matchStrength, 0.82d);
+            }
+
+            if (TraditionalChineseFuzzyMatcher.Normalize(item.Qualification).Contains(normalizedQuery, StringComparison.Ordinal))
+            {
+                matchStrength = Math.Max(matchStrength, 0.45d);
+            }
+
+            if (item.CodeKeywordList.Any(keyword =>
+                    TraditionalChineseFuzzyMatcher.Normalize(keyword?.CodeName).Contains(normalizedQuery, StringComparison.Ordinal)))
+            {
+                matchStrength = Math.Max(matchStrength, 0.90d);
+            }
+
+            if (item.CodeRecipientList.Any(recipient =>
+                    TraditionalChineseFuzzyMatcher.Normalize(recipient?.CodeName).Contains(normalizedQuery, StringComparison.Ordinal)))
+            {
+                matchStrength = Math.Max(matchStrength, 0.60d);
+            }
+
+            if (item.CodeIdentityList.Any(identity =>
+                    TraditionalChineseFuzzyMatcher.Normalize(identity?.CodeName).Contains(normalizedQuery, StringComparison.Ordinal)))
+            {
+                matchStrength = Math.Max(matchStrength, 0.56d);
+            }
+
+            if (item.CodeIncomeList.Any(income =>
+                    TraditionalChineseFuzzyMatcher.Normalize(income?.CodeName).Contains(normalizedQuery, StringComparison.Ordinal)))
+            {
+                matchStrength = Math.Max(matchStrength, 0.52d);
+            }
+
+            if (matchStrength <= 0d)
+            {
+                return 0d;
+            }
+
+            var fuzzyGate = Math.Min(1d, Math.Max(0d, fuzzyScore));
+            return queryHotBoost * matchStrength * fuzzyGate * 0.12d;
+        }
+
+        private static IEnumerable<string> EnumerateAutocompleteFields(FarePolicyData item)
+        {
+            var fields = new List<string>
+            {
+                TraditionalChineseFuzzyMatcher.Normalize(item?.Title),
+                TraditionalChineseFuzzyMatcher.Normalize(item?.CodePolicy_LabelName),
+                TraditionalChineseFuzzyMatcher.Normalize(item?.Qualification),
+                TraditionalChineseFuzzyMatcher.Normalize(item?.CodeDomicile_LabelName)
+            };
+
+            fields.AddRange(item?.CodeKeywordList.Select(keyword => TraditionalChineseFuzzyMatcher.Normalize(keyword?.CodeName)) ?? Enumerable.Empty<string>());
+            fields.AddRange(item?.CodeRecipientList.Select(recipient => TraditionalChineseFuzzyMatcher.Normalize(recipient?.CodeName)) ?? Enumerable.Empty<string>());
+            fields.AddRange(item?.CodeIdentityList.Select(identity => TraditionalChineseFuzzyMatcher.Normalize(identity?.CodeName)) ?? Enumerable.Empty<string>());
+            fields.AddRange(item?.CodeIncomeList.Select(income => TraditionalChineseFuzzyMatcher.Normalize(income?.CodeName)) ?? Enumerable.Empty<string>());
+
+            return fields.Where(field => !string.IsNullOrWhiteSpace(field));
         }
 
         private static string BuildSearchDocument(FarePolicyData item)
@@ -554,31 +669,123 @@ namespace IFare_API.TaskManager.Fare.Policy
 
                 using var command = connection.CreateCommand();
                 command.CommandText = @"
-WITH term_scores AS (
+WITH recent_scores AS (
     SELECT
         stat.term_id,
-        SUM(COALESCE(stat.trend_score, 0)) AS total_trend_score,
-        SUM(COALESCE(stat.search_count, 0)) AS total_search_count
+        SUM(CASE
+            WHEN stat.stat_date >= DATEADD(DAY, -7, CAST(GETDATE() AS DATE))
+            THEN COALESCE(stat.final_hot_score, 0)
+            ELSE 0
+        END) AS hot_score_7d,
+        SUM(CASE
+            WHEN stat.stat_date >= DATEADD(DAY, -30, CAST(GETDATE() AS DATE))
+            THEN COALESCE(stat.final_hot_score, 0)
+            ELSE 0
+        END) AS hot_score_30d,
+        SUM(CASE
+            WHEN stat.stat_date >= DATEADD(DAY, -7, CAST(GETDATE() AS DATE))
+            THEN COALESCE(stat.external_trend_score, 0)
+            ELSE 0
+        END) AS external_trend_score_7d,
+        SUM(CASE
+            WHEN stat.stat_date >= DATEADD(DAY, -30, CAST(GETDATE() AS DATE))
+            THEN COALESCE(stat.search_count, 0)
+            ELSE 0
+        END) AS total_search_count_30d
     FROM [dbo].[search_term_stat_daily] stat
-    WHERE stat.stat_date >= DATEADD(DAY, -7, CAST(GETDATE() AS DATE))
+    WHERE stat.stat_date >= DATEADD(DAY, -30, CAST(GETDATE() AS DATE))
     GROUP BY stat.term_id
+),
+ranked_keywords AS (
+    SELECT
+        COALESCE(NULLIF(term.display_term, N''), term.term) AS display_text,
+        term.term_type,
+        term.source_kind,
+        COALESCE(score.hot_score_7d, 0) AS hot_score_7d,
+        COALESCE(score.hot_score_30d, 0) AS hot_score_30d,
+        COALESCE(score.external_trend_score_7d, 0) AS external_trend_score_7d,
+        COALESCE(score.total_search_count_30d, 0) AS total_search_count_30d,
+        COALESCE(term.manual_boost, 0) AS manual_boost,
+        COALESCE(term.base_weight, 1) AS base_weight,
+        CASE
+            WHEN term.source_kind = N'google_trends_related_query' THEN 0.85
+            WHEN term.source_kind = N'policy_extract' THEN 0.95
+            WHEN term.source_kind IN (N'code_keyword', N'code_policy', N'code_recipient', N'code_identity', N'code_income') THEN 1.05
+            WHEN term.source_kind = N'ifare_policy' THEN 1.00
+            ELSE 1.00
+        END AS source_weight,
+        ROW_NUMBER() OVER (
+            PARTITION BY COALESCE(NULLIF(term.display_term, N''), term.term)
+            ORDER BY
+                (COALESCE(score.hot_score_7d, 0) *
+                    CASE
+                        WHEN term.source_kind = N'google_trends_related_query' THEN 0.85
+                        WHEN term.source_kind = N'policy_extract' THEN 0.95
+                        WHEN term.source_kind IN (N'code_keyword', N'code_policy', N'code_recipient', N'code_identity', N'code_income') THEN 1.05
+                        ELSE 1.00
+                    END
+                ) DESC,
+                COALESCE(score.hot_score_30d, 0) DESC,
+                (COALESCE(score.external_trend_score_7d, 0) *
+                    CASE
+                        WHEN term.source_kind = N'google_trends_related_query' THEN 0.75
+                        ELSE 1.00
+                    END
+                ) DESC,
+                COALESCE(score.total_search_count_30d, 0) DESC,
+                COALESCE(term.manual_boost, 0) DESC,
+                COALESCE(term.base_weight, 1) DESC,
+                CASE term.term_type
+                    WHEN N'keyword' THEN 1
+                    WHEN N'recipient' THEN 2
+                    WHEN N'identity' THEN 3
+                    WHEN N'income' THEN 4
+                    WHEN N'policy' THEN 5
+                    WHEN N'manual' THEN 6
+                    WHEN N'trend' THEN 7
+                    WHEN N'policy_title' THEN 20
+                    ELSE 10
+                END ASC,
+                term.id ASC
+        ) AS rn
+    FROM [dbo].[search_term] term
+    LEFT JOIN recent_scores score
+        ON score.term_id = term.id
+    WHERE
+        term.status = N'active'
+        AND LEN(COALESCE(NULLIF(term.display_term, N''), term.term)) BETWEEN 2 AND 20
+        AND term.term_type IN (
+            N'keyword',
+            N'recipient',
+            N'identity',
+            N'income',
+            N'policy',
+            N'manual',
+            N'trend'
+        )
 )
 SELECT TOP (@limit)
     keyword_stats.display_text
-FROM (
-    SELECT
-        COALESCE(NULLIF(term.display_term, N''), term.term) AS display_text,
-        MAX(score.total_trend_score) AS total_trend_score,
-        MAX(score.total_search_count) AS total_search_count
-    FROM [dbo].[search_term] term
-    INNER JOIN term_scores score
-        ON score.term_id = term.id
-    WHERE term.status = N'active'
-    GROUP BY COALESCE(NULLIF(term.display_term, N''), term.term)
-) keyword_stats
+FROM ranked_keywords keyword_stats
+WHERE
+    keyword_stats.rn = 1
+    AND (
+        keyword_stats.hot_score_7d > 0 OR
+        keyword_stats.hot_score_30d > 0 OR
+        keyword_stats.external_trend_score_7d > 0 OR
+        keyword_stats.total_search_count_30d > 0 OR
+        keyword_stats.manual_boost > 0
+    )
 ORDER BY
-    keyword_stats.total_trend_score DESC,
-    keyword_stats.total_search_count DESC,
+    (((keyword_stats.hot_score_7d * 0.55) +
+     (keyword_stats.hot_score_30d * 0.20) +
+     (keyword_stats.external_trend_score_7d * 0.15) +
+     (keyword_stats.total_search_count_30d * 0.05) +
+     (keyword_stats.manual_boost * 10.0) +
+     (keyword_stats.base_weight * 0.05)) * keyword_stats.source_weight) DESC,
+    keyword_stats.hot_score_7d DESC,
+    keyword_stats.external_trend_score_7d DESC,
+    keyword_stats.total_search_count_30d DESC,
     keyword_stats.display_text ASC;";
                 command.Parameters.AddWithValue("@limit", limit);
 
@@ -867,6 +1074,108 @@ VALUES (
             }
         }
 
+        private double GetSearchQueryHotBoost(string normalizedQuery)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedQuery))
+            {
+                return 0d;
+            }
+
+            var cacheKey = BuildQueryHotScoreCacheKey(normalizedQuery);
+            if (TryGetCachedValue(cacheKey, out double cachedScore))
+            {
+                return cachedScore;
+            }
+
+            double normalizedHotBoost = 0d;
+
+            try
+            {
+                var connectionString = ResolveIFareConnectionString();
+                if (string.IsNullOrWhiteSpace(connectionString))
+                {
+                    return 0d;
+                }
+
+                using var connection = new SqlConnection(connectionString);
+                connection.Open();
+
+                using var command = connection.CreateCommand();
+                command.CommandText = @"
+WITH latest_snapshot AS (
+    SELECT MAX(stat_date) AS stat_date
+    FROM [dbo].[search_term_stat_daily]
+),
+matched_term AS (
+    SELECT
+        term.id AS term_id,
+        COALESCE(stat.final_hot_score, 0) AS final_hot_score,
+        CASE
+            WHEN term.normalized_term = @normalizedQuery THEN 3
+            WHEN term.normalized_term LIKE @prefixQuery THEN 2
+            ELSE 1
+        END AS match_priority
+    FROM [dbo].[search_term] term
+    LEFT JOIN [dbo].[search_term_stat_daily] stat
+        ON stat.term_id = term.id
+       AND stat.stat_date = (SELECT stat_date FROM latest_snapshot)
+    WHERE
+        term.status = N'active'
+        AND (
+            term.normalized_term = @normalizedQuery OR
+            term.normalized_term LIKE @prefixQuery OR
+            term.normalized_term LIKE @containsQuery
+        )
+
+    UNION ALL
+
+    SELECT
+        term.id AS term_id,
+        COALESCE(stat.final_hot_score, 0) AS final_hot_score,
+        CASE
+            WHEN alias.normalized_alias = @normalizedQuery THEN 3
+            WHEN alias.normalized_alias LIKE @prefixQuery THEN 2
+            ELSE 1
+        END AS match_priority
+    FROM [dbo].[search_term_alias] alias
+    INNER JOIN [dbo].[search_term] term
+        ON term.id = alias.term_id
+       AND term.status = N'active'
+    LEFT JOIN [dbo].[search_term_stat_daily] stat
+        ON stat.term_id = term.id
+       AND stat.stat_date = (SELECT stat_date FROM latest_snapshot)
+    WHERE
+        alias.status = N'active'
+        AND (
+            alias.normalized_alias = @normalizedQuery OR
+            alias.normalized_alias LIKE @prefixQuery OR
+            alias.normalized_alias LIKE @containsQuery
+        )
+)
+SELECT TOP (1)
+    CAST(final_hot_score AS FLOAT)
+FROM matched_term
+ORDER BY match_priority DESC, final_hot_score DESC, term_id ASC;";
+                command.Parameters.AddWithValue("@normalizedQuery", normalizedQuery);
+                command.Parameters.AddWithValue("@prefixQuery", normalizedQuery + "%");
+                command.Parameters.AddWithValue("@containsQuery", "%" + normalizedQuery + "%");
+
+                var result = command.ExecuteScalar();
+                var rawHotScore = result == null || result == DBNull.Value
+                    ? 0d
+                    : Convert.ToDouble(result);
+
+                normalizedHotBoost = Math.Min(1d, Math.Max(0d, rawHotScore / 20d));
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"[FarePolicySearchDictionary] failed to read query hot boost: {ex.Message}");
+            }
+
+            SetCachedValue(cacheKey, normalizedHotBoost, GetSuggestionCacheTtl(normalizedQuery));
+            return normalizedHotBoost;
+        }
+
         private static bool ShouldWriteSearchQueryLog(string sourcePage, string normalizedQuery, int resultCount)
         {
             if (string.IsNullOrWhiteSpace(normalizedQuery))
@@ -943,6 +1252,14 @@ VALUES (
             return BuildCacheKey("ifare:fare-policy:hot-keywords", new[]
             {
                 $"limit={limit}"
+            });
+        }
+
+        private string BuildQueryHotScoreCacheKey(string normalizedQuery)
+        {
+            return BuildCacheKey("ifare:fare-policy:query-hot-score", new[]
+            {
+                $"q={normalizedQuery ?? string.Empty}"
             });
         }
 

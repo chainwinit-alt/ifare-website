@@ -633,3 +633,31 @@ const currentPage_QA = ref(1);
 loadOfficeList();
 loadQAList();
 </script>
+
+<style scoped>
+.query-action-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  flex-direction: unset !important;
+}
+
+.query-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100% !important;
+}
+
+.btn-query-submit {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  width: auto !important;
+  min-width: 110px;
+}
+
+:deep(.input-query) {
+  min-width: 0 !important;
+}
+</style>

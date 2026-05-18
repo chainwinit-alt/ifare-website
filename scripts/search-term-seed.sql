@@ -217,6 +217,8 @@ GO
 
 DECLARE @today DATE = CAST(GETDATE() AS DATE);
 
+DELETE FROM [dbo].[search_term_stat_daily];
+
 ;WITH source_terms AS (
     SELECT
         term.id AS term_id,

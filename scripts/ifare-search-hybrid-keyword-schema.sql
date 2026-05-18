@@ -438,6 +438,7 @@ BEGIN
 
     DECLARE @effective_start_date DATE = ISNULL(@start_date, DATEADD(DAY, -30, CAST(GETUTCDATE() AS DATE)));
     DECLARE @effective_end_date DATE = ISNULL(@end_date, CAST(GETUTCDATE() AS DATE));
+    DECLARE @snapshot_date DATE = CAST(GETUTCDATE() AS DATE);
 
     IF @effective_start_date > @effective_end_date
     BEGIN
@@ -445,10 +446,11 @@ BEGIN
         RETURN;
     END;
 
+    DELETE FROM [dbo].[search_term_stat_daily];
+
     ;WITH matched_log AS
     (
         SELECT
-            CAST(q.created_at AS DATE) AS stat_date,
             t.id AS term_id,
             q.source_page,
             q.result_count
@@ -461,7 +463,6 @@ BEGIN
         UNION
 
         SELECT
-            CAST(q.created_at AS DATE) AS stat_date,
             a.term_id,
             q.source_page,
             q.result_count
@@ -474,13 +475,11 @@ BEGIN
     deduped_match AS
     (
         SELECT
-            stat_date,
             term_id,
             source_page,
             result_count
         FROM matched_log
         GROUP BY
-            stat_date,
             term_id,
             source_page,
             result_count
@@ -489,15 +488,14 @@ BEGIN
     (
         SELECT
             m.term_id,
-            m.stat_date,
+            @snapshot_date AS stat_date,
             COUNT(1) AS search_count,
             SUM(CASE WHEN m.source_page = N'ifare_search_result' THEN 1 ELSE 0 END) AS select_count,
             SUM(ISNULL(m.result_count, 0)) AS result_count,
             SUM(CASE WHEN ISNULL(m.result_count, 0) <= 0 THEN 1 ELSE 0 END) AS zero_result_count
         FROM deduped_match m
         GROUP BY
-            m.term_id,
-            m.stat_date
+            m.term_id
     ),
     content_stats AS
     (
@@ -626,7 +624,7 @@ INNER JOIN [dbo].[search_term_stat_daily] s
     ON s.term_id = t.id
 WHERE
     t.status = N'active'
-    AND s.stat_date >= DATEADD(DAY, -7, CAST(GETUTCDATE() AS DATE))
+    AND s.stat_date = (SELECT MAX(stat_date) FROM [dbo].[search_term_stat_daily])
 GROUP BY
     t.id,
     t.term,

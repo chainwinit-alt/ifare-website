@@ -1,101 +1,125 @@
 # iFare 搜尋詞典初始化與維運流程
 
-更新日期：2026-05-15
+更新日期：2026-05-18
 
 ## 目的
 
-這份文件說明當 `[iFare].[dbo]` 中還沒有搜尋詞典相關資料，或資料量很少時，要如何透過現有 SQL 建立：
+這份文件記錄目前 iFare 搜尋詞典的實際維運方式，包含：
 
-- `search_term`
-- `search_term_alias`
-- `search_term_source`
-- `search_term_stat_daily`
-- `search_policy_term_candidate`
-- `search_term_candidate`
+- 正式搜尋詞典 `search_term`
+- 別名詞典 `search_term_alias`
+- 詞來源追蹤 `search_term_source`
+- 熱度快照表 `search_term_stat_daily`
+- 候選詞池 `search_policy_term_candidate`
+- 外部趨勢原始表 `search_term_trend_daily`
 
-同時整理目前四支 SQL 的用途，避免後續維運時重複執行或跑錯版本。
+目前流程已經和早期版本不同，重點變更如下：
 
-## SQL 檔案角色
+- `search_term_stat_daily` 不再當作長期 daily history
+- `search_term_stat_daily` 現在視為「當前熱門快照表」
+- 每次重建 hot snapshot 時，會先清空 `search_term_stat_daily` 再重算
+- Google Trends `relatedQueries` 主要用於擴詞 / trend snapshot，不再強依賴 `pytrends`
 
-### 正式保留
+## 表用途
 
-1. [`../scripts/ifare-search-hybrid-keyword-schema.sql`](../scripts/ifare-search-hybrid-keyword-schema.sql)
+### `search_term`
+
+正式搜尋詞典主表。
+
 用途：
-- 建立或補齊搜尋詞典相關資料表
-- 補 `search_term_stat_daily` 的 hybrid score 欄位
-- 建立 `sp_rebuild_search_term_stat_daily`
-- 建立 `vw_search_term_hot_score_7d`
 
-這支是 `schema / migration` 用。
+- autocomplete 正式詞
+- suggestion 正式詞
+- hot keyword 對應 term 主檔
 
-2. [`../scripts/ifare-policy-content-term-pipeline.sql`](../scripts/ifare-policy-content-term-pipeline.sql)
+### `search_term_alias`
+
+正式詞的別名 / 同義詞表。
+
 用途：
-- 從 `IFarePolicy + Code*` 建立內容導向候選詞
-- 升級 candidate 到 `search_term`
-- 用 `search_query_log` 回填熱門分數
 
-這支是 `內容建詞 + 熱門統計` 用。
+- 將民眾常用說法映射回正式詞
+- 提高搜尋召回率
 
-### 歷史保留，不建議當正式主流程
+### `search_term_source`
 
-3. [`../scripts/search-query-log.sql`](../scripts/search-query-log.sql)
+正式詞來源追蹤表。
+
 用途：
-- 建立 `search_query_log`
-- 建立 `search_query_log` 相關 index
-- 內含舊版 aggregation 範例
 
-這支在「全新資料庫且連搜尋事件表都不存在」時仍然有用，但只建議使用其中的 `search_query_log` 建表與 index 功能。
+- 記錄一個正式詞來自哪個來源
+- 保留 traceability
 
-4. [`../scripts/search-term-seed.sql`](../scripts/search-term-seed.sql)
+### `search_policy_term_candidate`
+
+政策 / 補助領域候選詞池。
+
 用途：
-- 舊版 seed script
-- 可當初始化參考，但與新 pipeline 重疊
 
-## 適用情境
+- 存放內容抽詞候選
+- 存放 Google related query 候選
+- 後續人工審核或 promote 到 `search_term`
 
-### 情境 A：全新資料庫，還沒有搜尋詞典表
+### `search_term_trend_daily`
 
-這是最完整的初始化流程。
+外部趨勢原始表。
 
-### 情境 B：搜尋詞典表已存在，但 `search_term` / `search_term_stat_daily` 幾乎沒資料
+目前可做兩種用途：
 
-這時不用重建表，只要跑內容建詞與統計流程。
+- 傳統 daily timeline 原始資料
+- summary snapshot 類型資料
 
-### 情境 C：搜尋詞典表已存在，但 `search_query_log` 還不存在
+目前實務上以「summary snapshot」為主，也就是一個詞只保留當次匯入的一筆 trend 值。
 
-這時要先補 `search_query_log`，再決定是否回填熱門統計。
+### `search_term_stat_daily`
 
-## 前置條件
+目前定義為「熱門關鍵字快照表」。
 
-在執行前，請先確認這些業務表已經有資料：
+雖然表名還叫 `daily`，但目前不再保留長期每日歷史，而是每次重建時：
 
-- `IFarePolicy`
-- `CodeKeyword`
-- `CodeRecipient`
-- `CodeIdentity`
-- `CodeIncome`
-- `CodePolicy`
-- 以及對應的 mapping table，例如 `IFarePolicy_CodeKeyword`
+1. 清空整張表
+2. 依據最新視窗資料重算
+3. 每個 `term_id` 只保留一筆最新快照
 
-如果上面表本身沒有資料，內容建詞流程就不會產出有效詞典。
+用途：
 
-另外，若要算搜尋熱度，還需要：
+- 空白熱門關鍵字推薦
+- hot suggestions 排序
+- 搜尋字典熱門度 materialized ranking table
 
-- `search_query_log`
+## 目前推薦資料流
 
-注意這裡分兩種情況：
+### A. 正式詞典
 
-1. `search_query_log` 表不存在
-這時要先建立表。
+```text
+IFarePolicy / Code* / 人工匯入 / Google 擴詞
+-> search_policy_term_candidate
+-> promote
+-> search_term
+-> search_term_alias / search_term_source
+```
 
-2. `search_query_log` 表存在，但沒有資料
-這時可以先完成內容詞典初始化，熱門分數之後再回填。
+### B. 熱門快照
 
-## 建議初始化順序
+```text
+search_query_log
++ search_term_trend_daily
++ search_term / search_policy_term_candidate
+-> rebuild snapshot
+-> search_term_stat_daily
+-> Hot Suggestions / Hot Keywords
+```
 
-### Step 1：建立或補齊搜尋詞典 schema
+## 初始化 / 更新流程
 
-執行：
+### Step 1. 更新 schema 與 stored procedure
+
+先套用這兩支 SQL：
+
+1. [scripts/ifare-search-hybrid-keyword-schema.sql](../scripts/ifare-search-hybrid-keyword-schema.sql)
+2. [scripts/ifare-policy-content-term-pipeline.sql](../scripts/ifare-policy-content-term-pipeline.sql)
+
+建議執行：
 
 ```sql
 USE [iFare];
@@ -103,271 +127,275 @@ GO
 
 :r ..\scripts\ifare-search-hybrid-keyword-schema.sql
 GO
-```
-
-如果你的工具不支援 `:r`，就直接開啟該 SQL 檔後整份執行。
-
-執行完成後，至少應該存在：
-
-- `search_term`
-- `search_term_alias`
-- `search_term_source`
-- `search_term_stat_daily`
-- `search_term_candidate`
-- `vw_search_term_hot_score_7d`
-- `sp_rebuild_search_term_stat_daily`
-
-### Step 1.5：如果 `search_query_log` 不存在，先建立它
-
-先檢查：
-
-```sql
-SELECT OBJECT_ID(N'[dbo].[search_query_log]', N'U') AS search_query_log_object_id;
-```
-
-如果結果是 `NULL`，代表表不存在。
-
-這時請執行 [`../scripts/search-query-log.sql`](../scripts/search-query-log.sql)，但用途只限於：
-
-- 建立 `search_query_log`
-- 建立 `search_query_log` index
-
-如果你是手動分段執行，建議只執行這份 SQL 前半段的：
-
-- `CREATE TABLE [dbo].[search_query_log]`
-- `CREATE INDEX IX_search_query_log_created_at`
-- `CREATE INDEX IX_search_query_log_normalized_query`
-- `CREATE INDEX IX_search_query_log_source_page_created_at`
-
-不要把這支檔案後半段的舊版 aggregation 當成正式主流程反覆執行。
-
-### Step 2：建立內容導向候選詞流程
-
-執行：
-
-```sql
-USE [iFare];
-GO
 
 :r ..\scripts\ifare-policy-content-term-pipeline.sql
 GO
 ```
 
-執行完成後，至少應該存在：
+這兩支會更新：
 
-- `search_policy_term_candidate`
-- `sp_refresh_policy_term_candidate`
-- `sp_promote_policy_term_candidate_to_search_term`
+- `search_term_stat_daily` schema
+- `sp_rebuild_search_term_stat_daily`
 - `sp_rebuild_policy_term_hot_stat`
+- `vw_search_term_hot_score_7d`
 
-### Step 3：從政策與 code table 刷新候選詞
+目前這些流程都已改為 snapshot 模式。
 
-執行：
+### Step 2. 匯入正式詞 / 候選詞
 
-```sql
-EXEC [dbo].[sp_refresh_policy_term_candidate];
+依需求執行以下任一流程。
+
+#### 2A. 從內candidate容抽詞 CSV 匯入 
+
+使用：
+
+- [scripts/import-policy-term-candidates.py](../scripts/import-policy-term-candidates.py)
+
+示例：
+
+```powershell
+python scripts\import-policy-term-candidates.py --replace-source-kind --min-score 5 --min-policy-count 2
 ```
 
-這一步會從：
+若要一起清掉舊的同來源正式詞並 promote：
 
-- `IFarePolicy.Title`
-- `CodeKeyword`
-- `CodeRecipient`
-- `CodeIdentity`
-- `CodeIncome`
-- `CodePolicy`
-
-建立 `search_policy_term_candidate`。
-
-### Step 4：將候選詞升級為正式詞典
-
-執行：
-
-```sql
-EXEC [dbo].[sp_promote_policy_term_candidate_to_search_term]
-    @min_quality_score = 2.0,
-    @min_policy_count = 1;
+```powershell
+python scripts\import-policy-term-candidates.py --replace-source-kind --replace-search-term --min-score 5 --min-policy-count 2 --promote --promote-min-quality-score 5 --promote-min-policy-count 2
 ```
 
-這一步會把符合條件的 candidate 寫入：
+#### 2B. 從 Google related queries 匯入 candidate
+
+使用：
+
+- [scripts/import-google-related-queries.py](../scripts/import-google-related-queries.py)
+
+它會掃：
+
+- `scripts/Google_Trend/relatedQueries*.csv`
+
+示例：
+
+```powershell
+python scripts\import-google-related-queries.py --replace-source-kind
+```
+
+用途：
+
+- 將 `TOP` / `RISING` 匯入 `search_policy_term_candidate`
+- 後續人工審核或 promote
+
+#### 2C. 從可信來源重建正式詞典
+
+使用：
+
+- [scripts/rebuild-search-term-table.py](../scripts/rebuild-search-term-table.py)
+
+示例：
+
+```powershell
+python scripts\rebuild-search-term-table.py --preview-csv scripts\search-term-preview.csv
+python scripts\rebuild-search-term-table.py --apply
+```
+
+### Step 3. 匯入外部趨勢 snapshot
+
+目前不建議直接用 `pytrends` 批次抓全量詞。
+
+推薦做法是使用 Google Trends 網頁匯出的 `relatedQueries*.csv`，再匯入成 summary trend snapshot。
+
+使用：
+
+- [scripts/import-google-related-queries-to-trend.py](../scripts/import-google-related-queries-to-trend.py)
+
+示例：
+
+```powershell
+python scripts\import-google-related-queries-to-trend.py --replace-source-region-date
+```
+
+這支會：
+
+- 掃 `scripts/Google_Trend/relatedQueries*.csv`
+- 每個 query 只寫一筆到 `search_term_trend_daily`
+- 不展開時間序列
+
+如果只想寫 raw trend table，不同步 stat：
+
+```powershell
+python scripts\import-google-related-queries-to-trend.py --replace-source-region-date --skip-stat-sync
+```
+
+## Hot Snapshot 重建
+
+### 目前正式做法
+
+目前熱門快照表以 `search_term_stat_daily` 為唯一前台熱門來源。
+
+每次重建時：
+
+1. 清空 `search_term_stat_daily`
+2. 聚合最近一段時間的 `search_query_log`
+3. 補入內容分數與外部 trend 分數
+4. 每個 `term_id` 只寫一筆
+
+### 手動執行方式
+
+#### SQL 版
+
+使用：
+
+- [scripts/rebuild-search-term-hot-snapshot.sql](../scripts/rebuild-search-term-hot-snapshot.sql)
+
+```sql
+:r ..\scripts\rebuild-search-term-hot-snapshot.sql
+GO
+```
+
+#### Python 觸發版
+
+使用：
+
+- [scripts/run-search-hot-snapshot.py](../scripts/run-search-hot-snapshot.py)
+
+```powershell
+python scripts\run-search-hot-snapshot.py
+```
+
+如果要改視窗：
+
+```powershell
+python scripts\run-search-hot-snapshot.py --window-days 7
+```
+
+或指定日期：
+
+```powershell
+python scripts\run-search-hot-snapshot.py --start-date 2026-05-01 --end-date 2026-05-18
+```
+
+### 目前重建入口
+
+目前建議以這支 stored procedure 當主要 rebuild 入口：
+
+```sql
+EXEC [dbo].[sp_rebuild_policy_term_hot_stat]
+    @start_date = '2026-04-18',
+    @end_date = '2026-05-18';
+```
+
+## 空白熱門關鍵字推薦
+
+目前空白狀態下的熱門關鍵字推薦來自：
 
 - `search_term`
-- `search_term_source`
+- `search_term_stat_daily`
 
-### Step 5：如果已有搜尋紀錄，回填熱門統計
+後端讀取位置：
 
-若 `search_query_log` 已經有資料，執行：
+- `FarePolicyTaskManager.GetDictionaryHotKeywords(...)`
 
-```sql
-EXEC [dbo].[sp_rebuild_policy_term_hot_stat]
-    @start_date = '2026-04-01',
-    @end_date = '2026-05-15';
-```
+排序邏輯目前已整合：
 
-日常維運時，改成你要重算的日期區間即可。
+- `final_hot_score`
+- `external_trend_score`
+- `search_count`
+- `manual_boost`
+- `base_weight`
+- `source_kind` 權重
 
-如果目前沒有任何搜尋紀錄，這一步可以先跳過。
+其中：
 
-## 全新資料庫的最小初始化順序
+- `search_query_log` 會間接影響 hot keyword
+- 它不是直接被前台讀取
+- 而是先彙總進 `search_term_stat_daily`
 
-如果今天 `[iFare].[dbo]` 裡完全沒有搜尋相關表，建議順序如下：
+## 維運建議
 
-1. 執行 [`../scripts/ifare-search-hybrid-keyword-schema.sql`](../scripts/ifare-search-hybrid-keyword-schema.sql)
-2. 執行 [`../scripts/search-query-log.sql`](../scripts/search-query-log.sql) 的 `search_query_log` 建表與 index 段
-3. 執行 [`../scripts/ifare-policy-content-term-pipeline.sql`](../scripts/ifare-policy-content-term-pipeline.sql)
-4. 執行：
+### 建議固定節奏
 
-```sql
-EXEC [dbo].[sp_refresh_policy_term_candidate];
-EXEC [dbo].[sp_promote_policy_term_candidate_to_search_term]
-    @min_quality_score = 2.0,
-    @min_policy_count = 1;
-```
+1. 搜尋事件持續寫入 `search_query_log`
+2. 候選詞 / Google related queries 視需要匯入
+3. 手動或定時執行 hot snapshot rebuild
+4. 前台熱門推薦只讀 `search_term_stat_daily`
 
-5. 等 `search_query_log` 開始累積資料後，再執行：
+### SQL Server Express 環境
 
-```sql
-EXEC [dbo].[sp_rebuild_policy_term_hot_stat]
-    @start_date = DATEADD(DAY, -30, CAST(GETUTCDATE() AS DATE)),
-    @end_date = CAST(GETUTCDATE() AS DATE);
-```
+若環境是 SQL Server Express，沒有 SQL Server Agent，可使用：
 
-## 初始化完成後的驗證查詢
+- 手動執行 Python：
+  [scripts/run-search-hot-snapshot.py](../scripts/run-search-hot-snapshot.py)
+- 或 Windows Task Scheduler + Python / sqlcmd
 
-### 1. 驗證候選詞有沒有產生
+### 不建議的做法
 
-```sql
-SELECT TOP (50)
-    term,
-    normalized_term,
-    term_type,
-    source_kind,
-    policy_count,
-    content_score,
-    quality_score,
-    status
-FROM [dbo].[search_policy_term_candidate]
-ORDER BY quality_score DESC, policy_count DESC, term ASC;
-```
+- 每次使用者搜尋後就即時重建整張 hot snapshot
+- 直接把 Google `relatedQueries` 的分數當作全域最終熱門分數
+- 讓前台直接讀 `search_query_log`
 
-### 2. 驗證正式詞典有沒有資料
+## 常用檢查 SQL
+
+### 看目前 hot snapshot
 
 ```sql
-SELECT TOP (50)
-    id,
-    term,
-    normalized_term,
-    term_type,
-    source_kind,
-    base_weight,
-    manual_boost,
-    status,
-    updated_at
-FROM [dbo].[search_term]
-ORDER BY updated_at DESC, id DESC;
-```
-
-### 3. 驗證熱門統計有沒有資料
-
-```sql
-SELECT TOP (50)
+SELECT
+    t.id,
     t.term,
+    t.display_term,
     t.term_type,
     t.source_kind,
     s.stat_date,
     s.search_count,
     s.select_count,
-    s.result_count,
-    s.zero_result_count,
     s.trend_score,
-    s.content_match_count,
+    s.external_trend_score,
     s.final_hot_score
-FROM [dbo].[search_term_stat_daily] s
-INNER JOIN [dbo].[search_term] t
+FROM dbo.search_term_stat_daily s
+INNER JOIN dbo.search_term t
     ON t.id = s.term_id
-ORDER BY s.final_hot_score DESC, s.search_count DESC;
+ORDER BY s.final_hot_score DESC, s.search_count DESC, t.term ASC;
 ```
 
-## 沒有 `search_query_log` 資料時的預期
-
-如果資料庫中還沒有使用者搜尋紀錄，初始化後你應該看到：
-
-- `search_policy_term_candidate` 有資料
-- `search_term` 有資料
-- `search_term_source` 有資料
-- `search_query_log` 表存在，但可能是空的
-- `search_term_stat_daily` 可能沒有資料，或只有很少資料
-
-這是正常的。
-
-因為：
-
-- `search_term` 是內容詞典
-- `search_term_stat_daily` 是行為熱度統計
-
-沒有搜尋行為，就不會有真實熱門度。
-
-## 日常維運建議
-
-### 每次政策內容大量更新後
-
-執行：
+### 看某個 query 有沒有進 log
 
 ```sql
-EXEC [dbo].[sp_refresh_policy_term_candidate];
-EXEC [dbo].[sp_promote_policy_term_candidate_to_search_term]
-    @min_quality_score = 2.0,
-    @min_policy_count = 1;
+SELECT TOP (50)
+    id,
+    query,
+    normalized_query,
+    source_page,
+    created_at
+FROM dbo.search_query_log
+WHERE query LIKE N'%學雜費補助%'
+   OR normalized_query LIKE N'%學雜費補助%'
+ORDER BY created_at DESC;
 ```
 
-### 每天或每週重算熱門分數
-
-執行：
+### 看某個詞是否已存在正式詞典
 
 ```sql
-EXEC [dbo].[sp_rebuild_policy_term_hot_stat]
-    @start_date = DATEADD(DAY, -30, CAST(GETUTCDATE() AS DATE)),
-    @end_date = CAST(GETUTCDATE() AS DATE);
+SELECT
+    id,
+    term,
+    display_term,
+    normalized_term,
+    term_type,
+    source_kind,
+    status
+FROM dbo.search_term
+WHERE normalized_term = N'學雜費補助';
 ```
 
-如果 SQL Server Agent 有排程，建議把這支 proc 納入排程。
-
-## 不建議的做法
-
-- 不要把 `search-term-seed.sql` 當日常主流程反覆執行
-- 不要把 `search-query-log.sql` 的 aggregation 段和新 proc 混著跑
-- 不要同時維護兩套不同的 `search_term_stat_daily` 計算方式
-
-## 建議最終主流程
-
-後續維運只要記住這三段：
-
-1. `schema migration`
-執行 [`../scripts/ifare-search-hybrid-keyword-schema.sql`](../scripts/ifare-search-hybrid-keyword-schema.sql)
-
-2. `search event log bootstrap`
-只在 `search_query_log` 不存在時執行 [`../scripts/search-query-log.sql`](../scripts/search-query-log.sql) 的建表與 index 段
-
-3. `content dictionary refresh`
+### 看某個詞是否只存在 candidate
 
 ```sql
-EXEC [dbo].[sp_refresh_policy_term_candidate];
-EXEC [dbo].[sp_promote_policy_term_candidate_to_search_term]
-    @min_quality_score = 2.0,
-    @min_policy_count = 1;
+SELECT
+    term,
+    normalized_term,
+    source_kind,
+    evidence_field,
+    quality_score,
+    status
+FROM dbo.search_policy_term_candidate
+WHERE normalized_term = N'學雜費補助'
+ORDER BY quality_score DESC;
 ```
-
-4. `behavior hot stat refresh`
-
-```sql
-EXEC [dbo].[sp_rebuild_policy_term_hot_stat]
-    @start_date = DATEADD(DAY, -30, CAST(GETUTCDATE() AS DATE)),
-    @end_date = CAST(GETUTCDATE() AS DATE);
-```
-
-這樣即可完成：
-
-- 詞典結構建立
-- 內容導向候選詞建立
-- 正式詞典更新
-- 熱門分數更新

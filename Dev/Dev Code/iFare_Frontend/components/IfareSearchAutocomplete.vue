@@ -12,6 +12,8 @@
         :disabled="disabled"
         @focus="handleFocus"
         @input="handleInput"
+        @compositionstart="handleCompositionStart"
+        @compositionend="handleCompositionEnd"
         @keydown.down.prevent="moveHighlight(1)"
         @keydown.up.prevent="moveHighlight(-1)"
         @keydown.enter.prevent="handleEnter"
@@ -108,6 +110,7 @@ const rootRef = ref<HTMLElement | null>(null);
 const inputRef = ref<HTMLInputElement | null>(null);
 const isOpen = ref(false);
 const isLoading = ref(false);
+const isComposing = ref(false);
 const highlightedIndex = ref(-1);
 const hotKeywords = ref<string[]>([]);
 const suggestions = ref<SuggestionItem[]>([]);
@@ -119,6 +122,7 @@ const displayItems = computed(() =>
 );
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let activeRequestId = 0;
 
 function buildRequestQuery() {
   const query: Record<string, any> = {
@@ -139,11 +143,16 @@ function buildRequestQuery() {
 }
 
 async function loadSuggestions() {
-  if (props.disabled) return;
+  if (props.disabled || isComposing.value) return;
 
+  const requestId = ++activeRequestId;
   isLoading.value = true;
   try {
     const { data } = await $WebApiGetDetailed("/FarePolicy/GetIFareSearchSuggestions", buildRequestQuery());
+    if (requestId !== activeRequestId) {
+      return;
+    }
+
     const payload = getApiResultValue<SuggestionPayload>(data) || {};
     hotKeywords.value = Array.isArray(payload.hotKeywords)
       ? payload.hotKeywords.filter(Boolean)
@@ -153,15 +162,27 @@ async function loadSuggestions() {
       : [];
     highlightedIndex.value = -1;
   } catch {
-    hotKeywords.value = [];
+    if (requestId !== activeRequestId) {
+      return;
+    }
+
+    if (!trimmedQuery.value) {
+      hotKeywords.value = [];
+    }
     suggestions.value = [];
     highlightedIndex.value = -1;
   } finally {
-    isLoading.value = false;
+    if (requestId === activeRequestId) {
+      isLoading.value = false;
+    }
   }
 }
 
 function queueLoadSuggestions() {
+  if (props.disabled || isComposing.value) {
+    return;
+  }
+
   if (debounceTimer) {
     clearTimeout(debounceTimer);
   }
@@ -178,6 +199,27 @@ function handleFocus() {
 
 function handleInput(event: Event) {
   const nextValue = (event.target as HTMLInputElement).value || "";
+  emit("update:modelValue", nextValue);
+  if (!isOpen.value) {
+    isOpen.value = true;
+  }
+  if (isComposing.value) {
+    return;
+  }
+  queueLoadSuggestions();
+}
+
+function handleCompositionStart() {
+  isComposing.value = true;
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+}
+
+function handleCompositionEnd(event: CompositionEvent) {
+  isComposing.value = false;
+  const nextValue = (event.target as HTMLInputElement)?.value || "";
   emit("update:modelValue", nextValue);
   if (!isOpen.value) {
     isOpen.value = true;
@@ -266,7 +308,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
 watch(
   () => [trimmedQuery.value, JSON.stringify(props.filters || {})],
   () => {
-    if (!isOpen.value) return;
+    if (!isOpen.value || isComposing.value) return;
     queueLoadSuggestions();
   },
 );
@@ -280,12 +322,37 @@ onBeforeUnmount(() => {
   if (debounceTimer) {
     clearTimeout(debounceTimer);
   }
+  activeRequestId += 1;
 });
 </script>
 
 <style scoped lang="scss">
 .ifare-search-autocomplete {
   position: relative;
+  width: 100%;
+}
+
+.query-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.input-query {
+  width: 100%;
+  min-width: 0;
+  padding-right: 64px;
+  box-sizing: border-box;
+}
+
+.query-count {
+  position: absolute;
+  right: 14px;
+  bottom: 50%;
+  transform: translateY(50%);
+  pointer-events: none;
+  color: rgba(22, 63, 64, 0.46);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .search-suggestion-panel {
@@ -372,5 +439,16 @@ onBeforeUnmount(() => {
   padding: 10px 4px;
   color: rgba(22, 63, 64, 0.62);
   font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .input-query {
+    padding-right: 58px;
+  }
+
+  .query-count {
+    right: 12px;
+    font-size: 10px;
+  }
 }
 </style>

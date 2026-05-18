@@ -59,11 +59,14 @@ END;
 GO
 
 /*
-    Aggregate query log into [search_term_stat_daily].
-    Run this in a daily SQL Agent job, or invoke it after a batch import.
+    Aggregate query log into [search_term_stat_daily] as a current snapshot.
+    This keeps one snapshot row per term for the current rebuild run.
 */
 
-DECLARE @target_date DATE = DATEADD(DAY, -1, CAST(GETDATE() AS DATE));
+DECLARE @target_date DATE = CAST(GETDATE() AS DATE);
+DECLARE @window_start_date DATE = DATEADD(DAY, -30, @target_date);
+
+DELETE FROM [dbo].[search_term_stat_daily];
 
 ;WITH daily_logs AS (
     SELECT
@@ -73,8 +76,7 @@ DECLARE @target_date DATE = DATEADD(DAY, -1, CAST(GETDATE() AS DATE));
         log.result_count
     FROM [dbo].[search_query_log] log
     WHERE
-        log.created_at >= @target_date
-        AND log.created_at < DATEADD(DAY, 1, @target_date)
+        CAST(log.created_at AS DATE) BETWEEN @window_start_date AND @target_date
         AND NULLIF(LTRIM(RTRIM(log.normalized_query)), N'') IS NOT NULL
 ),
 matched_terms AS (

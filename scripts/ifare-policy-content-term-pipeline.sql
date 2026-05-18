@@ -98,6 +98,16 @@ BEGIN
         SELECT
             p.ID,
             p.Title,
+            CASE
+                WHEN LEFT(LTRIM(RTRIM(p.Title)), 1) = N'【'
+                     AND CHARINDEX(N'】', LTRIM(RTRIM(p.Title))) > 1
+                THEN LTRIM(SUBSTRING(
+                    LTRIM(RTRIM(p.Title)),
+                    CHARINDEX(N'】', LTRIM(RTRIM(p.Title))) + 1,
+                    200
+                ))
+                ELSE LTRIM(RTRIM(p.Title))
+            END AS CleanTitle,
             p.Qualification,
             p.CodePolicy_ID,
             p.ReleaseTime,
@@ -112,8 +122,8 @@ BEGIN
     source_terms AS
     (
         SELECT
-            p.Title AS term,
-            p.Title AS display_term,
+            p.CleanTitle AS term,
+            p.CleanTitle AS display_term,
             LOWER(REPLACE(REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(p.Title)), N' ', N''), N'-', N''), N'_', N''), N'　', N'')) AS normalized_term,
             N'policy_title' AS term_type,
             N'ifare_policy' AS source_kind,
@@ -262,6 +272,61 @@ BEGIN
             AND NULLIF(LTRIM(RTRIM(cp.LabelName)), N'') IS NOT NULL
         GROUP BY cp.ID, cp.LabelName
     ),
+    normalized_source_terms AS
+    (
+        SELECT
+            CASE
+                WHEN s.source_kind = N'ifare_policy'
+                     AND s.term_type = N'policy_title'
+                     AND LEFT(LTRIM(RTRIM(s.term)), 1) = N'【'
+                     AND CHARINDEX(N'】', LTRIM(RTRIM(s.term))) > 1
+                THEN LTRIM(SUBSTRING(
+                    LTRIM(RTRIM(s.term)),
+                    CHARINDEX(N'】', LTRIM(RTRIM(s.term))) + 1,
+                    200
+                ))
+                ELSE s.term
+            END AS term,
+            CASE
+                WHEN s.source_kind = N'ifare_policy'
+                     AND s.term_type = N'policy_title'
+                     AND LEFT(LTRIM(RTRIM(s.display_term)), 1) = N'【'
+                     AND CHARINDEX(N'】', LTRIM(RTRIM(s.display_term))) > 1
+                THEN LTRIM(SUBSTRING(
+                    LTRIM(RTRIM(s.display_term)),
+                    CHARINDEX(N'】', LTRIM(RTRIM(s.display_term))) + 1,
+                    200
+                ))
+                ELSE s.display_term
+            END AS display_term,
+            CASE
+                WHEN s.source_kind = N'ifare_policy'
+                     AND s.term_type = N'policy_title'
+                     AND LEFT(LTRIM(RTRIM(s.term)), 1) = N'【'
+                     AND CHARINDEX(N'】', LTRIM(RTRIM(s.term))) > 1
+                THEN LOWER(REPLACE(REPLACE(REPLACE(REPLACE(
+                    LTRIM(SUBSTRING(
+                        LTRIM(RTRIM(s.term)),
+                        CHARINDEX(N'】', LTRIM(RTRIM(s.term))) + 1,
+                        200
+                    )),
+                    N' ', N''
+                ), N'-', N''), N'_', N''), N'　', N''))
+                ELSE s.normalized_term
+            END AS normalized_term,
+            s.term_type,
+            s.source_kind,
+            s.source_ref_id,
+            s.evidence_field,
+            s.policy_count,
+            s.title_hit_count,
+            s.keyword_hit_count,
+            s.recipient_hit_count,
+            s.identity_hit_count,
+            s.income_hit_count,
+            s.policy_type_hit_count
+        FROM source_terms s
+    ),
     scored_terms AS
     (
         SELECT
@@ -307,7 +372,7 @@ BEGIN
                 END
                 AS DECIMAL(18,6)
             ) AS quality_score
-        FROM source_terms s
+        FROM normalized_source_terms s
         WHERE
             NULLIF(s.normalized_term, N'') IS NOT NULL
             AND LEN(s.normalized_term) >= 2
@@ -538,11 +603,13 @@ BEGIN
 
     DECLARE @effective_start_date DATE = ISNULL(@start_date, DATEADD(DAY, -30, CAST(GETUTCDATE() AS DATE)));
     DECLARE @effective_end_date DATE = ISNULL(@end_date, CAST(GETUTCDATE() AS DATE));
+    DECLARE @snapshot_date DATE = CAST(GETUTCDATE() AS DATE);
+
+    DELETE FROM [dbo].[search_term_stat_daily];
 
     ;WITH mapped_query AS
     (
         SELECT
-            CAST(q.created_at AS DATE) AS stat_date,
             COALESCE(term.id, alias_term.id) AS term_id,
             q.result_count,
             q.source_page
@@ -563,7 +630,7 @@ BEGIN
     daily_behavior AS
     (
         SELECT
-            mq.stat_date,
+            @snapshot_date AS stat_date,
             mq.term_id,
             COUNT(*) AS search_count,
             SUM(CASE WHEN mq.source_page = N'ifare_search_result' THEN 1 ELSE 0 END) AS select_count,
@@ -571,7 +638,7 @@ BEGIN
             SUM(CASE WHEN ISNULL(mq.result_count, 0) <= 0 THEN 1 ELSE 0 END) AS zero_result_count
         FROM mapped_query mq
         WHERE mq.term_id IS NOT NULL
-        GROUP BY mq.stat_date, mq.term_id
+        GROUP BY mq.term_id
     ),
     content_support AS
     (
