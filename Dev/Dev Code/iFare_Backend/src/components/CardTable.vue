@@ -120,7 +120,7 @@
       />
     </div>
   </div>
-  <DialogAlert v-model:isVisable="isDialogAlertVisible" :alertMsg="alertMsg" confirmBtnName="刪除" width="15%" @confirm="deleteConfirm" :confirmApiName="confirmApiName" :param="param"/>
+  <DialogAlert v-model:isVisable="isDialogAlertVisible" :alertMsg="alertMsg" confirmBtnName="刪除" title="刪除資料" width="min(420px, 92vw)" @confirm="deleteConfirm" :confirmApiName="confirmApiName" :param="param"/>
   <DialogAddEditImg v-model:isVisable="isVisableAddEditImgDialog" v-model:format_title="editImgTitle" v-model:format_type="editImgType" v-model:format_img="editImg" v-model:format_id="editImgID" v-model:updateTime="editImgUpdateTime" title="編輯圖片"></DialogAddEditImg>
   <DialogErrorInfo v-model:isVisable="isVisableErrorInfoDialog" alertMsg="複製連結成功！" />
 </template>
@@ -215,6 +215,7 @@ watch(totalRows, () => {
 });
 
 watch(pageSize, () => {
+  currentPage.value = 1;
   clampCurrentPage();
 });
 
@@ -282,31 +283,49 @@ const handleClick_Code = (_data: any) => {
   _global?.$router.push({ name: editPageName, query: { id: _id } });
 };
 
+function getDeleteTargetLabel(row: any) {
+  const candidates = [
+    row.title,
+    row.question,
+    row.user_name,
+    row.name,
+    row.account,
+    row.email,
+    row.id ? `編號 ${row.id}` : "",
+  ];
+  const label = candidates.find((value) => value !== undefined && value !== null && `${value}`.trim() !== "");
+
+  return label ? `${label}` : "這筆資料";
+}
+
+function openDeleteConfirm(row: any, apiName: string) {
+  const label = getDeleteTargetLabel(row);
+
+  param.value = { id: row.id };
+  confirmApiName.value = apiName;
+  alertMsg.value = `確定要刪除「${label}」嗎？\n刪除後無法復原。`;
+  isDialogAlertVisible.value = true;
+}
+
 const handleClick_Articles_Welfare = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "Articles_Welfare_Detail", query: { id: _id } });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteArticlesWelfare'
+  openDeleteConfirm(_data.row, 'DeleteArticlesWelfare')
 };
 
 const handleClick_Articles_Lazy = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "Articles_Lazy_Detail", query: { id: _id } });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteArticlesLazy'
+  openDeleteConfirm(_data.row, 'DeleteArticlesLazy')
 };
 
 const handleClick_IFare_QA = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "IFare_QA_Detail", query: {id: _id} });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteFareQA'
+  openDeleteConfirm(_data.row, 'DeleteFareQA')
 };
 
 const handleClick_IFare_OfficeUnit = (_data: any) => {
@@ -318,27 +337,21 @@ const handleClick_IFare_Policy = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "IFare_Policy_Detail", query: {id: _id} });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteFarePolicy'
+  openDeleteConfirm(_data.row, 'DeleteFarePolicy')
 };
 
 const handleClick_Collaborator = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "Collaborator_Detail", query: { id: _id } });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteCollaborator'
+  openDeleteConfirm(_data.row, 'DeleteCollaborator')
 };
 
 const handleClick_News = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "News_Detail", query: { id: _id } });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteNews'
+  openDeleteConfirm(_data.row, 'DeleteNews')
 };
 
 const handleClick_ImgManager = async (_data:any, _btnType: string) => {
@@ -368,9 +381,7 @@ const handleClick_ImgManager = async (_data:any, _btnType: string) => {
   }
 
   if (_btnType == "刪除") {
-    param.value = { id: _id}
-    isDialogAlertVisible.value = true
-    confirmApiName.value = 'DeleteImgManager'
+    openDeleteConfirm(_data.row, 'DeleteImgManager')
     return;
   }
 }

@@ -29,8 +29,14 @@
             type="password"
             placeholder="輸入密碼"
             show-password
+            @keydown="syncCapsLockState"
+            @keyup="syncCapsLockState"
+            @blur="isCapsLockOn = false"
             @keyup.enter.native="sendActPwd(ruleFormRef)"
           ></el-input>
+          <p v-if="isCapsLockOn" class="login-hint login-hint--warning">
+            Caps Lock 已開啟，請確認密碼大小寫。
+          </p>
         </el-form-item>
         <el-form-item>
           <!-- 登入按鈕，點擊後執行 sendActPwd；loading 狀態避免重複送出 -->
@@ -108,6 +114,17 @@ $padding-section-login: 40px;
     }
   }
 
+  .login-hint {
+    width: 100%;
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .login-hint--warning {
+    color: #b95f00;
+  }
+
   .btn-card-login {
     margin-top: 36px;
   }
@@ -149,6 +166,7 @@ const act = ref("")
 const pwd = ref("")
 // 控制登入按鈕的 loading 狀態，防止重複提交
 const isLoading = ref(false)
+const isCapsLockOn = ref(false)
 
 // Element Plus 表單實例參考
 const ruleFormRef = ref<FormInstance>()
@@ -167,6 +185,10 @@ const rules = reactive<FormRules<RuleForm>>({
     { required: true, message: 'Please input your password.', trigger: 'blur'}
   ]
 })
+
+function syncCapsLockState(event: KeyboardEvent) {
+  isCapsLockOn.value = event.getModifierState?.('CapsLock') ?? false
+}
 
 /**
  * sendActPwd - 執行登入流程

@@ -4,8 +4,16 @@
     :class="{ 'image-right': section.imagePosition === 'right' }"
   >
     <div class="it-image">
-      <img v-if="section.imageSrc" :src="section.imageSrc" :alt="section.imageAlt" loading="lazy" />
-      <div v-else class="it-image-placeholder">(尚未指定圖片)</div>
+      <img
+        v-if="resolvedImageSrc && !imageLoadFailed"
+        :src="resolvedImageSrc"
+        :alt="section.imageAlt"
+        loading="lazy"
+        @error="imageLoadFailed = true"
+      />
+      <div v-else class="it-image-placeholder">
+        {{ section.imageSrc ? '圖片路徑無法載入' : '(尚未指定圖片)' }}
+      </div>
     </div>
     <div class="it-content">
       <h2 class="it-title">{{ section.title || '(未填標題)' }}</h2>
@@ -23,9 +31,20 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue';
 import type { ImageTextSection } from '~/types/dynamic-page';
+import { resolveDynamicImageSrc } from '~/utils/dynamicImage';
 
-defineProps<{ section: ImageTextSection }>();
+const props = defineProps<{ section: ImageTextSection }>();
+const imageLoadFailed = ref(false);
+const resolvedImageSrc = computed(() => resolveDynamicImageSrc(props.section.imageSrc));
+
+watch(
+  () => props.section.imageSrc,
+  () => {
+    imageLoadFailed.value = false;
+  },
+);
 </script>
 
 <style lang="scss" scoped>

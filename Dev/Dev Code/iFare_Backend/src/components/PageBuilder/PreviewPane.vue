@@ -261,19 +261,23 @@ onUnmounted(() => {
 
 .preview-frame-shell {
   width: 100%;
+  max-width: 1280px;
   min-height: 680px;
   border: 1px solid #e4e7ed;
   border-radius: 24px;
   overflow: hidden;
   background: #ffffff;
   box-shadow: 0 22px 40px -28px rgba(0, 0, 0, 0.35);
+  transition:
+    max-width 0.25s ease,
+    border-radius 0.25s ease;
 
-  &.tablet {
+  &.device-tablet {
     max-width: 840px;
   }
 
-  &.mobile {
-    max-width: 402px;
+  &.device-mobile {
+    max-width: 390px;
     border-radius: 32px;
   }
 }
@@ -412,8 +416,8 @@ onUnmounted(() => {
     padding: 8px;
   }
 
-  .preview-frame-shell.mobile,
-  .preview-frame-shell.tablet {
+  .preview-frame-shell.device-mobile,
+  .preview-frame-shell.device-tablet {
     max-width: 100%;
   }
 }

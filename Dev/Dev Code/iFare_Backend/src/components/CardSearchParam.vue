@@ -12,6 +12,7 @@
           type="button"
           class="search-toolbar__reset"
           :disabled="!hasActiveFilters"
+          aria-label="清除所有搜尋條件"
           @click="resetSearchParams"
         >
           清除全部
@@ -145,6 +146,7 @@
         class="btn-search btn-search-reset"
         plain
         size="large"
+        :icon="RefreshLeft"
         :disabled="!hasActiveFilters"
         @click="resetSearchParams"
       >清除條件</el-button>
@@ -169,14 +171,13 @@
  * Emits：
  * - update:searchParams：傳出包含所有搜尋條件的物件給父元件
  */
-import { ref, watch, computed } from "vue";
-import { Search } from "@element-plus/icons-vue";
+import { computed, reactive, ref } from "vue";
+import { RefreshLeft, Search } from "@element-plus/icons-vue";
 import { ElButton } from "element-plus";
 import CompDateRangePicker from "@/components/CompDateRangePicker.vue";
 import CompRadioSelect from "./CompRadioSelect.vue";
 import CompItemSelect from "./CompItemSelect.vue";
 import CompTextInput from "./CompTextInput.vue";
-import { reactive } from "vue";
 import { useRouter } from "vue-router";
 
 const _router = useRouter()
@@ -185,6 +186,8 @@ const emits = defineEmits(["update:searchParams"]);
 const ALL_OPTION_LABEL = "不限";
 
 /* ========== 型別定義 ========== */
+
+type QueryValue = string | number | null | undefined;
 
 /** 日期範圍條件物件 */
 interface mdatepicker {
@@ -204,10 +207,10 @@ interface mradioSelect {
 
 /** 下拉選單條件物件 */
 interface mitemSelect {
-  domicile?: string;
-  policy?: string;
-  keyword?: string;
-  imgManagerType?: string;
+  domicile?: QueryValue;
+  policy?: QueryValue;
+  keyword?: QueryValue[] | null;
+  imgManagerType?: QueryValue;
 }
 
 /** 文字輸入搜尋條件物件 */
@@ -292,6 +295,38 @@ const activeFilterCount = computed(() => {
 });
 
 const hasActiveFilters = computed(() => activeFilterCount.value > 0);
+
+function getSelectValue(value: any): QueryValue {
+  if (value && typeof value === "object" && "value" in value) {
+    return value.value;
+  }
+
+  return value;
+}
+
+function getKeywordValues(value: any) {
+  if (!value) return value;
+  const list = Array.isArray(value) ? value : [value];
+  return list.map((item) => getSelectValue(item)).filter((item) => item !== null && item !== undefined && `${item}`.trim() !== "");
+}
+
+function formatDateForQuery(value: Date | string) {
+  if (typeof value === "string") return value;
+
+  const dateFormatOptions: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  };
+
+  return value.toLocaleDateString('en-US', dateFormatOptions);
+}
+
+function applyDateQuery(query: Record<string, string>, key: string, value: any) {
+  if (!Array.isArray(value) || value.length !== 2 || !value[0] || !value[1]) return;
+
+  query[key] = `${formatDateForQuery(value[0])}TO${formatDateForQuery(value[1])}`;
+}
 
 /**
  * checkCompToShow - 判斷指定搜尋元件是否應該顯示
@@ -447,11 +482,11 @@ function SetSearchParams() {
     }),
     itemSelect: reactive<mitemSelect>({
       // 下拉選單取 value 屬性（SelectOption 結構）
-      domicile: selectValue_domicile.value ? selectValue_domicile.value.value : selectValue_domicile.value,
-      policy: selectValue_policy.value ? selectValue_policy.value.value : selectValue_policy.value,
+      domicile: getSelectValue(selectValue_domicile.value) as string,
+      policy: getSelectValue(selectValue_policy.value) as string,
       // 關鍵字為多選，取出每個選項的 value 並組成陣列
-      keyword: selectValue_keyword.value ? selectValue_keyword.value.map((item:any) => { return item.value}) : selectValue_keyword.value,
-      imgManagerType: selectValue_imgManagerType.value ? selectValue_imgManagerType.value.value : selectValue_imgManagerType.value
+      keyword: getKeywordValues(selectValue_keyword.value),
+      imgManagerType: getSelectValue(selectValue_imgManagerType.value) as string
     }),
     searchInput: reactive<msearchInput>({
       num: inputValue_num.value,
@@ -462,37 +497,12 @@ function SetSearchParams() {
 
   // 組合 URL query 物件，日期格式為 en-US（MM/DD/YYYY）
   let _query:any = {}
-  const _dFormat = {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }
 
-  // 日期範圍條件：長度為 2（起始/結束）才加入 query
-  if (searchParams.datepicker?.create && searchParams.datepicker?.create.length == 2) {
-    const _dList = searchParams.datepicker?.create
-    const _dS = _dList[0].toLocaleDateString('en-US', _dFormat)
-    const _dE = _dList[1].toLocaleDateString('en-US', _dFormat)
-    _query.create = `${_dS}TO${_dE}`
-  }
-  if (searchParams.datepicker?.update && searchParams.datepicker?.update.length == 2) {
-    const _dList = searchParams.datepicker?.update
-    const _dS = _dList[0].toLocaleDateString('en-US', _dFormat)
-    const _dE = _dList[1].toLocaleDateString('en-US', _dFormat)
-    _query.update = `${_dS}TO${_dE}`
-  }
-  if (searchParams.datepicker?.release && searchParams.datepicker?.release.length == 2) {
-    const _dList = searchParams.datepicker?.release
-    const _dS = _dList[0].toLocaleDateString('en-US', _dFormat)
-    const _dE = _dList[1].toLocaleDateString('en-US', _dFormat)
-    _query.release = `${_dS}TO${_dE}`
-  }
-  if (searchParams.datepicker?.discontinued && searchParams.datepicker?.discontinued.length == 2) {
-    const _dList = searchParams.datepicker?.discontinued
-    const _dS = _dList[0].toLocaleDateString('en-US', _dFormat)
-    const _dE = _dList[1].toLocaleDateString('en-US', _dFormat)
-    _query.discontinued = `${_dS}TO${_dE}`
-  }
+  applyDateQuery(_query, "create", searchParams.datepicker?.create);
+  applyDateQuery(_query, "update", searchParams.datepicker?.update);
+  applyDateQuery(_query, "upload", searchParams.datepicker?.upload);
+  applyDateQuery(_query, "release", searchParams.datepicker?.release);
+  applyDateQuery(_query, "discontinued", searchParams.datepicker?.discontinued);
 
   // 單選條件：若為「不限」則不加入 query
   if (searchParams.radioSelect?.dataState && searchParams.radioSelect?.dataState != ALL_OPTION_LABEL) _query.dataState = searchParams.radioSelect?.dataState
@@ -504,6 +514,7 @@ function SetSearchParams() {
   if (searchParams.itemSelect?.policy) _query.policy = searchParams.itemSelect?.policy
   // 關鍵字多選轉為逗號分隔字串
   if (searchParams.itemSelect?.keyword && searchParams.itemSelect?.keyword?.length > 0) _query.keyword = searchParams.itemSelect?.keyword.toString()
+  if (searchParams.itemSelect?.imgManagerType) _query.imgManagerType = searchParams.itemSelect?.imgManagerType
 
   // 文字搜尋條件
   if (searchParams.searchInput?.num) _query.num = searchParams.searchInput?.num

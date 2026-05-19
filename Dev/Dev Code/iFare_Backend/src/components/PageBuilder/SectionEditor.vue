@@ -168,6 +168,23 @@
         <div class="item-row">
           <label class="item-label">圖片網址</label>
           <el-input v-model="section.imageSrc" placeholder="https://... 或 /img/..." />
+          <div class="image-source-actions">
+            <el-button :icon="Upload" size="small" plain :loading="uploadingImage" @click="triggerImageFileSelect">
+              選擇本機圖片
+            </el-button>
+            <el-button v-if="isEmbeddedImage" size="small" text @click="clearSelectedImage">
+              清除已選圖片
+            </el-button>
+            <input
+              ref="imageFileInput"
+              class="image-file-input"
+              type="file"
+              accept="image/*"
+              @change="onImageFileChange"
+            />
+          </div>
+          <span class="item-hint">本機 C:\... 路徑無法直接預覽，請使用公開網址、assets/img/...，或按「選擇本機圖片」。</span>
+          <span v-if="isLocalImagePath" class="item-warning">偵測到本機檔案路徑，瀏覽器無法直接載入這種路徑。</span>
         </div>
 
         <div class="item-row">
@@ -234,8 +251,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { ElButton, ElInput, ElRadioButton, ElRadioGroup } from 'element-plus';
+import { computed, ref } from 'vue';
+import { ElButton, ElInput, ElMessage, ElRadioButton, ElRadioGroup } from 'element-plus';
 import {
   ArrowDown,
   ArrowUp,
@@ -244,6 +261,7 @@ import {
   Delete,
   Plus,
   Top,
+  Upload,
 } from '@element-plus/icons-vue';
 import {
   ICON_OPTIONS,
@@ -275,6 +293,17 @@ const emit = defineEmits<{
 
 const section = computed(() => props.modelValue);
 const isEmpty = computed(() => isSectionEmpty(section.value));
+const imageFileInput = ref<HTMLInputElement | null>(null);
+const uploadingImage = ref(false);
+const FRONTEND_ASSET_UPLOAD_URL =
+  (import.meta.env.VITE_FRONTEND_ASSET_UPLOAD_URL as string | undefined) ||
+  'http://localhost:3000/api/dynamic-assets';
+const MAX_IMAGE_UPLOAD_SIZE = 8 * 1024 * 1024;
+const isEmbeddedImage = computed(() => section.value.type === 'image-text' && section.value.imageSrc.startsWith('data:image/'));
+const isLocalImagePath = computed(() => (
+  section.value.type === 'image-text' &&
+  /^(["']?)([a-zA-Z]:\\|[a-zA-Z]:\/|\\\\|file:\/\/)/.test(section.value.imageSrc.trim())
+));
 
 const summaryText = computed(() => {
   const current = section.value;
@@ -361,6 +390,69 @@ function addCtaCard() {
 function removeCtaCard(idx: number) {
   if (section.value.type === 'cta-card' && section.value.cards.length > 1) {
     section.value.cards.splice(idx, 1);
+  }
+}
+
+function triggerImageFileSelect() {
+  imageFileInput.value?.click();
+}
+
+function clearSelectedImage() {
+  if (section.value.type !== 'image-text') return;
+  section.value.imageSrc = '';
+}
+
+async function uploadImageFile(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(FRONTEND_ASSET_UPLOAD_URL, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return response.json() as Promise<{ url?: string; path?: string }>;
+}
+
+async function onImageFileChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('請選擇圖片檔案');
+    input.value = '';
+    return;
+  }
+
+  if (file.size > MAX_IMAGE_UPLOAD_SIZE) {
+    ElMessage.warning('圖片不可超過 8MB，請壓縮後再上傳');
+    input.value = '';
+    return;
+  }
+
+  uploadingImage.value = true;
+
+  try {
+    const result = await uploadImageFile(file);
+    if (section.value.type !== 'image-text') return;
+
+    section.value.imageSrc = result.url || result.path || '';
+    if (!section.value.imageAlt.trim()) {
+      section.value.imageAlt = file.name.replace(/\.[^.]+$/, '');
+    }
+    ElMessage.success('圖片已上傳，儲存頁面時會保留圖片網址');
+  } catch (err) {
+    console.warn('[PageBuilder] image upload failed', err);
+    ElMessage.error('圖片上傳失敗，請確認前台 dev server 已啟動');
+  } finally {
+    uploadingImage.value = false;
+    input.value = '';
   }
 }
 </script>
@@ -527,6 +619,23 @@ function removeCtaCard(idx: number) {
   font-size: 12px;
   color: #909399;
   line-height: 1.6;
+}
+
+.item-warning {
+  font-size: 12px;
+  color: #c45656;
+  line-height: 1.6;
+}
+
+.image-source-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.image-file-input {
+  display: none;
 }
 
 .paragraphs-list,

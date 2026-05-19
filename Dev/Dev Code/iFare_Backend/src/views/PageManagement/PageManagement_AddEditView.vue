@@ -944,6 +944,29 @@ async function onCancel() {
   router.go(-1);
 }
 
+function getEmbeddedImageSectionIndex() {
+  return form.sections.findIndex((section) => section.type === 'image-text' && section.imageSrc.startsWith('data:image/'));
+}
+
+function getSaveErrorMessage(err: unknown) {
+  if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+    return '儲存失敗：瀏覽器暫存容量已滿。請確認圖片不是舊版 data:image 內嵌資料，改用「選擇本機圖片」重新上傳後再儲存。';
+  }
+
+  if (err instanceof Error && /quota|storage/i.test(err.message)) {
+    return '儲存失敗：資料量超過瀏覽器暫存容量。請重新上傳圖片，避免儲存很長的 data:image 圖片資料。';
+  }
+
+  return '儲存失敗，請稍後再試；若剛更新圖片，請確認前台 dev server 已啟動並重新選擇圖片。';
+}
+
+function afterSave() {
+  saving.value = false;
+  isDirty.value = false;
+  originalSnapshot = JSON.stringify(form);
+  removeDraftStorage();
+}
+
 function onSave() {
   const validationErrors = validatePage(form, isSlugConflict, isAdd.value ? undefined : form.id);
 
@@ -965,6 +988,15 @@ function onSave() {
     return;
   }
 
+  const embeddedImageSectionIndex = getEmbeddedImageSectionIndex();
+  if (embeddedImageSectionIndex >= 0) {
+    warning(
+      `第 ${embeddedImageSectionIndex + 1} 個圖文並列仍是舊版內嵌圖片資料，請按「選擇本機圖片」重新上傳後再儲存。`,
+      7000,
+    );
+    return;
+  }
+
   saving.value = true;
 
   const payload = {
@@ -982,14 +1014,12 @@ function onSave() {
     status: form.status,
   };
 
+  try {
   if (isAdd.value) {
     const newPage = insert(payload);
     form.id = newPage.id;
     isAdd.value = false;
-    saving.value = false;
-    isDirty.value = false;
-    originalSnapshot = JSON.stringify(form);
-    removeDraftStorage();
+    afterSave();
     // 留頁體驗：改 query 不切 route name，避免 unmount 重新初始化
     router.replace({ query: { ...route.query, id: newPage.id } });
     if (form.status === 'published') {
@@ -1005,11 +1035,11 @@ function onSave() {
     return;
   }
 
-  update(form.id, payload);
-  saving.value = false;
-  isDirty.value = false;
-  originalSnapshot = JSON.stringify(form);
-  removeDraftStorage();
+  const didUpdate = update(form.id, payload);
+  if (!didUpdate) {
+    throw new Error('Page not found');
+  }
+  afterSave();
   if (form.status === 'published') {
     successWithLink({
       title: '頁面已更新',
@@ -1022,6 +1052,11 @@ function onSave() {
   }
   window.removeEventListener('beforeunload', beforeUnloadHandler);
   router.back();
+  } catch (err) {
+    console.error('[PageManagement] save failed', err);
+    showError(getSaveErrorMessage(err), 7000);
+    saving.value = false;
+  }
 }
 </script>
 

@@ -9,6 +9,6 @@ import type { H3Event } from 'h3';
 
 export function applyCors(event: H3Event): void {
   setHeader(event, 'Access-Control-Allow-Origin', '*');
-  setHeader(event, 'Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
+  setHeader(event, 'Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   setHeader(event, 'Access-Control-Allow-Headers', 'Content-Type');
 }
