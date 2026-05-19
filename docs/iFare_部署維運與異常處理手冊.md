@@ -1,6 +1,6 @@
 # iFare 基金會網站 — 部署維運與異常處理手冊
 
-> 版本：v2.0（整併版）
+> 版本：v2.1（2026-05-19 補充版）
 > 建立日期：2026-04-14
 > 整併日期：2026-04-28
 > 負責人：昀臻
@@ -61,6 +61,7 @@
   - 4.3.2 appsettings.json 設定
   - 4.3.3 Kestrel + IIS 反向代理設定
   - 4.3.4 連線字串與資料庫遷移
+- 4.4 PageBuilder 動態頁與圖片資料
 
 ### 五、日常維護
 - 5.1 每日檢查項目
@@ -139,6 +140,80 @@
 - 12.3 資料庫連線問題
 - 12.4 部署後 IIS 顯示 500 錯誤
 - 12.5 SSL 憑證錯誤
+- 12.6 PageBuilder 圖片或動態頁未顯示
+
+---
+
+## 2026-05-19 部署前補充：PageBuilder / Dynamic Assets
+
+這段是為了本次 UIUX + 後台調整補上的部署注意事項。PageBuilder 目前已能從後台同步到前台 Nuxt route，並支援圖片上傳，但資料仍是 runtime 檔案，不是正式資料庫。
+
+### 1. 建置與驗證
+
+前台：
+
+```bash
+cd "Dev/Dev Code/iFare_Frontend"
+npm run build
+```
+
+後台：
+
+```bash
+cd "Dev/Dev Code/iFare_Backend"
+npm run type-check
+npm run build
+```
+
+部署前至少手動驗證：
+
+- 後台可登入，列表搜尋、日期快捷、刪除確認正常。
+- PageManagement 新增頁面後可儲存，不會一直 loading。
+- 前台 `/<slug>` 可看到 PageBuilder 內容。
+- 圖文區塊上傳本機圖片後，前台可看到圖片，不是破圖 icon。
+- 後台前台預覽可切桌機 / 平板 / 手機。
+- Dashboard、登入頁、無權限頁照 `iFare_RWD回歸檢查清單.md` 快速巡一次。
+
+### 2. 環境變數
+
+後台 Vite：
+
+| 變數 | 用途 | 建議值 |
+|------|------|--------|
+| `VITE_FRONTEND_BASE` | 後台 toast「前往前端預覽」的站台根網址 | 本地 `http://localhost:3000`；正式改正式前台網址 |
+| `VITE_FRONTEND_SYNC_URL` | 後台儲存後同步 PageBuilder JSON | 本地 `http://localhost:3000/api/dynamic-pages` |
+| `VITE_FRONTEND_ASSET_UPLOAD_URL` | PageBuilder 圖片上傳 API | 本地 `http://localhost:3000/api/dynamic-assets` |
+
+前台 Nuxt：
+
+| 變數 | 用途 | 備註 |
+|------|------|------|
+| `NUXT_PUBLIC_SITE_URL` / `NUXT_SITE_URL` | 前台 canonical / sitemap 站台 URL | 正式部署需改正式網址 |
+| `NUXT_PUBLIC_FRONTEND_API_BASE` | 前台 client 端 API base | 依目前環境設定 |
+| `NUXT_FRONTEND_API_SERVER_BASE` | 前台 server 端 API base | 依目前環境設定 |
+| `GEMINI_API_KEY` / `GOOGLE_API_KEY` | AI 相關功能 | 沒用到可不設定 |
+
+### 3. Runtime 資料要保留
+
+| 路徑 | 內容 | 部署注意 |
+|------|------|----------|
+| `Dev/Dev Code/iFare_Frontend/server/data/dynamic-pages.json` | PageBuilder 動態頁資料 | 目前 gitignored，重新部署時不要覆蓋掉 |
+| `Dev/Dev Code/iFare_Frontend/server/data/dynamic-assets/` | PageBuilder 上傳圖片 | 需要可寫入權限，且要納入備份 |
+
+正式環境若仍沿用 Nuxt server route，主機上的執行帳號必須能寫入 `server/data/`。若部署流程每次會整包覆蓋前台目錄，應先把 `server/data/` 移到持久化位置，或在部署前備份、部署後還原。
+
+### 4. 正式化建議
+
+- 短期：可以先讓 Nuxt `/api/dynamic-pages` 與 `/api/dynamic-assets` 作為 staging bridge，但要限制 CORS origin，不要長期 wildcard。
+- 中期：把 PageBuilder 資料與圖片上傳改進 .NET API，資料進 SQL Server，圖片進正式儲存位置。
+- 長期：加入 slug 衝突、版本歷史、審核流程與多人編輯鎖定，避免內容互蓋。
+
+### 5. 常見排查
+
+- 前台頁面 404：確認該頁狀態是 `published`，且 `dynamic-pages.json` 內有該 slug。
+- 圖片破圖：確認圖片 URL 是 `/api/dynamic-assets/...`，不是 `C:\...`、`file://...` 或 `IPv4://...`。
+- 儲存一直轉：看後台 console 與前台 Nuxt server log，通常是同步 API 或圖片上傳 API 沒啟動。
+- 遠端主機更新後內容消失：優先檢查 `server/data/` 是否被部署流程覆蓋。
 
 ---
 
@@ -148,3 +223,4 @@
 |------|------|----------|
 | v1.0 | 2026-04-14 | 初版（部署環境說明 + 維護SOP 各自獨立） |
 | v2.0 | 2026-04-28 | 整併兩份文件，依「部署 → 維運 → 異常 → 緊急 → 交接」時間軸排列；移除與「Git 工作流程」「新人環境建置」重複的內容（已歸入 `iFare_開發上手與協作規範.md`） |
+| v2.1 | 2026-05-19 | 補充 PageBuilder 動態頁、圖片上傳、runtime 資料保留與部署前驗證項目 |
