@@ -21,9 +21,11 @@
           <li :class="{ active: $route.name == 'collaborator' }">
             <NuxtLink to="/collaborator" :aria-current="$route.name === 'collaborator' ? 'page' : undefined">公益夥伴</NuxtLink>
           </li>
+          <!-- 未來規劃暫時關閉；日後要啟用時取消註解即可
           <li :class="{ active: $route.name == 'future' }">
             <NuxtLink to="/future" :aria-current="$route.name === 'future' ? 'page' : undefined">未來規劃</NuxtLink>
           </li>
+          -->
           <li>
             <NuxtLink
               to="/ifare"
@@ -76,11 +78,13 @@
           >公益夥伴</NuxtLink
         >
       </li>
+      <!-- 未來規劃暫時關閉；日後要啟用時取消註解即可
       <li :class="{ active: $route.name == 'future'}">
         <NuxtLink class="mobileNav-link" to="/future" :aria-current="$route.name === 'future' ? 'page' : undefined" @click="MenuToggle"
           >未來規劃</NuxtLink
         >
       </li>
+      -->
     </ul>
     <section class="section-menu-share">
       <div class="group-share">

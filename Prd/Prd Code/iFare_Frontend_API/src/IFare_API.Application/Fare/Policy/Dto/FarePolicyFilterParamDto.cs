@@ -11,6 +11,7 @@ namespace IFare_API.Fare.Policy.Dto
         public long? CodeRecipient { get; set; }
         public long? CodePolicy {get; set; }
         public long? CodeIncome { get; set; }
-        public List<long>? CodeIdentities {get; set; }
+        public List<long> CodeIdentities {get; set; } = new List<long>();
+        public string Query { get; set; } = string.Empty;
     }
 }

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="app-body" :name="$route.name">
     <div class="bg-sector-bottom"></div>
     <div class="part-bg">
@@ -34,25 +34,33 @@
             <span>找尋適合您的社會福利</span>
           </h3>
         </div>
-        <div class="card-ifare-filter">
+        <div class="card-ifare-filter" role="search" aria-labelledby="ifare-search-title">
+          <span id="ifare-search-title" class="sr-only">i-Fare 福利搜尋表單</span>
           <div class="item item-policy">
-            <label class="filter-name">受助者情況</label>
+            <label class="filter-name" id="label-policy" for="select-policy">受助者情況</label>
             <CompSelect
+              id="select-policy"
               placeholder="選擇受助情境"
               select-title="受助情境"
               select-type="policy"
               :select-list="policySelectList"
+              aria-labelledby="label-policy"
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
             />
           </div>
           <div class="item item-recipient transition-general" :class="{'visible': isVisibleRecipient}">
-            <label class="filter-name">受助者年齡區間</label>
-            <div class="btn-tag-list">
+            <label class="filter-name" id="label-recipient">受助者年齡區間</label>
+            <div class="btn-tag-list" role="group" aria-labelledby="label-recipient">
               <span
                 class="btn btn-tag transition-general"
                 :class="{ active: _recipient.isActive }"
+                role="button"
+                tabindex="0"
+                :aria-pressed="_recipient.isActive"
                 @click="SwitchRecipient(_recipient.val)"
+                @keydown.enter.prevent="SwitchRecipient(_recipient.val)"
+                @keydown.space.prevent="SwitchRecipient(_recipient.val)"
                 :name="_recipient.name"
                 v-for="_recipient in recipientSelectList"
                 :key="_recipient.val"
@@ -61,20 +69,32 @@
             </div>
           </div>
           <div class="item item-identity">
-            <label class="filter-name">受助者戶籍地</label>
+            <label class="filter-name" id="label-area" for="select-area">受助者戶籍地</label>
             <CompSelect
+              id="select-area"
               placeholder="選擇受助者所在戶籍"
               select-title="戶籍地"
               select-type="area"
               :select-list="areaSelectList"
+              aria-labelledby="label-area"
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
             />
           </div>
+          <div class="item item-query">
+            <label class="filter-name">關鍵字</label>
+            <input v-model="searchQuery" class="input-query" type="text" placeholder="請輸入關鍵字" />
+          </div>
           <div class="item item-bottom">
-            <button class="btn-filter transition-general" @click="Search" :disabled="codeSelect_policy == '' || codeSelectRecipient == '' || codeSelect_area == ''">
+            <button
+              class="btn-filter transition-general"
+              type="submit"
+              @click="Search"
+              :disabled="!canSearch"
+              :aria-disabled="!canSearch"
+            >
               <span>搜尋</span>
-              <i class="icon ic-search"></i>
+              <i class="icon ic-search" aria-hidden="true"></i>
             </button>
           </div>
         </div>
@@ -128,13 +148,20 @@
                 class="faq-item transition-general"
                 :class="{ active: item.isActive }"
                 @click="item.isActive = !item.isActive"
+                @keydown.enter.prevent="item.isActive = !item.isActive"
+                @keydown.space.prevent="item.isActive = !item.isActive"
                 v-for="(item, i) in qaList"
                 :key="i"
+                role="button"
+                tabindex="0"
+                :aria-expanded="item.isActive"
+                :aria-controls="`faq-info-${i}`"
               >
                 <div class="faq-comp">
                   <h5 class="faq-title">
                     <i
                       class="faq-logo ic-faq transition-general"
+                      aria-hidden="true"
                     ></i>
                     <span>{{ item.question }}</span>
                   </h5>
@@ -144,9 +171,10 @@
                       'ic-plus': !item.isActive,
                       'ic-dash-primary-dark': item.isActive,
                     }"
+                    aria-hidden="true"
                   ></i>
                 </div>
-                <div class="faq-info transition-general">
+                <div class="faq-info transition-general" :id="`faq-info-${i}`" :aria-hidden="!item.isActive">
                   <span class="info-content transition-general">{{ item.answer }}</span>
                 </div>
               </li>
@@ -191,6 +219,9 @@ interface selectItem {
   isActive: boolean;
 }
 
+const ALL_POLICY_VALUE = "__all_policy";
+const ALL_AREA_VALUE = "__all_area";
+
 function isSelectOpen(type: string, val: boolean) {
   // console.log(`[${type}] val => ${val} || type ${typeof val}`)
   _isSelect.value = val
@@ -208,9 +239,18 @@ const policySelectList = reactive<Array<selectItem>>([]);
 const codeSelect_policy = ref("");
 const areaSelectList = reactive<Array<selectItem>>([]);
 const codeSelect_area = ref("");
+const searchQuery = ref("");
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient = ref("");
 const isVisibleRecipient = ref(true)
+const canSearch = computed(() => {
+  return Boolean(
+    codeSelect_policy.value ||
+    codeSelectRecipient.value ||
+    codeSelect_area.value ||
+    searchQuery.value.trim()
+  );
+});
 
 function getSelectValue(type: string, val: string) {
   // console.log(`[${type}] val => ${val}`)
@@ -227,40 +267,40 @@ function getSelectValue(type: string, val: string) {
 // Code Policy
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
-  const _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
+  if (!res?.result?.result) return;
+  const _data = res.result.result;
 
-  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
       val: item.id,
     };
   });
 
-  policySelectList.push(..._list);
+  policySelectList.push({ name: "全部", val: ALL_POLICY_VALUE, isActive: false }, ..._list);
 });
 
 // Code area
 const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
 codeArea.then((res: any) => {
-  const _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
+  if (!res?.result?.result) return;
+  const _data = res.result.result;
 
-  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
       val: item.id,
     };
   });
 
-  areaSelectList.push(..._list);
+  areaSelectList.push({ name: "全國", val: ALL_AREA_VALUE, isActive: false }, ..._list);
 });
 
 // Code recipient
 const codeRecipient = $WebApiGet("/Code/GetCodeRecipientList");
 codeRecipient.then((res: any) => {
-  const _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
+  if (!res?.result?.result) return;
+  const _data = res.result.result;
 
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
@@ -274,6 +314,13 @@ codeRecipient.then((res: any) => {
 });
 
 function SwitchRecipient(codeVal: any) {
+  const selectedItem = recipientSelectList.find((item) => item.val == codeVal);
+  if (selectedItem?.isActive) {
+    selectedItem.isActive = false;
+    codeSelectRecipient.value = "";
+    return;
+  }
+
   recipientSelectList.forEach((item, i) => {
     item.isActive = item.val == codeVal;
     if (item.isActive) {
@@ -283,12 +330,12 @@ function SwitchRecipient(codeVal: any) {
 }
 
 function Search() {
-  if (codeSelect_policy.value == "" || codeSelectRecipient.value == "" || codeSelect_area.value == "") return false;
+  if (!canSearch.value) return false;
   let query: any = {};
   if (codeSelect_policy.value) query.policy = codeSelect_policy.value;
   if (codeSelectRecipient.value) query.recipient = codeSelectRecipient.value;
   if (codeSelect_area.value) query.area = codeSelect_area.value;
-  console.log(query)
+  if (searchQuery.value.trim()) query.query = searchQuery.value.trim();
   $router.push({ path: "/ifare/result", query: query });
   // Init value.
   codeSelect_policy.value = ""
@@ -297,6 +344,7 @@ function Search() {
     item.isActive = false;
   });
   codeSelect_area.value = ""
+  searchQuery.value = ""
 }
 
 // Office Unit
@@ -318,8 +366,8 @@ const PAGEITEMMAX_OFFICE = 6;
 
 const listOffice = $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
 listOffice.then((res: any) => {
-  const _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
+  if (!res?.result?.result) return;
+  const _data = res.result.result;
 
   let _newsList: Array<OfficeUnitItem> = _data
     .filter((p: any) => p.id != 1)
@@ -400,8 +448,8 @@ const PAGEITEMMAX_QA = 9;
 
 const listNews = $WebApiGet("/FareQA/GetIFareQAList");
 listNews.then((res: any) => {
-  const _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
+  if (!res?.result?.result) return;
+  const _data = res.result.result;
 
   let _newsList: Array<QAItem> = _data
     .filter((p: any) => p.id != 1)

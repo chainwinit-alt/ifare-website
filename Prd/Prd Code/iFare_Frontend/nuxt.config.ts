@@ -1,7 +1,23 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   devtools: { enabled: false },
+  runtimeConfig: {
+    frontendApiServerBase:
+      process.env.NUXT_FRONTEND_API_SERVER_BASE || 'https://www.i-fare.org.tw/ifare_api/api/services/app',
+    public: {
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'https://www.i-fare.org.tw/',
+      frontendApiBase:
+        process.env.NUXT_PUBLIC_FRONTEND_API_BASE || 'https://www.i-fare.org.tw/ifare_api/api/services/app'
+    }
+  },
   nitro: {
+    devProxy: {
+      '/api/services/app': {
+        target: 'https://www.i-fare.org.tw/ifare_api/api/services/app',
+        changeOrigin: true,
+        secure: false
+      }
+    },
     // IIS options default
     iis: {
       // merges in a pre-existing web.config file to the nitro default file

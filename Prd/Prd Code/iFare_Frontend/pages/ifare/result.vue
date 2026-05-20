@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="app-body-child" :name="$route.name">
     <div class="section-list">
       <section class="section-filter">
@@ -40,6 +40,10 @@
                 @update:select-value="getSelectValue"
               />
             </div>
+            <div class="filter-group">
+              <label class="filter-title">關鍵字</label>
+              <input v-model="searchQuery" class="input-query" type="text" placeholder="請輸入關鍵字" />
+            </div>
           </div>
           <div class="part-bottom" v-show="isOpts">
             <div class="filter-group">
@@ -80,7 +84,7 @@
               ></i>
               <span>篩選</span>
             </button>
-            <button class="btn btn-filter" @click="Search" :disabled="codeSelect_policy == '' || codeSelectRecipient == '' || codeSelect_area == ''">
+            <button class="btn btn-filter" @click="Search" :disabled="!canSearch || isLoading">
               <span>搜尋</span>
               <i class="icon ic-search"></i>
             </button>
@@ -120,6 +124,17 @@
                 @update:select-value="getSelectValue"
               />
             </div>
+            <div class="part-mobile-query">
+              <label class="sr-only" for="ifare-result-mobile-query">關鍵字</label>
+              <input
+                id="ifare-result-mobile-query"
+                v-model="searchQuery"
+                class="input-query"
+                type="text"
+                placeholder="請輸入關鍵字"
+                @keydown.enter.prevent="Search"
+              />
+            </div>
             <div class="part-end">
               <CompSelectElse 
                 select-title="篩選"
@@ -129,7 +144,7 @@
                 @is-opened="isSelectOpen"
                 @update:select-items="getSelectItems"
                 />
-              <button class="btn-filter" @click="Search" :disabled="codeSelect_policy == '' || codeSelectRecipient == '' || codeSelect_area == ''">
+              <button class="btn-filter" @click="Search" :disabled="!canSearch || isLoading">
                 <span></span>
                 <i class="icon ic-search"></i>
               </button>
@@ -143,7 +158,8 @@
       <section class="section-result">
         <div class="part-list">
           <span class="result-total">{{ storageiFarePolicyList.length }}</span>
-          <ul class="list-unstyled result-list">
+          <div class="result-loading" v-if="isLoading">政策資料搜尋中...</div>
+          <ul class="list-unstyled result-list" v-else>
             <li
               class="result-item transition-general"
               v-for="_item in iFarePolicyList"
@@ -155,9 +171,9 @@
                   <div class="result-filter">
                     <label class="result-filter-area">{{ _item.area }}</label>
                     <label class="result-filter-qualify">
-                      <span :class="{remark: _item.hasRecipient}">{{_item.hasRecipient ? '有' : '無'}}</span>年齡限制、
-                      <span :class="{remark: _item.hasIncome}">{{ _item.hasIncome ? '有' : '無' }}</span>經濟限制、
-                      <span :class="{remark: _item.hasIndentity}">{{ _item.hasIndentity ? '有' : '無' }}</span>特殊身分
+                      <span :class="{ remark: _item.hasRecipient }">{{ _item.hasRecipient ? '有' : '無' }}</span>年齡限制、
+                      <span :class="{ remark: _item.hasIncome }">{{ _item.hasIncome ? '有' : '無' }}</span>經濟限制、
+                      <span :class="{ remark: _item.hasIndentity }">{{ _item.hasIndentity ? '有' : '無' }}</span>特殊身分
                     </label>
                   </div>
                   <i class="ic-arrow-right link-url transition-general"></i>
@@ -166,7 +182,7 @@
             </li>
           </ul>
         </div>
-        <div class="part-pages">
+        <div class="part-pages" v-show="!isLoading">
           <CompPage :page-list="pageNums" @change-page="PageChange"/>
         </div>
       </section>
@@ -208,19 +224,50 @@ interface selectItem {
   isActive: boolean;
 }
 
+const ALL_POLICY_VALUE = "__all_policy";
+const ALL_AREA_VALUE = "__all_area";
+
 const policySelectList = reactive<Array<selectItem>>([]);
 const codeSelect_policy:Ref<string> = ref("");
 const areaSelectList = reactive<Array<selectItem>>([]);
 const codeSelect_area:Ref<string> = ref("");
+const searchQuery = ref("");
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient:Ref<string> = ref("");
 const incomeSelectList = reactive<Array<selectItem>>([]);
 const codeSelectIncome = ref("");
 const identitySelectList = reactive<Array<selectItem>>([]);
 const codeSelectIdentity: any = ref([]);
+const isLoading = ref(false);
+const canSearch = computed(() => {
+  return Boolean(
+    codeSelect_policy.value ||
+    codeSelectRecipient.value ||
+    codeSelect_area.value ||
+    searchQuery.value.trim()
+  );
+});
+
+function isAllPolicyValue(value: any) {
+  return value == ALL_POLICY_VALUE || value == "全部";
+}
+
+function isAllAreaValue(value: any) {
+  return value == ALL_AREA_VALUE || value == "全國";
+}
+
+function buildFarePolicyApiQuery() {
+  let query: any = {};
+  if (codeSelect_policy.value && !isAllPolicyValue(codeSelect_policy.value)) query.CodePolicy = codeSelect_policy.value;
+  if (codeSelectRecipient.value) query.CodeRecipient = codeSelectRecipient.value;
+  if (codeSelect_area.value && !isAllAreaValue(codeSelect_area.value)) query.CodeDomicile = codeSelect_area.value;
+  if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
+  if (searchQuery.value.trim()) query.Query = searchQuery.value.trim();
+  if (codeSelectIdentity.value.length > 0) query.CodeIdentities = codeSelectIdentity.value;
+  return query;
+}
 
 function getSelectValue(type: string, val: string) {
-  console.log(`[${type}] val => ${val}`)
   if (type == "policy") {
     codeSelect_policy.value = val;
   }
@@ -235,21 +282,14 @@ function getSelectValue(type: string, val: string) {
 }
 
 function getSelectItems(type: string, items: any) {
-  console.log('type:', type)
-  console.log(items)
-
   let selectIncome = items.find((p:any) => p.type == 'Income')
   codeSelectIncome.value = selectIncome ? selectIncome.value : ""
-  console.log(codeSelectIncome)
 
   let selectIdentitys = items.filter((p:any) => p.type == 'Identity')
-  console.log(selectIdentitys)
   if (selectIdentitys.length > 0) {
     codeSelectIdentity.value.splice(0)
     if (selectIdentitys.find((p:any) => p.value == 1)) return false
     codeSelectIdentity.value.push(...selectIdentitys.map((p:any) => { return p.value}))
-    // codeSelectIdentity.value.splice(0, selectIdentitys.length, ...selectIdentitys.map((p:any) => { return p.value}))
-    console.log(codeSelectIdentity)
   } else {
     codeSelectIdentity.value.splice(0)
   }
@@ -258,36 +298,36 @@ function getSelectItems(type: string, items: any) {
 // Code Policy
 const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
-  const _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
-  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+  if (!res?.result?.result) return;
+  const _data = res.result.result;
+let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
       val: item.id,
     };
   });
-  policySelectList.push(..._list);
+  policySelectList.push({ name: "全部", val: ALL_POLICY_VALUE, isActive: false }, ..._list);
 });
 
 // Code area
 const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
 codeArea.then((res: any) => {
-  const _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
-  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+  if (!res?.result?.result) return;
+  const _data = res.result.result;
+let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
       val: item.id,
     };
   });
-  areaSelectList.push(..._list);
+  areaSelectList.push({ name: "全國", val: ALL_AREA_VALUE, isActive: false }, ..._list);
 });
 
 // Code recipient
 const codeRecipient = $WebApiGet("/Code/GetCodeRecipientList");
 codeRecipient.then((res: any) => {
-  const _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
+  if (!res?.result?.result) return;
+  const _data = res.result.result;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName,
@@ -302,26 +342,34 @@ codeRecipient.then((res: any) => {
 });
 
 function SwitchRecipient(codeVal: any) {
+  if (codeVal == "reset") {
+    codeSelectRecipient.value = ""
+    recipientSelectList.forEach((item) => {
+      item.isActive = false
+    })
+    return
+  }
+
+  const selectedItem = recipientSelectList.find((item) => item.val == codeVal);
+  if (selectedItem?.isActive) {
+    selectedItem.isActive = false;
+    codeSelectRecipient.value = "";
+    return;
+  }
+
   recipientSelectList.forEach((item, i) => {
     item.isActive = item.val == codeVal;
     if (item.isActive) {
       codeSelectRecipient.value = item.val;
     }
   });
-
-  if (codeVal == "reset") {
-    codeSelectRecipient.value = ""
-    const _tempRecipient = JSON.parse(JSON.stringify(recipientSelectList))
-    recipientSelectList.splice(0)
-    recipientSelectList.push(..._tempRecipient)
-  }
 }
 
 // Code income
 const codeIncome = $WebApiGet("/Code/GetCodeIncomeList");
 codeIncome.then((res: any) => {
-  const _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
+  if (!res?.result?.result) return;
+  const _data = res.result.result;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName,
@@ -356,11 +404,11 @@ function SwitchIncome(codeVal: any) {
 // Code identity
 const codeIdentity = $WebApiGet("/Code/GetCodeIdentityList");
 codeIdentity.then((res: any) => {
-  const _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
+  if (!res?.result?.result) return;
+  const _data = res.result.result;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
-      name: item.codeName == '全選' ? '不限' : item.codeName,
+      name: item.codeName == '?券' ? '銝?' : item.codeName,
       val: item.id,
       isActive: false,
     };
@@ -369,7 +417,6 @@ codeIdentity.then((res: any) => {
 });
 
 function SwitchIdentity(codeVal: any) {
-  console.log(codeVal)
   identitySelectList.forEach((item:any, i) => {
     if (item.val == codeVal) {
       if (item.isActive) {
@@ -400,15 +447,8 @@ function SwitchIdentity(codeVal: any) {
 }
 
 function Search() {
-  let query: any = {};
-  if (codeSelect_policy.value) query.CodePolicy = codeSelect_policy.value;
-  if (codeSelectRecipient.value)
-    query.CodeRecipient = codeSelectRecipient.value;
-  if (codeSelect_area.value) query.CodeDomicile = codeSelect_area.value;
-  if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
-  if (codeSelectIdentity.value.length > 0)
-    query.CodeIdentities = codeSelectIdentity.value;
-  SetDataInit(query);
+  if (!canSearch.value) return false;
+  SetDataInit(buildFarePolicyApiQuery());
 }
 
 // iFare Policy
@@ -416,16 +456,18 @@ const PAGEITEMMAX = 10;
 const $route = useRoute();
 
 // Init filter default value.
-codeSelect_policy.value = `${$route.query.policy}`
-codeSelect_area.value = `${$route.query.area}`
-codeSelectRecipient.value = `${$route.query.recipient}`
+codeSelect_policy.value = typeof $route.query.policy == "string" ? $route.query.policy : ""
+codeSelect_area.value = typeof $route.query.area == "string" ? $route.query.area : ""
+codeSelectRecipient.value = typeof $route.query.recipient == "string" ? $route.query.recipient : ""
+searchQuery.value = typeof $route.query.query == "string" ? $route.query.query : ""
 
 const _query: any = {};
 
 if (Object.keys($route.query).length > 0) {
-  if ($route.query.policy) _query.CodePolicy = $route.query.policy;
+  if ($route.query.policy && !isAllPolicyValue($route.query.policy)) _query.CodePolicy = $route.query.policy;
   if ($route.query.recipient) _query.CodeRecipient = $route.query.recipient;
-  if ($route.query.area) _query.CodeDomicile = $route.query.area;
+  if ($route.query.area && !isAllAreaValue($route.query.area)) _query.CodeDomicile = $route.query.area;
+  if ($route.query.query) _query.Query = $route.query.query;
 }
 
 interface iFarePolicyItem {
@@ -451,10 +493,15 @@ const pageNums = reactive<Array<pageNum>>([]);
 SetDataInit(_query);
 
 function SetDataInit(_q: any) {
+  isLoading.value = true;
   const listNews = $WebApiGet("/FarePolicy/GetIFarePolicyList", _q);
   listNews.then((res: any) => {
-    const _data = res?.result?.result;
-    if (!Array.isArray(_data)) return;
+    storageiFarePolicyList.splice(0);
+    iFarePolicyList.splice(0);
+    pageNums.splice(0);
+
+    if (!res?.result?.result) return;
+    const _data = res.result.result;
     let _newsList: Array<iFarePolicyItem> = _data.map(
       (item: any, i: number) => {
         return {
@@ -468,10 +515,6 @@ function SetDataInit(_q: any) {
         };
       }
     );
-
-    storageiFarePolicyList.splice(0);
-    iFarePolicyList.splice(0);
-    pageNums.splice(0);
 
     storageiFarePolicyList.push(..._newsList);
     iFarePolicyList.push(
@@ -491,6 +534,8 @@ function SetDataInit(_q: any) {
         isHide: false
       });
     }
+  }).finally(() => {
+    isLoading.value = false;
   });
 }
 
@@ -521,7 +566,6 @@ function isSelectOpen(type: string, val: boolean) {
 }
 
 function ResetParam() {
-  console.log('ResetParam')
   codeSelect_area.value = ""
   const _tempArea = JSON.parse(JSON.stringify(areaSelectList))
   areaSelectList.splice(0)
@@ -531,6 +575,8 @@ function ResetParam() {
   const _tempPolicy = JSON.parse(JSON.stringify(policySelectList))
   policySelectList.splice(0)
   policySelectList.push(..._tempPolicy)
+
+  searchQuery.value = ""
 
   SwitchRecipient("reset")
   SwitchIncome("reset")

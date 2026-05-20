@@ -5,6 +5,9 @@
  * 2. 處理帶有 ?reload 查詢參數的強制重新載入邏輯
  */
 export default defineNuxtRouteMiddleware((to, from) => {
+    if (import.meta.server) return
+    if (shouldSkipVisitorRecord(to.path)) return
+
     const $router = useRouter();
     // 檢查目標路由是否含有 reload 查詢參數（用於強制重新整理頁面）
     const isReload = to.query.hasOwnProperty('reload')
@@ -26,8 +29,21 @@ export default defineNuxtRouteMiddleware((to, from) => {
         $router.replace({ path: to.path, query: _query})
         setTimeout(() => {
             // 捲回頁面頂端後重新載入（ttl: 3000ms 為快取存活時間）
-            window.scrollTo(0,0)
+            window.scrollTo(0, 0)
             reloadNuxtApp({ path: to.path, ttl: 3000 })
         }, 10)
     }
 })
+
+function shouldSkipVisitorRecord(path: string) {
+    return path.startsWith('/api/')
+        || path.startsWith('/_nuxt/')
+        || path.startsWith('/fle/')
+        || path.startsWith('/pic/')
+        || path.startsWith('/images/')
+        || path.endsWith('.aspx')
+        || path.endsWith('.png')
+        || path.endsWith('.gif')
+        || path === '/robots.txt'
+        || path.includes('*')
+}

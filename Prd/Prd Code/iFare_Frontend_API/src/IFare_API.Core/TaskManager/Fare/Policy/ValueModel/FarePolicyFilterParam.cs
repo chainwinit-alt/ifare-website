@@ -8,11 +8,13 @@ namespace IFare_API.TaskManager.Fare.Policy.ValueModel
         public long? CodeRecipient { get; set; }
         public long? CodePolicy {get; set; }
         public long? CodeIncome { get; set; }
-        public List<long>? CodeIdentities {get; set; }
+        public List<long> CodeIdentities {get; set; } = new List<long>();
+        public string Query { get; set; } = string.Empty;
         public bool IsCodeDomicileFiltered { get; set; } = false;
         public bool IsCodeRecipientFiltered { get; set; } = false;
         public bool IsCodePolicyFiltered { get; set; } = false;
         public bool IsCodeIncomeFiltered { get; set; } = false;
         public bool IsCodeIdentitiesFiltered { get; set; } = false;
+        public bool IsQueryFiltered { get; set; } = false;
     }
 }

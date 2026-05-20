@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using IFare_API.TaskManager.Common;
 using IFare_API.TaskManager.Fare.Policy.ValueModel;
 
@@ -15,6 +16,9 @@ namespace IFare_API.TaskManager.Fare.Policy.Common
 
         public bool IsCheckPass() 
         {
+            _param.CodeIdentities = _param.CodeIdentities ?? new List<long>();
+            _param.Query = _param.Query?.Trim() ?? string.Empty;
+
             // Code Domicile Filter check.
             _param.IsCodeDomicileFiltered = _paramChecker.IsCodeDomicileFiltered(_param.CodeDomicile);
 
@@ -29,6 +33,9 @@ namespace IFare_API.TaskManager.Fare.Policy.Common
 
             // Code Identities Filter check.
             _param.IsCodeIdentitiesFiltered = _paramChecker.IsCodeIdentitiesFiltered(_param.CodeIdentities);
+
+            // Query Filter check.
+            _param.IsQueryFiltered = !string.IsNullOrWhiteSpace(_param.Query);
 
             return true;
         }

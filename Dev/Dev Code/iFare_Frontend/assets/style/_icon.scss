@@ -4,11 +4,11 @@ $bg-init: no-repeat center/contain;
   &[name="index"],
   &[name="ifare"],
   &[name="indexIFare"] {
-    background: url("../img/logo.svg") $bg-init;
+    background: url("../img/Logo.svg") $bg-init;
   }
 
   &[name="other"] {
-    background: url("../img/logo-color.svg") $bg-init;
+    background: url("../img/Logo-color.svg") $bg-init;
   }
 }
 
@@ -16,11 +16,11 @@ $bg-init: no-repeat center/contain;
   &[name="index"],
   &[name="ifare"],
   &[name="indexIFare"] {
-    background: url("../img/logo-title.svg") $bg-init;
+    background: url("../img/Logo-title.svg") $bg-init;
     margin-left: 8px;
   }
   &[name="other"] {
-    background: url("../img/logo-title-color.svg") $bg-init;
+    background: url("../img/Logo-title-color.svg") $bg-init;
   }
 }
 
