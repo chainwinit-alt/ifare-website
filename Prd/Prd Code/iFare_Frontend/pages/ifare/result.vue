@@ -224,13 +224,19 @@ interface selectItem {
   isActive: boolean;
 }
 
-const ALL_POLICY_VALUE = "__all_policy";
-const ALL_AREA_VALUE = "__all_area";
+const ALL_POLICY_VALUE = "全部";
+const ALL_AREA_VALUE = "全國";
+const LEGACY_ALL_POLICY_VALUE = "__all_policy";
+const LEGACY_ALL_AREA_VALUE = "__all_area";
 
-const policySelectList = reactive<Array<selectItem>>([]);
-const codeSelect_policy:Ref<string> = ref("");
-const areaSelectList = reactive<Array<selectItem>>([]);
-const codeSelect_area:Ref<string> = ref("");
+const policySelectList = reactive<Array<selectItem>>([
+  { name: ALL_POLICY_VALUE, val: ALL_POLICY_VALUE, isActive: false },
+]);
+const codeSelect_policy:Ref<string> = ref(ALL_POLICY_VALUE);
+const areaSelectList = reactive<Array<selectItem>>([
+  { name: ALL_AREA_VALUE, val: ALL_AREA_VALUE, isActive: false },
+]);
+const codeSelect_area:Ref<string> = ref(ALL_AREA_VALUE);
 const searchQuery = ref("");
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient:Ref<string> = ref("");
@@ -249,18 +255,31 @@ const canSearch = computed(() => {
 });
 
 function isAllPolicyValue(value: any) {
-  return value == ALL_POLICY_VALUE || value == "全部";
+  return value == ALL_POLICY_VALUE || value == LEGACY_ALL_POLICY_VALUE;
 }
 
 function isAllAreaValue(value: any) {
-  return value == ALL_AREA_VALUE || value == "全國";
+  return value == ALL_AREA_VALUE || value == LEGACY_ALL_AREA_VALUE;
+}
+
+function getPolicyRouteValue(value: any) {
+  if (value == LEGACY_ALL_POLICY_VALUE) return ALL_POLICY_VALUE;
+  return typeof value == "string" ? value : ALL_POLICY_VALUE;
+}
+
+function getAreaRouteValue(value: any) {
+  if (value == LEGACY_ALL_AREA_VALUE) return ALL_AREA_VALUE;
+  return typeof value == "string" ? value : ALL_AREA_VALUE;
 }
 
 function buildFarePolicyApiQuery() {
   let query: any = {};
-  if (codeSelect_policy.value && !isAllPolicyValue(codeSelect_policy.value)) query.CodePolicy = codeSelect_policy.value;
+  const selectedPolicy = codeSelect_policy.value || ALL_POLICY_VALUE;
+  const selectedArea = codeSelect_area.value || ALL_AREA_VALUE;
+
+  if (!isAllPolicyValue(selectedPolicy)) query.CodePolicy = selectedPolicy;
   if (codeSelectRecipient.value) query.CodeRecipient = codeSelectRecipient.value;
-  if (codeSelect_area.value && !isAllAreaValue(codeSelect_area.value)) query.CodeDomicile = codeSelect_area.value;
+  if (!isAllAreaValue(selectedArea)) query.CodeDomicile = selectedArea;
   if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
   if (searchQuery.value.trim()) query.Query = searchQuery.value.trim();
   if (codeSelectIdentity.value.length > 0) query.CodeIdentities = codeSelectIdentity.value;
@@ -306,7 +325,7 @@ let _list: Array<selectItem> = _data.map((item: any, i: number) => {
       val: item.id,
     };
   });
-  policySelectList.push({ name: "全部", val: ALL_POLICY_VALUE, isActive: false }, ..._list);
+  policySelectList.push(..._list);
 });
 
 // Code area
@@ -320,7 +339,7 @@ let _list: Array<selectItem> = _data.map((item: any, i: number) => {
       val: item.id,
     };
   });
-  areaSelectList.push({ name: "全國", val: ALL_AREA_VALUE, isActive: false }, ..._list);
+  areaSelectList.push(..._list);
 });
 
 // Code recipient
@@ -456,19 +475,10 @@ const PAGEITEMMAX = 10;
 const $route = useRoute();
 
 // Init filter default value.
-codeSelect_policy.value = typeof $route.query.policy == "string" ? $route.query.policy : ""
-codeSelect_area.value = typeof $route.query.area == "string" ? $route.query.area : ""
+codeSelect_policy.value = getPolicyRouteValue($route.query.policy)
+codeSelect_area.value = getAreaRouteValue($route.query.area)
 codeSelectRecipient.value = typeof $route.query.recipient == "string" ? $route.query.recipient : ""
 searchQuery.value = typeof $route.query.query == "string" ? $route.query.query : ""
-
-const _query: any = {};
-
-if (Object.keys($route.query).length > 0) {
-  if ($route.query.policy && !isAllPolicyValue($route.query.policy)) _query.CodePolicy = $route.query.policy;
-  if ($route.query.recipient) _query.CodeRecipient = $route.query.recipient;
-  if ($route.query.area && !isAllAreaValue($route.query.area)) _query.CodeDomicile = $route.query.area;
-  if ($route.query.query) _query.Query = $route.query.query;
-}
 
 interface iFarePolicyItem {
   id: number;
@@ -490,7 +500,7 @@ const iFarePolicyList = reactive<Array<iFarePolicyItem>>([]);
 const storageiFarePolicyList = reactive<Array<iFarePolicyItem>>([]);
 const pageNums = reactive<Array<pageNum>>([]);
 
-SetDataInit(_query);
+SetDataInit(buildFarePolicyApiQuery());
 
 function SetDataInit(_q: any) {
   isLoading.value = true;
@@ -566,12 +576,12 @@ function isSelectOpen(type: string, val: boolean) {
 }
 
 function ResetParam() {
-  codeSelect_area.value = ""
+  codeSelect_area.value = ALL_AREA_VALUE
   const _tempArea = JSON.parse(JSON.stringify(areaSelectList))
   areaSelectList.splice(0)
   areaSelectList.push(..._tempArea)
 
-  codeSelect_policy.value = ""
+  codeSelect_policy.value = ALL_POLICY_VALUE
   const _tempPolicy = JSON.parse(JSON.stringify(policySelectList))
   policySelectList.splice(0)
   policySelectList.push(..._tempPolicy)

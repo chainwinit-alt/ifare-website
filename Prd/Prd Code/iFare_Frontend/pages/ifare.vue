@@ -44,6 +44,7 @@
               select-title="受助情境"
               select-type="policy"
               :select-list="policySelectList"
+              :select-default="codeSelect_policy"
               aria-labelledby="label-policy"
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
@@ -76,6 +77,7 @@
               select-title="戶籍地"
               select-type="area"
               :select-list="areaSelectList"
+              :select-default="codeSelect_area"
               aria-labelledby="label-area"
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
@@ -219,8 +221,8 @@ interface selectItem {
   isActive: boolean;
 }
 
-const ALL_POLICY_VALUE = "__all_policy";
-const ALL_AREA_VALUE = "__all_area";
+const ALL_POLICY_VALUE = "全部";
+const ALL_AREA_VALUE = "全國";
 
 function isSelectOpen(type: string, val: boolean) {
   // console.log(`[${type}] val => ${val} || type ${typeof val}`)
@@ -235,10 +237,14 @@ function isSelectOpen(type: string, val: boolean) {
   // })
 }
 
-const policySelectList = reactive<Array<selectItem>>([]);
-const codeSelect_policy = ref("");
-const areaSelectList = reactive<Array<selectItem>>([]);
-const codeSelect_area = ref("");
+const policySelectList = reactive<Array<selectItem>>([
+  { name: ALL_POLICY_VALUE, val: ALL_POLICY_VALUE, isActive: false },
+]);
+const codeSelect_policy = ref(ALL_POLICY_VALUE);
+const areaSelectList = reactive<Array<selectItem>>([
+  { name: ALL_AREA_VALUE, val: ALL_AREA_VALUE, isActive: false },
+]);
+const codeSelect_area = ref(ALL_AREA_VALUE);
 const searchQuery = ref("");
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient = ref("");
@@ -277,7 +283,7 @@ let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     };
   });
 
-  policySelectList.push({ name: "全部", val: ALL_POLICY_VALUE, isActive: false }, ..._list);
+  policySelectList.push(..._list);
 });
 
 // Code area
@@ -293,7 +299,7 @@ let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     };
   });
 
-  areaSelectList.push({ name: "全國", val: ALL_AREA_VALUE, isActive: false }, ..._list);
+  areaSelectList.push(..._list);
 });
 
 // Code recipient
@@ -331,19 +337,20 @@ function SwitchRecipient(codeVal: any) {
 
 function Search() {
   if (!canSearch.value) return false;
-  let query: any = {};
-  if (codeSelect_policy.value) query.policy = codeSelect_policy.value;
+  let query: any = {
+    policy: codeSelect_policy.value || ALL_POLICY_VALUE,
+    area: codeSelect_area.value || ALL_AREA_VALUE,
+  };
   if (codeSelectRecipient.value) query.recipient = codeSelectRecipient.value;
-  if (codeSelect_area.value) query.area = codeSelect_area.value;
   if (searchQuery.value.trim()) query.query = searchQuery.value.trim();
   $router.push({ path: "/ifare/result", query: query });
   // Init value.
-  codeSelect_policy.value = ""
+  codeSelect_policy.value = ALL_POLICY_VALUE
   codeSelectRecipient.value = ""
   recipientSelectList.forEach((item, i) => {
     item.isActive = false;
   });
-  codeSelect_area.value = ""
+  codeSelect_area.value = ALL_AREA_VALUE
   searchQuery.value = ""
 }
 

@@ -63,18 +63,26 @@ const props = defineProps([
 ]);
 const emits = defineEmits(["update:selectValue", "isOpened"]);
 
-watch(props.selectList, (newList, oldList) => {
-  if (props.selectDefault) {
-    const _defaultItem = newList.find((p:any) => p.val == props.selectDefault)
-    selectName.value = _defaultItem.name
-    selectVal.value = _defaultItem.val
-  }
+watch(
+  () => [props.selectDefault, props.selectList],
+  ([selectDefault, newList]) => {
+    const list = Array.isArray(newList) ? newList : []
 
-  if (props.selectDefault == "") {
-    selectName.value = ""
-    selectVal.value = ""
-  }
-})
+    if (selectDefault) {
+      const _defaultItem = list.find((p:any) => p.val == selectDefault || p.name == selectDefault)
+      if (_defaultItem) {
+        selectName.value = _defaultItem.name
+        selectVal.value = _defaultItem.val
+      }
+    }
+
+    if (selectDefault == "") {
+      selectName.value = ""
+      selectVal.value = ""
+    }
+  },
+  { immediate: true, deep: true }
+)
 
 const modelValue = computed({
   get() {
