@@ -441,6 +441,33 @@ onBeforeUnmount(() => {
   font-size: 14px;
 }
 
+@media (max-width: 1024px) {
+  .search-suggestion-panel {
+    position: static;
+    margin-top: 10px;
+    border-radius: 16px;
+    box-shadow: 0 12px 32px rgba(21, 74, 76, 0.12);
+  }
+
+  .hot-keyword-list {
+    gap: 10px;
+  }
+
+  .hot-keyword-chip {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .suggestion-item {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .suggestion-main {
+    min-width: 0;
+  }
+}
+
 @media (max-width: 640px) {
   .input-query {
     padding-right: 58px;

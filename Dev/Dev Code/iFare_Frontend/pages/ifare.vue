@@ -88,6 +88,7 @@
                 <IfareSearchAutocomplete
                   v-model="searchQuery"
                   :filters="autocompleteFilters"
+                  placeholder="輸入關鍵字"
                   @submit="Search"
                 />
               </div>
@@ -659,5 +660,43 @@ loadQAList();
 
 :deep(.input-query) {
   min-width: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .card-ifare-filter {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .item-query {
+    order: 10;
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  .item-bottom {
+    order: 11;
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .query-action-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .query-field,
+  .btn-query-submit {
+    width: 100% !important;
+  }
+
+  .btn-query-submit {
+    min-width: 0;
+    justify-content: center;
+  }
 }
 </style>

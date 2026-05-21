@@ -1,19 +1,18 @@
 /*
-    Rebuild current hot keyword snapshot for iFare search.
+    Rebuild hot keyword daily history for iFare search.
 
     Purpose:
-    - Recompute dbo.search_term_stat_daily as a current snapshot table
+    - Recompute dbo.search_term_stat_daily for the requested date range
     - Use recent search_query_log behavior plus policy/content support
-    - Keep only the latest rebuild output for hot suggestions
+    - Keep recent daily history so 7-day / 30-day scoring can aggregate correctly
 
     Recommended usage:
     - Run by SQL Agent every 5 to 15 minutes
     - Or run manually after importing search terms / trend data
 
     Notes:
-    - dbo.sp_rebuild_policy_term_hot_stat has been updated to rebuild
-      dbo.search_term_stat_daily as a snapshot, not a historical daily series
-    - This procedure clears existing dbo.search_term_stat_daily rows before rebuild
+    - dbo.sp_rebuild_policy_term_hot_stat updates only the requested date range
+      and preserves external trend values already merged into dbo.search_term_stat_daily
 */
 
 USE [iFare];

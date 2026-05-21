@@ -596,24 +596,91 @@ GO
 
 CREATE PROCEDURE [dbo].[sp_rebuild_policy_term_hot_stat]
     @start_date DATE = NULL,
-    @end_date DATE = NULL
+    @end_date DATE = NULL,
+    @retention_days INT = 120
 AS
 BEGIN
     SET NOCOUNT ON;
 
     DECLARE @effective_start_date DATE = ISNULL(@start_date, DATEADD(DAY, -30, CAST(GETUTCDATE() AS DATE)));
     DECLARE @effective_end_date DATE = ISNULL(@end_date, CAST(GETUTCDATE() AS DATE));
-    DECLARE @snapshot_date DATE = CAST(GETUTCDATE() AS DATE);
+    DECLARE @start_datetime DATETIME2 = CAST(@effective_start_date AS DATETIME2);
+    DECLARE @end_datetime_exclusive DATETIME2 = DATEADD(DAY, 1, CAST(@effective_end_date AS DATETIME2));
+    DECLARE @retention_cutoff DATE = DATEADD(DAY, -CASE WHEN @retention_days < 1 THEN 120 ELSE @retention_days END, CAST(GETUTCDATE() AS DATE));
 
-    DELETE FROM [dbo].[search_term_stat_daily];
+    IF @effective_start_date > @effective_end_date
+    BEGIN
+        RAISERROR('@start_date cannot be greater than @end_date.', 16, 1);
+        RETURN;
+    END;
 
-    ;WITH mapped_query AS
+    IF OBJECT_ID('tempdb..#hot_payload') IS NOT NULL
+        DROP TABLE #hot_payload;
+
+    IF OBJECT_ID('tempdb..#content_support') IS NOT NULL
+        DROP TABLE #content_support;
+
+    CREATE TABLE #hot_payload
+    (
+        term_id BIGINT NOT NULL,
+        stat_date DATE NOT NULL,
+        search_count INT NOT NULL,
+        select_count INT NOT NULL,
+        result_count INT NOT NULL,
+        zero_result_count INT NOT NULL,
+        trend_score DECIMAL(12,4) NOT NULL,
+        content_match_count INT NOT NULL,
+        content_freshness_score DECIMAL(18,6) NOT NULL,
+        editorial_boost_score DECIMAL(18,6) NOT NULL,
+        base_weight DECIMAL(10,4) NOT NULL
+    );
+
+    CREATE TABLE #content_support
+    (
+        term_id BIGINT NOT NULL PRIMARY KEY,
+        policy_count INT NOT NULL,
+        content_score DECIMAL(18,6) NOT NULL
+    );
+
+    INSERT INTO #content_support
+    (
+        term_id,
+        policy_count,
+        content_score
+    )
+    SELECT
+        t.id AS term_id,
+        ISNULL(MAX(c.policy_count), 0) AS policy_count,
+        CAST(ISNULL(MAX(c.content_score), 0) AS DECIMAL(18,6)) AS content_score
+    FROM [dbo].[search_term] t
+    LEFT JOIN [dbo].[search_policy_term_candidate] c
+        ON c.normalized_term = t.normalized_term
+       AND c.term_type = t.term_type
+    WHERE t.status = N'active'
+    GROUP BY t.id;
+
+    ;WITH filtered_query AS
+    (
+        SELECT
+            q.normalized_query,
+            q.result_count,
+            q.source_page,
+            CAST(q.created_at AS DATE) AS stat_date
+        FROM [dbo].[search_query_log] q
+        WHERE
+            q.created_at >= @start_datetime
+            AND q.created_at < @end_datetime_exclusive
+            AND q.normalized_query IS NOT NULL
+            AND q.normalized_query <> N''
+    ),
+    mapped_query AS
     (
         SELECT
             COALESCE(term.id, alias_term.id) AS term_id,
+            q.stat_date,
             q.result_count,
             q.source_page
-        FROM [dbo].[search_query_log] q
+        FROM filtered_query q
         LEFT JOIN [dbo].[search_term] term
             ON term.normalized_term = q.normalized_query
            AND term.status = N'active'
@@ -623,33 +690,19 @@ BEGIN
         LEFT JOIN [dbo].[search_term] alias_term
             ON alias_term.id = alias.term_id
            AND alias_term.status = N'active'
-        WHERE
-            CAST(q.created_at AS DATE) BETWEEN @effective_start_date AND @effective_end_date
-            AND NULLIF(LTRIM(RTRIM(q.normalized_query)), N'') IS NOT NULL
     ),
     daily_behavior AS
     (
         SELECT
-            @snapshot_date AS stat_date,
             mq.term_id,
+            mq.stat_date,
             COUNT(*) AS search_count,
             SUM(CASE WHEN mq.source_page = N'ifare_search_result' THEN 1 ELSE 0 END) AS select_count,
             SUM(ISNULL(mq.result_count, 0)) AS result_count,
             SUM(CASE WHEN ISNULL(mq.result_count, 0) <= 0 THEN 1 ELSE 0 END) AS zero_result_count
         FROM mapped_query mq
         WHERE mq.term_id IS NOT NULL
-        GROUP BY mq.term_id
-    ),
-    content_support AS
-    (
-        SELECT
-            c.normalized_term,
-            c.term_type,
-            MAX(c.policy_count) AS policy_count,
-            MAX(c.content_score) AS content_score,
-            MAX(c.quality_score) AS quality_score
-        FROM [dbo].[search_policy_term_candidate] c
-        GROUP BY c.normalized_term, c.term_type
+        GROUP BY mq.term_id, mq.stat_date
     ),
     payload AS
     (
@@ -661,36 +714,78 @@ BEGIN
             b.result_count,
             b.zero_result_count,
             CAST(
-                (b.search_count * 0.50) +
-                (b.select_count * 0.30) +
-                ((b.result_count - b.zero_result_count) * 0.20)
+                (b.search_count * 0.70) +
+                (b.select_count * 0.20) +
+                ((b.result_count - b.zero_result_count) * 0.10)
                 AS DECIMAL(12,4)
             ) AS trend_score,
-            CAST(0 AS DECIMAL(18,6)) AS external_trend_score,
-            CAST(0 AS DECIMAL(18,6)) AS trend_growth_score,
             ISNULL(cs.policy_count, 0) AS content_match_count,
-            CAST(ISNULL(cs.content_score, 0) AS DECIMAL(18,6)) AS content_freshness_score,
+            ISNULL(cs.content_score, 0) AS content_freshness_score,
             CAST(ISNULL(t.manual_boost, 0) AS DECIMAL(18,6)) AS editorial_boost_score,
-            CAST(
-                (
-                    ((b.search_count * 0.50) +
-                     (b.select_count * 0.30) +
-                     ((b.result_count - b.zero_result_count) * 0.20)) * 0.40
-                ) +
-                (ISNULL(cs.content_score, 0) * 0.20) +
-                (ISNULL(t.manual_boost, 0) * 0.10) +
-                (ISNULL(t.base_weight, 1.0) * 0.10)
-                AS DECIMAL(18,6)
-            ) AS final_hot_score
+            CAST(ISNULL(t.base_weight, 1.0) AS DECIMAL(10,4)) AS base_weight
         FROM daily_behavior b
         INNER JOIN [dbo].[search_term] t
             ON t.id = b.term_id
-        LEFT JOIN content_support cs
-            ON cs.normalized_term = t.normalized_term
-           AND cs.term_type = t.term_type
+        LEFT JOIN #content_support cs
+            ON cs.term_id = t.id
     )
+    INSERT INTO #hot_payload
+    (
+        term_id,
+        stat_date,
+        search_count,
+        select_count,
+        result_count,
+        zero_result_count,
+        trend_score,
+        content_match_count,
+        content_freshness_score,
+        editorial_boost_score,
+        base_weight
+    )
+    SELECT
+        term_id,
+        stat_date,
+        search_count,
+        select_count,
+        result_count,
+        zero_result_count,
+        trend_score,
+        content_match_count,
+        content_freshness_score,
+        editorial_boost_score,
+        base_weight
+    FROM payload;
+
+    UPDATE target
+    SET
+        target.search_count = 0,
+        target.select_count = 0,
+        target.result_count = 0,
+        target.zero_result_count = 0,
+        target.trend_score = 0,
+        target.content_match_count = ISNULL(cs.policy_count, 0),
+        target.content_freshness_score = CAST(ISNULL(cs.content_score, 0) AS DECIMAL(18,6)),
+        target.editorial_boost_score = CAST(ISNULL(t.manual_boost, 0) AS DECIMAL(18,6)),
+        target.final_hot_score = CAST(
+            (ISNULL(target.external_trend_score, 0) * 0.10) +
+            (CASE WHEN ISNULL(target.trend_growth_score, 0) > 0 THEN target.trend_growth_score ELSE 0 END * 0.05) +
+            (ISNULL(cs.content_score, 0) * 0.10) +
+            (ISNULL(t.manual_boost, 0) * 0.03) +
+            (ISNULL(t.base_weight, 1.0) * 0.02)
+            AS DECIMAL(18,6)
+        ),
+        target.updated_at = SYSUTCDATETIME()
+    FROM [dbo].[search_term_stat_daily] target
+    INNER JOIN [dbo].[search_term] t
+        ON t.id = target.term_id
+       AND t.status = N'active'
+    LEFT JOIN #content_support cs
+        ON cs.term_id = t.id
+    WHERE target.stat_date BETWEEN @effective_start_date AND @effective_end_date;
+
     MERGE [dbo].[search_term_stat_daily] AS target
-    USING payload AS src
+    USING #hot_payload AS src
     ON target.term_id = src.term_id
        AND target.stat_date = src.stat_date
     WHEN MATCHED THEN
@@ -700,12 +795,18 @@ BEGIN
             target.result_count = src.result_count,
             target.zero_result_count = src.zero_result_count,
             target.trend_score = src.trend_score,
-            target.external_trend_score = src.external_trend_score,
-            target.trend_growth_score = src.trend_growth_score,
             target.content_match_count = src.content_match_count,
             target.content_freshness_score = src.content_freshness_score,
             target.editorial_boost_score = src.editorial_boost_score,
-            target.final_hot_score = src.final_hot_score,
+            target.final_hot_score = CAST(
+                (src.trend_score * 0.70) +
+                (ISNULL(target.external_trend_score, 0) * 0.10) +
+                (CASE WHEN ISNULL(target.trend_growth_score, 0) > 0 THEN target.trend_growth_score ELSE 0 END * 0.05) +
+                (src.content_freshness_score * 0.10) +
+                (src.editorial_boost_score * 0.03) +
+                (src.base_weight * 0.02)
+                AS DECIMAL(18,6)
+            ),
             target.updated_at = SYSUTCDATETIME()
     WHEN NOT MATCHED THEN
         INSERT
@@ -735,15 +836,24 @@ BEGIN
             src.result_count,
             src.zero_result_count,
             src.trend_score,
-            src.external_trend_score,
-            src.trend_growth_score,
+            0,
+            0,
             src.content_match_count,
             src.content_freshness_score,
             src.editorial_boost_score,
-            src.final_hot_score,
+            CAST(
+                (src.trend_score * 0.70) +
+                (src.content_freshness_score * 0.10) +
+                (src.editorial_boost_score * 0.03) +
+                (src.base_weight * 0.02)
+                AS DECIMAL(18,6)
+            ),
             SYSUTCDATETIME(),
             SYSUTCDATETIME()
         );
+
+    DELETE FROM [dbo].[search_term_stat_daily]
+    WHERE stat_date < @retention_cutoff;
 END;
 GO
 

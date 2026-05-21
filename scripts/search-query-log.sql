@@ -58,9 +58,22 @@ BEGIN
 END;
 GO
 
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_search_query_log_created_at_normalized_query'
+      AND object_id = OBJECT_ID(N'[dbo].[search_query_log]')
+)
+BEGIN
+    CREATE INDEX IX_search_query_log_created_at_normalized_query
+        ON [dbo].[search_query_log](created_at ASC, normalized_query ASC)
+        INCLUDE (source_page, result_count);
+END;
+GO
+
 /*
-    Aggregate query log into [search_term_stat_daily] as a current snapshot.
-    This keeps one snapshot row per term for the current rebuild run.
+    Aggregate query log into [search_term_stat_daily] as daily history.
+    Each rebuild should upsert per-term, per-day rows instead of replacing the whole table.
 */
 
 DECLARE @target_date DATE = CAST(GETDATE() AS DATE);

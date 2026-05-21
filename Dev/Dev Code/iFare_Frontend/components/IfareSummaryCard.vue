@@ -24,24 +24,6 @@
         </button> -->
       </div>
     </div>
-
-    <div class="summary-top-list" v-if="topCases.length">
-      <article class="top-case-card" v-for="item in topCases" :key="item.id">
-        <div class="top-case-rank">0{{ item.rank }}</div>
-        <div class="top-case-copy">
-          <h4 class="top-case-title">{{ item.title }}</h4>
-          <div class="top-case-bottom">
-            <p class="top-case-area">{{ item.area }}</p>
-            <div class="top-case-flags">
-              <span :class="{ active: item.hasRecipient }">{{ item.hasRecipient ? "有" : "無" }}受助者</span>
-              <span :class="{ active: item.hasIncome }">{{ item.hasIncome ? "有" : "無" }}經濟</span>
-              <span :class="{ active: item.hasIndentity }">{{ item.hasIndentity ? "有" : "無" }}身分</span>
-            </div>
-          </div>
-        </div>
-      </article>
-    </div>
-
     <div class="summary-body">
       <div v-if="isLoading && !summaryText.trim()" class="summary-loading">
         <span class="summary-spinner" aria-hidden="true"></span>
@@ -64,14 +46,29 @@
         <span class="reference-label">參考連結</span>
         <span class="reference-count">{{ referenceCases.length }} 筆</span>
       </div>
-      <ul class="reference-list">
-        <li v-for="item in actualReferenceCases" :key="item.id" class="reference-item">
-          <NuxtLink class="reference-link" :to="buildCaseLink(item.id)">
-            <span class="reference-badge">[參考 {{ item.referenceNo }}]</span>
-            <span class="reference-title">{{ item.title }}</span>
-          </NuxtLink>
-        </li>
-      </ul>
+      <div class="reference-card-list">
+        <NuxtLink
+          v-for="item in actualReferenceCases"
+          :key="item.id"
+          class="reference-card-link"
+          :to="buildCaseLink(item.id)"
+        >
+          <article class="top-case-card reference-case-card">
+            <div class="top-case-rank">0{{ item.referenceNo }}</div>
+            <div class="top-case-copy">
+              <h4 class="top-case-title">{{ item.title }}</h4>
+              <div class="top-case-bottom">
+                <p class="top-case-area">{{ item.area }}</p>
+                <div class="top-case-flags">
+                  <span :class="{ active: item.hasRecipient }">受補助對象</span>
+                  <span :class="{ active: item.hasIncome }">收入資格</span>
+                  <span :class="{ active: item.hasIndentity }">身分類別</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </NuxtLink>
+      </div>
     </div>
 
     <div class="summary-foot">
@@ -261,7 +258,6 @@ function rankCases(query: string, cases: SummaryCaseItem[]): RankedSummaryCaseIt
 }
 
 const rankedCases = computed(() => rankCases(props.query, props.cases));
-const topCases = computed(() => rankedCases.value.slice(0, 3));
 const hasSearchContext = computed(() => Boolean((props.summaryCacheKey || "").trim()));
 const fallbackText = computed(() => {
   if (!props.cases.length) {
@@ -736,13 +732,6 @@ onBeforeUnmount(() => {
   opacity: 0.7;
 }
 
-.summary-top-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 18px;
-}
-
 .top-case-card {
   display: flex;
   gap: 14px;
@@ -914,12 +903,14 @@ onBeforeUnmount(() => {
 }
 
 .summary-references {
-  margin-top: 10px;
-  padding: 14px;
-  border-radius: 18px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 18px;
+  padding: 10px 12px 12px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(96, 67, 26, 0.1);
-  box-shadow: 0 12px 24px rgba(92, 64, 20, 0.05);
+  box-shadow: 0 10px 20px rgba(92, 64, 20, 0.04);
 }
 
 .reference-head {
@@ -927,7 +918,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin: 2px 0 8px;
 }
 
 .reference-label,
@@ -938,61 +929,75 @@ onBeforeUnmount(() => {
   letter-spacing: 0.06em;
 }
 
-.reference-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.reference-card-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 16px;
+  row-gap: 16px;
+  margin-top: 2px;
+  align-items: stretch;
 }
 
-.reference-item {
-  margin: 0;
-}
-
-.reference-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 14px;
+.reference-card-link {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   text-decoration: none;
-  background: rgba(255, 250, 244, 0.92);
-  border: 1px solid rgba(194, 111, 12, 0.12);
+}
+
+.reference-card-link .top-case-card {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
-.reference-link:hover {
-  transform: translateY(-1px);
-  border-color: rgba(194, 111, 12, 0.28);
-  box-shadow: 0 12px 20px rgba(92, 64, 20, 0.08);
+.reference-case-card {
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  box-shadow: 0 8px 16px rgba(92, 64, 20, 0.06);
 }
 
-.reference-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(194, 111, 12, 0.12);
-  color: #a45e00;
+.reference-case-card .top-case-rank {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.reference-case-card .top-case-title {
   font-size: 12px;
-  font-weight: 800;
-  flex: 0 0 auto;
+  line-height: 1.3;
 }
 
-.reference-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #2b2116;
-  line-height: 1.4;
-  min-width: 0;
+.reference-case-card .top-case-area {
+  font-size: 11px;
+  line-height: 1.3;
 }
 
-.reference-link .reference-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.reference-case-card .top-case-bottom {
+  gap: 3px;
+}
+
+.reference-case-card .top-case-flags {
+  gap: 3px;
+}
+
+.reference-case-card .top-case-flags span {
+  padding: 2px 5px;
+  font-size: 9px;
+  line-height: 1.1;
+}
+
+.reference-card-link:hover .top-case-card {
+  transform: translateY(-1px);
+  border-color: rgba(194, 111, 12, 0.22);
+  box-shadow: 0 10px 16px rgba(92, 64, 20, 0.06);
 }
 
 .summary-foot {
@@ -1017,9 +1022,16 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1024px) {
-  .summary-top-list {
-    grid-template-columns: 1fr;
-  }
+  .reference-card-list {
+  display: grid;
+  width: 100%;
+  box-sizing: border-box;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 16px;
+  row-gap: 16px;
+  margin-top: 2px;
+  align-items: stretch;
+}
 }
 
 @media (max-width: 768px) {
@@ -1063,8 +1075,15 @@ onBeforeUnmount(() => {
     margin-top: 0;
   }
 
-  .reference-list {
-    grid-template-columns: 1fr;
-  }
+  .reference-card-list {
+  display: grid;
+  width: 100%;
+  box-sizing: border-box;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 16px;
+  row-gap: 16px;
+  margin-top: 2px;
+  align-items: stretch;
+}
 }
 </style>

@@ -164,6 +164,19 @@ BEGIN
 END;
 GO
 
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_search_term_alias_normalized_alias_status'
+      AND object_id = OBJECT_ID(N'[dbo].[search_term_alias]')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_search_term_alias_normalized_alias_status]
+        ON [dbo].[search_term_alias] ([normalized_alias] ASC, [status] ASC)
+        INCLUDE ([term_id]);
+END;
+GO
+
 IF OBJECT_ID(N'[dbo].[search_term_source]', N'U') IS NULL
 BEGIN
     CREATE TABLE [dbo].[search_term_source]
@@ -346,6 +359,19 @@ BEGIN
     CREATE NONCLUSTERED INDEX [IX_search_term_stat_daily_stat_date_hot_score]
         ON [dbo].[search_term_stat_daily] ([stat_date] DESC, [final_hot_score] DESC)
         INCLUDE ([term_id], [search_count], [trend_score], [external_trend_score]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_search_term_stat_daily_stat_date_term_id'
+      AND object_id = OBJECT_ID(N'[dbo].[search_term_stat_daily]')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_search_term_stat_daily_stat_date_term_id]
+        ON [dbo].[search_term_stat_daily] ([stat_date] DESC, [term_id] ASC)
+        INCLUDE ([search_count], [select_count], [result_count], [zero_result_count], [trend_score], [external_trend_score], [trend_growth_score], [final_hot_score]);
 END;
 GO
 

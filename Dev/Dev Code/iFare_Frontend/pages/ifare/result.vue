@@ -132,6 +132,17 @@
                 @is-opened="isSelectOpen"
                 @update:select-value="getSelectValue"
               />
+              <div class="query-field query-field-mobile">
+                <div class="query-field-mobile-inner">
+                  <IfareSearchAutocomplete
+                    v-model="searchQuery"
+                    :filters="autocompleteFilters"
+                    placeholder="關鍵字搜尋"
+                    :show-count="false"
+                    @submit="Search"
+                  />
+                </div>
+              </div>
             </div>
             <div class="part-end">
               <CompSelectElse 
@@ -947,6 +958,10 @@ onBeforeUnmount(() => {
   width: 100% !important;
 }
 
+.query-field-mobile {
+  width: 100%;
+}
+
 .btn-query-submit {
   flex: 0 0 auto;
   white-space: nowrap;
@@ -954,7 +969,147 @@ onBeforeUnmount(() => {
   min-width: 110px;
 }
 
+:deep(.ifare-search-autocomplete) {
+  width: 100%;
+}
+
+:deep(.query-input-wrap) {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 2px 10px 2px 20px;
+  box-sizing: border-box;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: none !important;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  font-family: Noto Sans TC, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 34px;
+}
+
+:deep(.query-input-wrap:focus-within),
+:deep(.ifare-search-autocomplete.is-open .query-input-wrap) {
+  border-color: rgba(20, 70, 72, 0.4);
+  box-shadow: none !important;
+}
+
 :deep(.input-query) {
+  display: block;
+  align-self: center;
+  width: 100%;
   min-width: 0 !important;
+  height: 34px;
+  margin: 0;
+  padding: 0 44px 0 0;
+  border: 0 !important;
+  border-radius: 0;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font: inherit;
+  color: #000;
+  letter-spacing: 0;
+  line-height: inherit;
+  transform: translateY(-1px);
+}
+
+:deep(.input-query::placeholder) {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+:deep(.query-count) {
+  right: 12px;
+  color: rgba(0, 0, 0, 0.42);
+}
+
+:deep(.input-query:focus),
+:deep(.input-query:focus-visible) {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 768px) {
+  .query-field-mobile {
+    width: 100%;
+  }
+
+  .query-field-mobile .query-field-mobile-inner {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .query-field-mobile :deep(.ifare-search-autocomplete),
+  .query-field-mobile :deep(.query-input-wrap) {
+    width: 100%;
+  }
+
+  .query-field-mobile :deep(.query-input-wrap) {
+    min-height: 44px;
+    padding: 2px 10px 2px 20px;
+    border: 1px solid rgba(0, 0, 0, 0.2) !important;
+    border-radius: 5px;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  .query-field-mobile :deep(.input-query) {
+    display: block;
+    align-self: center;
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    margin: 0;
+    padding: 0 44px 0 0;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    font: inherit;
+    color: #000;
+    letter-spacing: 0;
+    line-height: inherit;
+    transform: translateY(-1px);
+  }
+
+  .query-field-mobile :deep(.input-query::placeholder) {
+    color: rgba(0, 0, 0, 0.3);
+  }
+
+  .query-field-mobile :deep(.input-query:focus) {
+    outline: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  .query-field-mobile :deep(.search-suggestion-panel) {
+    top: calc(100% + 8px);
+    border-radius: 14px;
+    padding: 10px;
+    box-shadow: 0 16px 32px rgba(21, 74, 76, 0.12);
+  }
+
+  .query-field-mobile :deep(.query-count) {
+    right: 12px;
+  }
 }
 </style>
