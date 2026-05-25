@@ -106,13 +106,14 @@
         </div>
         <div class="item-group-list">
           <div class="item-group">
+            <!-- 2026-05-25 #45 — placeholder 改成具體例子,讓使用者一眼知道該填什麼 -->
             <label class="item-title">主管機關</label>
             <el-input
                   v-model="input_competentAuthority"
                   class="p-input"
                   type="text"
                   size="large"
-                  placeholder="請輸入內容"
+                  placeholder="例：衛生福利部社會救助及社工司"
                 />
           </div>
           <div class="item-group">
@@ -153,12 +154,13 @@
         </div>
         <div class="item-group textarea">
           <label class="input-title required">申請資格</label>
+          <!-- 2026-05-25 #45 — placeholder 改成具體例子讓使用者更快進入狀況 -->
           <el-input
             v-model="input_qualification"
             rows="8"
             show-word-limit
             type="textarea"
-            placeholder="輸入內容"
+            placeholder="例：設籍本市滿 6 個月以上、年滿 65 歲、家庭總收入低於最低生活費 1.5 倍"
           />
         </div>
         <div class="item-group full-width html-editor">
@@ -167,12 +169,13 @@
         </div>
         <div class="item-group textarea">
           <label class="input-title required">應備證件資料</label>
+          <!-- 2026-05-25 #45 — placeholder 改成具體清單格式,引導使用者用條列式描述 -->
           <el-input
             v-model="input_evidence"
             rows="8"
             show-word-limit
             type="textarea"
-            placeholder="輸入內容"
+            placeholder="例：&#10;1. 身分證正反面影本&#10;2. 戶籍謄本&#10;3. 最近 3 個月收入證明&#10;4. 申請書(可至本所索取)"
           />
         </div>
         <div class="item-group">
@@ -184,12 +187,13 @@
                 :label="item.label"
                 :value="item.value"/>
             </el-select>
+          <!-- 2026-05-25 #45 — 洽辦單位選「其他」時,具體例子 placeholder 引導補單位資訊 -->
           <el-input
             class="p-input"
             v-model="input_officeInfo"
             type="text"
             size="large"
-            placeholder="請輸入內容"
+            placeholder="例:金山區公所社會課"
             v-show="fareOfficeUnitID==1"
           />
           <el-input
@@ -197,7 +201,7 @@
             v-model="input_officeTel"
             type="text"
             size="large"
-            placeholder="請輸入電話"
+            placeholder="例:(02) 2498-7224 分機 100"
             v-show="fareOfficeUnitID==1"
           />
         </div>
@@ -270,13 +274,14 @@
       <div class="card-info">
         <div class="item-group textarea">
           <label class="input-title">備註</label>
+          <!-- 2026-05-25 #45 — placeholder 明確告知這欄是內部用,前台不顯示 -->
           <el-input
             v-model="input_remark"
             rows="5"
             show-word-limit
             type="textarea"
             resize="none"
-            placeholder="輸入內容"
+            placeholder="給後台同仁的內部備註,前台不顯示。可記載修訂歷史、特殊處理說明、聯繫紀錄等"
           />
         </div>
       </div>
