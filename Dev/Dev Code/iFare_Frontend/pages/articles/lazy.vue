@@ -115,10 +115,7 @@ async function loadLazyDetail(articleId: number) {
 
   lazyItem.id = data.id;
   lazyItem.title = data.title;
-  // 2026-05-25 UIUX #34 — 打開詳情就標記為已讀
-  if (import.meta.client && lazyItem.id) {
-    useReadMarks('articles-lazy').markRead(lazyItem.id);
-  }
+  // 2026-05-25 UIUX #34 — 懶人包不追蹤已讀(per user feedback),只福利專欄才標記
   lazyItem.content = data.imageList
     .map(
       (_img: any, index: number) =>

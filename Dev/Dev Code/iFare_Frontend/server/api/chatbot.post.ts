@@ -61,10 +61,10 @@ const KNOWLEDGE_BASE: KnowledgeEntry[] = [
       '如果你想看基金會最新公告、活動與更新，請直接前往最新消息頁。站內入口：/news',
   },
   {
-    title: '文章專區',
+    title: '福利專欄',
     keywords: ['文章', '懶人包', '資源', '閱讀'],
     answer:
-      '如果你想看政策整理、圖文內容與延伸資源，建議直接前往文章專區。站內入口：/articles',
+      '如果你想看政策整理、圖文內容與延伸資源，建議直接前往福利專欄。站內入口：/articles',
   },
   {
     title: '聯絡資訊',
@@ -91,7 +91,7 @@ const KNOWLEDGE_BLOCK = KNOWLEDGE_BASE.map(
 ).join('\n');
 
 const API_UNAVAILABLE_FALLBACK_REPLY =
-  '目前智慧小幫手暫時無法連到 AI 服務。你可以先查看 i-Fare、公益夥伴、最新消息、文章專區或聯絡基金會真人協助。';
+  '目前智慧小幫手暫時無法連到 AI 服務。你可以先查看 i-Fare、公益夥伴、最新消息、福利專欄或聯絡基金會真人協助。';
 
 const AI_ONLY_SYSTEM_PROMPT = [
   '你是 i-Fare 網站上的智慧小幫手。',
@@ -390,7 +390,7 @@ export default defineEventHandler(async (event) => {
       source: 'gemini',
       reply:
         finalReply ||
-        '我目前沒有足夠把握直接回答這題，建議你改從 i-Fare、公益夥伴、文章專區或基金會聯絡方式繼續查找。',
+        '我目前沒有足夠把握直接回答這題，建議你改從 i-Fare、公益夥伴、福利專欄或基金會聯絡方式繼續查找。',
     };
   } catch (error: any) {
     const errorCode: ChatbotErrorCode =

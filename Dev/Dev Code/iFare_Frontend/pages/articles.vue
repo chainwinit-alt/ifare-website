@@ -136,14 +136,12 @@
               <p>目前沒有符合條件的懶人包</p>
             </div>
             <ul class="list-unstyled article-list" v-else>
-              <!-- 2026-05-25 UIUX #34 — 已讀標記 -->
+              <!-- 2026-05-25 — 懶人包列表移除「已讀」標記(per user feedback,僅福利專欄保留) -->
               <li
                 class="article-item transition-general"
-                :class="{ 'is-read': readMarksLazy.isRead(_lazy.id) }"
                 v-for="_lazy in lazyList"
                 :key="_lazy.id"
               >
-                <span class="badge-read" v-if="readMarksLazy.isRead(_lazy.id)">已讀</span>
                 <NuxtLink
                   class="item-page-link"
                   :to="{ path: '/articles/lazy', query: { id: _lazy.id } }"
@@ -180,12 +178,10 @@
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue";
 
-// 2026-05-25 UIUX #34 — 已讀標記(welfare / lazy 各自獨立)
+// 2026-05-25 UIUX #34 — 已讀標記(只開福利專欄;懶人包視覺型內容不需追蹤已讀)
 const readMarksWelfare = useReadMarks('articles-welfare')
-const readMarksLazy = useReadMarks('articles-lazy')
 onMounted(() => {
   readMarksWelfare.load()
-  readMarksLazy.load()
 })
 
 const isSelectOpened = ref(false);

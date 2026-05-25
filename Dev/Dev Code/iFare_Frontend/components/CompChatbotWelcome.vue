@@ -602,7 +602,7 @@ function buildKeywordActions(prompt: string): FollowUpAction[] {
   }
 
   if (/文章|資源|懶人包/.test(text)) {
-    actions.push({ label: '文章專區', type: 'route', to: '/articles', variant: 'link' });
+    actions.push({ label: '福利專欄', type: 'route', to: '/articles', variant: 'link' });
   }
 
   if (/捐款|支持|donate|donation/.test(text)) {
@@ -679,7 +679,7 @@ function getLocalKnowledgeReply(prompt: string) {
   }
 
   if (/文章|資源|懶人包/.test(text)) {
-    return '站上有政策文章與圖文整理，建議直接到文章專區查看。';
+    return '站上有政策文章與圖文整理，建議直接到福利專欄查看。';
   }
 
   return '';
