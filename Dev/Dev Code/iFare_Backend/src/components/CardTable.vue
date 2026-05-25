@@ -84,10 +84,36 @@
             </template>
           </el-table-column>
           <el-table-column :prop="column.prop" :label="column.label" width="180" v-else>
+            <!-- 2026-05-25 #35 — 「資料狀態」column header 加 tooltip 區分於「上架狀態」 -->
+            <template #header v-if="column.opts.type == 'state_data'">
+              <span class="state-header">
+                {{ column.label }}
+                <el-tooltip placement="top" effect="dark">
+                  <template #content>
+                    <div style="max-width: 240px; line-height: 1.6">
+                      <strong>資料狀態</strong>(啟用 / 停用)<br />
+                      指這筆<strong>資料本身</strong>是否啟用,停用後前台會自動隱藏。<br />
+                      不同於「上架狀態」(上架日期 / 下架日期),後者是控制公開時段。
+                    </div>
+                  </template>
+                  <el-icon class="state-info-icon" aria-label="說明資料狀態與上架狀態的差異">
+                    <QuestionFilled />
+                  </el-icon>
+                </el-tooltip>
+              </span>
+            </template>
+            <!-- 2026-05-25 #35 — 「資料狀態」改 el-tag + icon,視覺上跟未來的「上架狀態」明顯區分 -->
             <template #default="scope" v-if="column.opts.type == 'state_data'">
-              <el-text :type="scope.row.state_data == '停用' ? 'danger' : ''">{{
-                scope.row.state_data
-              }}</el-text>
+              <el-tag
+                :type="scope.row.state_data == '停用' ? 'info' : 'primary'"
+                :effect="scope.row.state_data == '停用' ? 'plain' : 'light'"
+                size="small"
+                class="state-data-tag"
+                :title="scope.row.state_data == '停用' ? '此資料目前停用,前台不顯示' : '此資料目前啟用'"
+              >
+                <span class="state-data-dot" :class="scope.row.state_data == '停用' ? 'is-off' : 'is-on'"></span>
+                {{ scope.row.state_data }}
+              </el-tag>
             </template>
             <template #default="scope" v-if="column.opts.type == 'url'">
               <el-button
@@ -134,8 +160,12 @@ import {
   ElButton,
   ElPagination,
   ElImage,
+  ElTag,
+  ElTooltip,
+  ElIcon,
 type UploadUserFile,
 } from "element-plus";
+import { QuestionFilled } from "@element-plus/icons-vue";
 import { stringifyQuery } from "vue-router";
 import { useUserStore } from "@/stores/user";
 import DialogAlert from './DialogAlert.vue'
@@ -577,6 +607,45 @@ const deleteConfirm = (callApiName:string, _param:any) => {
 
   span {
     font-size: 13px;
+  }
+}
+
+// 2026-05-25 #35 — 資料狀態 column 視覺強化
+.state-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.state-info-icon {
+  color: #909399;
+  font-size: 14px;
+  cursor: help;
+
+  &:hover {
+    color: #ea5504;
+  }
+}
+
+.state-data-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.state-data-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+
+  &.is-on {
+    background: #409eff;
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.18);
+  }
+
+  &.is-off {
+    background: #c0c4cc;
   }
 }
 </style>

@@ -43,7 +43,11 @@ export function useShareUrl() {
     const popup = window.open(target, '_blank', 'noopener,noreferrer')
     if (!popup) {
       console.warn('[share-url] Facebook popup was blocked')
-      window.alert('分享視窗被瀏覽器阻擋，請允許跳出視窗後重試。')
+      // 2026-05-25 UIUX #62 / #48 — 改 toast,附下一步建議
+      useToast().warning('分享視窗被瀏覽器阻擋', {
+        description: '請點瀏覽器網址列右側的彈出視窗圖示，允許此網站開啟新分頁後重試。',
+        duration: 6000,
+      })
     }
   }
 

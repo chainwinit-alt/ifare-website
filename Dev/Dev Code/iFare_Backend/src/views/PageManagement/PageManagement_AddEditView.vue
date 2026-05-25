@@ -370,7 +370,7 @@ const route = useRoute();
 const router = useRouter();
 
 const { getById, insert, isSlugConflict, update } = useDynamicPages();
-const { success, error: showError, info, warning, successWithLink } = useFeedback();
+const { success, error: showError, errorWithNextStep, info, warning, successWithLink } = useFeedback();
 const FRONTEND_PREVIEW_BASE =
   (import.meta.env.VITE_FRONTEND_BASE as string | undefined) || 'http://localhost:3000';
 
@@ -1284,16 +1284,17 @@ function getEmbeddedImageSectionIndex() {
   return form.sections.findIndex((section) => section.type === 'image-text' && section.imageSrc.startsWith('data:image/'));
 }
 
-function getSaveErrorMessage(err: unknown) {
+// 2026-05-25 #48 — 拆成 nextStep,讓 errorWithNextStep 用區塊呈現「下一步」
+function getSaveNextStep(err: unknown) {
   if (err instanceof DOMException && err.name === 'QuotaExceededError') {
-    return '儲存失敗：瀏覽器暫存容量已滿。請確認圖片不是舊版 data:image 內嵌資料，改用「選擇本機圖片」重新上傳後再儲存。';
+    return '瀏覽器暫存容量已滿。請確認圖片不是舊版 data:image 內嵌資料,改用「選擇本機圖片」重新上傳後再儲存。';
   }
 
   if (err instanceof Error && /quota|storage/i.test(err.message)) {
-    return '儲存失敗：資料量超過瀏覽器暫存容量。請重新上傳圖片，避免儲存很長的 data:image 圖片資料。';
+    return '資料量超過瀏覽器暫存容量。請重新上傳圖片,避免儲存很長的 data:image 圖片資料。';
   }
 
-  return '儲存失敗，請稍後再試；若剛更新圖片，請確認前台 dev server 已啟動並重新選擇圖片。';
+  return '請稍後再試;若剛更新圖片,請確認前台 dev server 已啟動並重新選擇圖片。';
 }
 
 function afterSave() {
@@ -1436,8 +1437,12 @@ async function onSave() {
       router.back();
     }
   } catch (err) {
-    console.error('[PageManagement] save failed', err);
-    showError(getSaveErrorMessage(err), 7000);
+    // 2026-05-25 #48 — 用 errorWithNextStep 顯示「主訊息 + 原因 + 下一步」分區
+    errorWithNextStep({
+      title: '儲存失敗',
+      nextStep: getSaveNextStep(err),
+      err,
+    });
     saving.value = false;
   }
 }

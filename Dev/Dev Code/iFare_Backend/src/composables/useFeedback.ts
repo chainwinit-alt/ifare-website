@@ -25,6 +25,46 @@ interface RunAsyncOptions {
   errorText: string;
   /** 整個畫面 mask（true）還是包覆指定 DOM（傳 element），預設整個畫面 */
   fullscreen?: boolean;
+  /** 2026-05-25 #48 — 失敗時除了 errorText 外的「下一步」建議文案 */
+  nextStep?: string;
+}
+
+// 2026-05-25 #48 — 依 error 類型自動建議「下一步」
+// 用於補強 error 訊息：不只說失敗，還要告訴使用者該怎麼辦
+export function guessNextStep(err: unknown): string {
+  if (!err) return '請重試一次；若持續失敗,請截圖回報管理員。';
+
+  // ApiError 風格（前端有 category/status 欄位）
+  const e = err as { category?: string; status?: number; message?: string };
+  const status = e.status ?? 0;
+  const category = e.category ?? '';
+  const msg = String(e.message ?? err).toLowerCase();
+
+  if (category === 'timeout' || /timeout|逾時/i.test(msg)) {
+    return '請求逾時 — 伺服器可能忙碌中,請稍後再試;若超過 5 分鐘仍失敗,請通知管理員。';
+  }
+  if (category === 'network' || /network|fetch failed|連線|斷線/i.test(msg)) {
+    return '網路連線異常 — 請檢查網路後重新整理頁面;手機可試切換 Wi-Fi / 行動網路。';
+  }
+  if (status === 401 || /unauthorized|登入|expired/i.test(msg)) {
+    return '登入已過期 — 請重新登入後再操作。';
+  }
+  if (status === 403 || /forbidden|permission|權限/i.test(msg)) {
+    return '您沒有此操作的權限 — 請聯絡管理員授權,或改用具備權限的帳號。';
+  }
+  if (status === 404 || /not found|找不到/i.test(msg)) {
+    return '找不到對應資料 — 可能已被刪除或網址有誤,請回列表重新整理。';
+  }
+  if (status === 409 || /conflict|重複|duplicate/i.test(msg)) {
+    return '資料衝突 — 同樣的代碼 / 網址已被使用,請改用其他名稱。';
+  }
+  if (status === 413 || /too large|超過|size/i.test(msg)) {
+    return '檔案過大 — 請壓縮後再上傳(建議圖片 < 2MB,可用 tinypng.com 壓縮)。';
+  }
+  if (status >= 500 || /server|internal error/i.test(msg)) {
+    return '伺服器暫時無法回應 — 請等 1-2 分鐘後再試;若持續失敗,請通知管理員。';
+  }
+  return '請重試一次;若持續失敗,請截圖此畫面回報管理員。';
 }
 
 export function useFeedback() {
@@ -37,6 +77,74 @@ export function useFeedback() {
     ElMessage({ type: 'error', message: `${message}${detail}` });
     if (err !== undefined) {
       console.error(message, err);
+    }
+  }
+
+  /**
+   * 2026-05-25 #48 — 錯誤訊息附下一步建議
+   * 用 ElNotification 而非 ElMessage,因為要顯示多行（標題 + 原因 + 下一步）
+   *
+   * 用法:
+   *   errorWithNextStep({ title: '儲存失敗', err, nextStep: '請檢查網路後重試' });
+   *   // nextStep 不傳的話會用 guessNextStep(err) 自動猜
+   */
+  function errorWithNextStep(options: {
+    /** 主訊息,例如「儲存失敗」 */
+    title: string;
+    /** 失敗原因(選填),會顯示在標題下方;不傳則用 err.message */
+    reason?: string;
+    /** 「下一步」建議;不傳則用 guessNextStep(err) 自動推測 */
+    nextStep?: string;
+    /** 操作按鈕(選填),例如「重新整理」「前往登入」 */
+    action?: { label: string; onClick: () => void };
+    /** 原始 error 物件,會 console.error + 用來推測下一步 */
+    err?: unknown;
+    /** 顯示時長 ms,預設 8000;0 = 不自動關 */
+    duration?: number;
+  }) {
+    const reason =
+      options.reason ||
+      (options.err instanceof Error && options.err.message ? options.err.message : '');
+    const nextStep = options.nextStep || guessNextStep(options.err);
+    const action = options.action;
+
+    const notif = ElNotification({
+      type: 'error',
+      title: options.title,
+      message: h('div', { style: 'line-height: 1.7' }, [
+        reason
+          ? h('div', { style: 'color: #606266; margin-bottom: 6px;' }, `原因：${reason}`)
+          : null,
+        h(
+          'div',
+          { style: 'background: #fef3e8; border-left: 3px solid #ea5504; padding: 6px 10px; border-radius: 4px; color: #303133;' },
+          [
+            h('strong', { style: 'color: #ea5504;' }, '下一步：'),
+            ' ',
+            nextStep,
+          ],
+        ),
+        action
+          ? h(
+              'button',
+              {
+                type: 'button',
+                style:
+                  'margin-top: 8px; background: #ea5504; border: 0; color: #fff; cursor: pointer; padding: 4px 14px; border-radius: 6px; font-weight: 700; font-size: 12px;',
+                onClick: () => {
+                  action.onClick();
+                  notif.close();
+                },
+              },
+              action.label,
+            )
+          : null,
+      ]),
+      duration: options.duration ?? 8000,
+    });
+
+    if (options.err !== undefined) {
+      console.error(options.title, options.err);
     }
   }
 
@@ -127,12 +235,26 @@ export function useFeedback() {
       if (options.successText) success(options.successText);
       return { ok: true, value };
     } catch (err) {
-      error(options.errorText, err);
+      // 2026-05-25 #48 — 失敗時若有 nextStep 或想要更詳細的引導,改用 errorWithNextStep
+      if (options.nextStep) {
+        errorWithNextStep({ title: options.errorText, nextStep: options.nextStep, err });
+      } else {
+        error(options.errorText, err);
+      }
       return { ok: false, error: err };
     } finally {
       loading?.close();
     }
   }
 
-  return { success, error, info, warning, successWithLink, successWithUndo, runAsync };
+  return {
+    success,
+    error,
+    errorWithNextStep,
+    info,
+    warning,
+    successWithLink,
+    successWithUndo,
+    runAsync,
+  };
 }

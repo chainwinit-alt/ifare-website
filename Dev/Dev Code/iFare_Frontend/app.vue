@@ -14,6 +14,8 @@
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
+    <!-- 2026-05-25 UIUX #62 — 全站 Toast 容器 -->
+    <AppToastStack />
   </div>
 </template>
 
