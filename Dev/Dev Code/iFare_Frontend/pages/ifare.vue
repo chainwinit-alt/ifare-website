@@ -140,6 +140,23 @@
           </div>
         </div>
 
+        <!-- 2026-05-25 UIUX #4 — 熱門搜尋快速入口(hardcoded 一組,後續可串 GA4 真實熱門資料) -->
+        <div class="hot-searches" aria-label="熱門搜尋">
+          <h3 class="hot-searches__title">
+            <span class="hot-searches__icon" aria-hidden="true">🔥</span>
+            熱門搜尋
+          </h3>
+          <ul class="hot-searches__list">
+            <li v-for="kw in HOT_KEYWORDS" :key="kw">
+              <button
+                type="button"
+                class="hot-search-chip transition-general"
+                @click="applyHotKeyword(kw)"
+              >{{ kw }}</button>
+            </li>
+          </ul>
+        </div>
+
         <!-- 2026-05-25 UIUX #5 — 最近搜尋紀錄,點 chip 直接執行同樣的搜尋 -->
         <div v-if="recentSearches.items.value.length > 0" class="recent-searches" aria-label="最近搜尋紀錄">
           <div class="recent-searches__head">
@@ -321,6 +338,27 @@ const ALL_AREA_VALUE = "__all_area";
 // 2026-05-25 UIUX #5 — 最近搜尋紀錄
 const recentSearches = useRecentSearches();
 onMounted(() => recentSearches.load());
+
+// 2026-05-25 UIUX #4 — 熱門搜尋(hardcoded 一組常見福利關鍵字;未來可串 GA4 真實 query)
+const HOT_KEYWORDS = [
+  '育兒津貼',
+  '老人福利',
+  '身心障礙',
+  '低收入戶',
+  '租屋補助',
+  '托育補助',
+  '醫療補助',
+  '就業協助',
+];
+
+function applyHotKeyword(keyword: string) {
+  $router.push({
+    path: '/ifare/result',
+    query: { query: keyword },
+  });
+  // 同步記到「最近搜尋」
+  recentSearches.add({ label: `「${keyword}」`, query: { query: keyword } });
+}
 
 /** 點最近搜尋 chip:用儲存的 query 直接跳到結果頁 */
 function applyRecentSearch(item: ReturnType<typeof useRecentSearches>['items']['value'][number]) {
@@ -845,6 +883,63 @@ onMounted(() => {
 @media (max-width: 520px) {
   .life-event-list {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 2026-05-25 UIUX #4 — 熱門搜尋 chips */
+.hot-searches {
+  width: min(100%, 980px);
+  margin: 16px auto 0;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, rgba(234, 85, 4, 0.06), rgba(229, 0, 110, 0.04));
+  border: 1px solid rgba(234, 85, 4, 0.2);
+  border-radius: 12px;
+}
+
+.hot-searches__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f3640;
+}
+
+.hot-searches__icon {
+  font-size: 14px;
+}
+
+.hot-searches__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hot-search-chip {
+  border: 1px solid rgba(234, 85, 4, 0.3);
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #1f3640;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.hot-search-chip:hover {
+  background: #ea5504;
+  color: #ffffff;
+  border-color: #ea5504;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 520px) {
+  .hot-searches {
+    margin: 12px 16px 0;
   }
 }
 

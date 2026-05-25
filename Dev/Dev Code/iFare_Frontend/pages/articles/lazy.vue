@@ -17,7 +17,8 @@
 
     <section class="section section-info">
       <div class="article-info">
-        <button class="btn-icon btn-ic-share" @click="shareCurrentUrlToLine"><i class="ic-share"></i></button>
+        <!-- 2026-05-25 UIUX #35 — 擴展分享:LINE / FB / 複製連結 / Email -->
+        <ShareButtons variant="fixed" />
         <div class="raw-html" v-html="useSanitize(lazyItem.content)"></div>
       </div>
     </section>
@@ -55,7 +56,6 @@ definePageMeta({
 
 const { $WebApiGet } = useNuxtApp();
 const { getApiResultValue } = useApiResult();
-const { shareCurrentUrlToLine } = useShareToLine();
 const { formatDisplayDate } = useDateFormatter();
 const { estimateReadingMinutes } = useReadingTime();
 const route = useRoute();
