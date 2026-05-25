@@ -1,4 +1,8 @@
-const imageModules = import.meta.glob('../assets/img/**/*.{avif,gif,jpeg,jpg,png,svg,webp}', {
+const imageModules = import.meta.glob([
+  '../assets/img/**/*.{avif,gif,jpeg,jpg,png,svg,webp}',
+  '!../assets/img/Index-Img-*.png',
+  '!../assets/img/Index-border.png',
+], {
   eager: true,
   import: 'default',
 }) as Record<string, string>;

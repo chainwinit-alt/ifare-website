@@ -67,6 +67,27 @@
       min-width: 100px;
     }
 
+    .field-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .field-error,
+    .input-hint {
+      font-size: 12px;
+      line-height: 18px;
+    }
+
+    .field-error {
+      color: #F56C6C;
+    }
+
+    .input-hint {
+      color: $color-text-placeholder;
+    }
+
     .p-input, .p-select {
       max-width: 60%;
       width: 100%;
@@ -78,6 +99,14 @@
 
     &.full-width {
       width: 100%;
+    }
+
+    &.has-error {
+      .el-input__wrapper,
+      .el-select__wrapper,
+      .el-textarea__inner {
+        box-shadow: 0 0 0 1px #F56C6C inset;
+      }
     }
 
     &.html-editor {
