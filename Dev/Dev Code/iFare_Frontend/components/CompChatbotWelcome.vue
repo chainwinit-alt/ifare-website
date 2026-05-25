@@ -30,7 +30,7 @@
           data-island-style="button"
           @click="resetConversation"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
             <path d="M3 6h18" />
             <path d="M8 6V4h8v2" />
             <path d="m8 6 1 13h6l1-13" />
@@ -45,7 +45,7 @@
           data-island-style="button"
           @click="handleClose"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>
         </button>
@@ -234,7 +234,7 @@
           data-island="送出問題"
           data-island-style="button"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
             <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
           </svg>
         </button>
