@@ -176,8 +176,8 @@
             </div>
         </div>
       </section>
-      <!-- 2026-05-25 UIUX #43 — 基金會歷程時間軸 -->
-      <section class="section section-about-timeline">
+      <!-- 2026-05-25 UIUX #43 — 基金會歷程時間軸 + #20 滾動觸發 -->
+      <section class="section section-about-timeline" v-scroll-reveal>
         <div class="part-top">
           <div class="title-component">
             <i class="ic-title-pattern"></i>
@@ -198,8 +198,8 @@
         </ol>
       </section>
 
-      <!-- 2026-05-25 UIUX #39 — 合作夥伴 logo 輪播(CSS marquee 無限滑動) -->
-      <section v-if="partnerLogos.length > 0" class="section section-about-partners">
+      <!-- 2026-05-25 UIUX #39 — 合作夥伴 logo 輪播(CSS marquee 無限滑動)+ #20 滾動進場 -->
+      <section v-if="partnerLogos.length > 0" class="section section-about-partners" v-scroll-reveal>
         <div class="part-top">
           <div class="title-component">
             <i class="ic-title-pattern"></i>

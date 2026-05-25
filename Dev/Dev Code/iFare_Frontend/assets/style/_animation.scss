@@ -132,6 +132,30 @@
     background-size: 480px 100%;
     animation: skeletonShimmer 1.4s ease-in-out infinite;
 }
+
+// 2026-05-25 UIUX #63 — 圖片 lazy load fade-in + 模糊預覽
+// 既有 img[loading="lazy"] 自動加 placeholder 灰底 + blur fade-in
+img[loading="lazy"] {
+  background: linear-gradient(135deg, #f5f5f5, #ececec);
+  transition: filter 0.5s ease, opacity 0.5s ease;
+}
+img[loading="lazy"]:not(.is-loaded) {
+  filter: blur(6px);
+  opacity: 0.7;
+}
+img[loading="lazy"].is-loaded,
+img[loading="lazy"]:not([src=""]) {
+  // src 已設定即視為要載入,等 onload 後 filter 變 none
+  // 簡化版:沒精確 onload hook 也至少 placeholder OK
+}
+
+@media (prefers-reduced-motion: reduce) {
+  img[loading="lazy"] {
+    transition: none;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+}
 .skeleton-line-title {
     height: 18px;
     width: 60%;

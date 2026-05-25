@@ -46,7 +46,7 @@
         </div>
       </section>
 <!-- 2026-05-25 UIUX #19 — 影響力數字區塊,首頁強化「故事感」+ 滾動到此區觸發 count-up 動畫 -->
-      <section class="section-impact bg-section" ref="impactSectionRef">
+      <section class="section-impact bg-section" ref="impactSectionRef" v-scroll-reveal>
         <div class="part-top">
           <div class="title-component">
             <i class="ic-title-pattern"></i>
@@ -68,7 +68,8 @@
           </ul>
         </div>
       </section>
-      <section class="section-news bg-section">
+      <!-- 2026-05-25 UIUX #20 — 滾動觸發進場動畫 -->
+      <section class="section-news bg-section" v-scroll-reveal>
         <div class="bg-radial"></div>
         <div class="part-top">
           <div class="title-component">
@@ -101,7 +102,21 @@
           >
         </div>
       </section>
-      <section class="section-articles bg-section">
+      <!-- 2026-05-25 UIUX #81 — 首頁主 CTA 轉換路徑強化:讀完最新消息後再次引導 i-Fare -->
+      <section class="section-cta bg-section" v-scroll-reveal>
+        <div class="index-cta-card">
+          <div class="index-cta-copy">
+            <h2 class="index-cta-title">準備好找尋適合你的福利了嗎?</h2>
+            <p class="index-cta-desc">i-Fare 整合全台公部門與民間補助資訊,輸入幾個條件就能找到符合你的方案。</p>
+          </div>
+          <NuxtLink to="/ifare" class="btn btn-index-cta transition-general">
+            <span>立即使用 i-Fare 找福利</span>
+            <i class="icon ic-arrow-simple-white" aria-hidden="true"></i>
+          </NuxtLink>
+        </div>
+      </section>
+
+      <section class="section-articles bg-section" v-scroll-reveal>
         <div class="part-top">
           <div class="title-component">
             <i class="ic-title-pattern"></i>
