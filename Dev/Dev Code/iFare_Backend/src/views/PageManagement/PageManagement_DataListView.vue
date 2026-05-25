@@ -1,9 +1,9 @@
 <template>
   <main-header>
     <template #btnsRight>
-      <!-- 2026-05-25 #95v4 — 4 個按鈕統一樣式:default size、次要動作都 plain + icon、主 CTA 維持 primary -->
-      <el-button :icon="Download" plain @click="onExport">匯出 JSON</el-button>
-      <el-button :icon="Upload" plain @click="triggerImport">匯入 JSON</el-button>
+      <!-- 2026-05-25 #95v5 — 4 按鈕加 min-width 等寬,視覺更平均 -->
+      <el-button class="pm-header-btn" :icon="Download" plain @click="onExport">匯出 JSON</el-button>
+      <el-button class="pm-header-btn" :icon="Upload" plain @click="triggerImport">匯入 JSON</el-button>
       <input
         ref="fileInput"
         type="file"
@@ -11,8 +11,8 @@
         style="display: none"
         @change="onImport"
       />
-      <el-button :icon="MagicStick" plain @click="openQuickCreate">用問答精靈建立</el-button>
-      <el-button :icon="Plus" type="primary" @click="openQuickCreate">快速新增頁面</el-button>
+      <el-button class="pm-header-btn" :icon="MagicStick" plain @click="openQuickCreate">用問答精靈建立</el-button>
+      <el-button class="pm-header-btn" :icon="Plus" type="primary" @click="openQuickCreate">快速新增頁面</el-button>
     </template>
   </main-header>
 
@@ -91,18 +91,16 @@
         </div>
         <div class="kpi-divider"></div>
 
-        <!-- 2026-05-25 T — 儲存空間使用量 -->
-        <div class="kpi-cell kpi-storage-cell" :class="`storage-${storageLevel}`">
+        <!-- 2026-05-25 T — 儲存空間使用量;2026-05-25 #95v5 — 精簡內容跟其他 cell 等寬,
+             文字 hint 拿掉改用 title hover,危險時 cell 變色提醒 -->
+        <div class="kpi-cell kpi-storage-cell" :class="`storage-${storageLevel}`" :title="storageHint">
           <div class="kpi-icon-sm icon-storage">💾</div>
           <div class="kpi-text kpi-storage-body">
-            <div class="kpi-storage-row">
-              <span class="kpi-num storage">{{ storageUsedLabel }}</span>
-              <span class="kpi-label">儲存空間</span>
-            </div>
+            <span class="kpi-num storage">{{ storageUsedLabel }}</span>
+            <span class="kpi-label">儲存空間 · 已用 {{ storagePercent }}%</span>
             <div class="storage-bar">
               <div class="storage-bar-fill" :style="{ width: storagePercent + '%' }"></div>
             </div>
-            <span class="kpi-sub-inline" :title="storageHint">{{ storageHint }}</span>
           </div>
         </div>
       </div>
@@ -812,8 +810,10 @@ async function onDelete(row: any) {
   }
 }
 
+// 2026-05-25 bug fix — 原本「下架」按鈕把 status 設成 'draft' 而非 'unpublished',
+// 導致下架頁面跑到「草稿」分頁;改成正確的 'unpublished',歸到「已下架」分頁
 function togglePublish(row: any, publish: boolean) {
-  const ok = update(row.id, { status: publish ? 'published' : 'draft' });
+  const ok = update(row.id, { status: publish ? 'published' : 'unpublished' });
   if (ok) {
     success(publish ? `已發布「${row.title || row.slug}」` : `已下架「${row.title || row.slug}」`);
   } else {
@@ -920,7 +920,14 @@ async function onImport(event: Event) {
 </script>
 
 <style lang="scss" scoped>
-// 2026-05-25 #95v2 — 使用指引 banner：薄條，可關閉
+// 2026-05-25 #95v5 — main-header 4 按鈕等寬,讓視覺更平均
+// 用 :deep 穿透 main-header 子 component
+:deep(.pm-header-btn) {
+  min-width: 140px;
+  justify-content: center;
+}
+
+// 2026-05-25 #95v2 — 使用指引 banner:薄條,可關閉
 .guide-banner {
   margin-bottom: 12px;
   padding: 14px 18px 16px;
@@ -1029,25 +1036,27 @@ async function onImport(event: Event) {
 }
 
 // 2026-05-25 #95v2 — KPI 列：與主卡同層、緊湊、4 cell + divider
+// 2026-05-25 #95v5 — 拿掉淺灰底跟邊框,4 cell 真正等寬(原 storage flex 1.4 撐寬);
+//                    視覺更輕,更像「資訊欄」而不是「獨立卡片」
 .kpi-strip {
   display: flex;
   flex-direction: row;
   align-items: stretch;
   gap: 0;
-  padding: 14px 6px;
+  padding: 8px 0;
   margin-bottom: 18px;
-  background: #fafbfc;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .kpi-cell {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 20px;
+  padding: 8px 16px;
 }
 
 .kpi-divider {
@@ -1100,8 +1109,9 @@ async function onImport(event: Event) {
   font-weight: 600;
 }
 
+// 2026-05-25 #95v5 — storage cell 不再撐寬,跟其他 cell 等寬
 .kpi-storage-cell {
-  flex: 1.4;
+  flex: 1 1 0;
 }
 
 .kpi-storage-body {
