@@ -24,6 +24,8 @@
         <ShareButtons variant="fixed" />
         <div class="raw-html" v-html="useSanitize(welfareItem.content)"></div>
       </div>
+      <!-- 2026-05-25 UIUX #21 — LINE 訂閱主動推廣 -->
+      <LineSubscribeCallout />
     </section>
 
     <section class="section section-bottom">

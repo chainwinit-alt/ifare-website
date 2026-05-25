@@ -15,6 +15,8 @@
         <ShareButtons variant="fixed" />
         <div class="raw-html" v-html="useSanitize(newsItem.content)"></div>
       </div>
+      <!-- 2026-05-25 UIUX #21 — 讀完文章主動推廣 LINE 訂閱 -->
+      <LineSubscribeCallout />
     </section>
   </div>
 </template>

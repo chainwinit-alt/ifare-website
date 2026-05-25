@@ -108,6 +108,36 @@ $bp-3xl: 1920px;  // 超大螢幕
 @mixin bp-up($size)   { @media (min-width: $size) { @content; } }
 @mixin bp-down($size) { @media (max-width: #{$size - 1px}) { @content; } }
 
+// ─── 2026-05-25 UIUX #76 — Transition duration tokens ─────────────────
+// 統一互動 transition 時長,避免散落各檔的 .15s / .18s / .22s / .25s / .3s
+// 用法:transition: all $duration-normal ease;
+//
+//   $duration-fast    — 微互動(hover icon、tag 反白)
+//   $duration-normal  — 一般 hover、color/opacity 變化
+//   $duration-slow    — 卡片浮起、模態彈出
+//   $duration-page    — 頁面切換
+$duration-fast:    0.15s;
+$duration-normal:  0.25s;
+$duration-slow:    0.35s;
+$duration-page:    0.45s;
+
+// 常用 easing(配合 $ease-island 已在 _mixin.scss)
+$ease-out:  cubic-bezier(0.16, 1, 0.3, 1);    // 快進慢出,適合彈出
+$ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);   // Material 標準
+
+// ─── 2026-05-25 UIUX #67 — 圓角值補完整 ──────────────────────────────
+// 既有已有 $radius-xs/sm/md/lg/xl/2xl/pill/circle(line 11-18)
+// 補上常用變體:
+$radius-input:  6px;     // input / select / 小型 button(介於 xs 4 與 sm 8 之間)
+$radius-tag:    $radius-pill;  // tag / chip — alias
+
+// ─── 2026-05-25 UIUX #68 — 陰影深度補完整 ────────────────────────────
+// 既有 $shadow-rest / card / hover / lift / cta / focus(line 31-36)
+// 補:
+$shadow-subtle: 0px 2px 8px -4px #{_shadow-color(0.08)};  // 平面卡微浮(skeleton 之類)
+$shadow-inset:  inset 0 1px 2px rgba(23, 24, 24, 0.08);    // 凹陷(input focus)
+$shadow-popup:  0px 24px 60px -12px #{_shadow-color(0.22)}; // dropdown / modal
+
 // ─── Notes ──────────────────────────────────────────────────────────
 // - 看到既有 code 用 `5px` / `6px` 之類非標準值,多半屬於早期遺留 — 之後修整時建議
 //   挑接近的 token 替換(5px → 4px / 6px → 8px),同時 review 視覺差異。
