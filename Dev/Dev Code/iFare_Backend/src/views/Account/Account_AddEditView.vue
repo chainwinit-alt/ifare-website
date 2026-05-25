@@ -86,17 +86,6 @@
             </div>
         </div>
     </template>
-    <template v-else>
-        <!-- 檢視模式：顯示現有密碼（非編輯路由才顯示） -->
-        <div class="section-main-card card-fullsize card-account card-input-format" name="edit-mode" v-if="$route.name != 'Account_Edit'">
-            <div class="card-info">
-                <div class="item-group">
-                    <label class="input-title">密碼</label>
-                    <span class="input-value">{{ input_password }}</span>
-                </div>
-            </div>
-        </div>
-    </template>
   </el-scrollbar>
 </template>
 <script setup lang="ts">
@@ -169,7 +158,6 @@ if (routeNameType.indexOf("edit") >= 0) {
     input_name.value = _res.result[0].userName
     input_account.value = _res.result[0].account
     input_email.value = _res.result[0].email
-    input_password.value = _res.result[0].pwd
     switch_state.value = _res.result[0].state != "停用"
     swtich_state_val.value = _res.result[0].state
     userState.value = _res.result[0].permission
@@ -205,6 +193,7 @@ function SaveAction() {
   if (!_permission) {
     return $Message({ message: `【權限】不可為空`, type: "warning" })
   }
+  if (routeNameType.indexOf("add") >= 0) {
   if (!_pwd) {
     return $Message({ message: `【預設密碼】不可為空`, type: "warning" })
   }
@@ -218,6 +207,8 @@ function SaveAction() {
   }
 
   // 新增模式：呼叫 InsertAccount API
+  }
+
   if (routeNameType.indexOf("add") >= 0) {
     console.log("[Add] Save action");
     $WebAPI.InsertAccount(userStore.token, _userName, _account, _email, _permission, _isEnabled, _pwd, _pwdConfirm,(res: any) => {

@@ -26,6 +26,5 @@ namespace IFare_BDAPI.Account.Dto
         public string Email { get; set; }
         public string Permission { get; set; }
         public string State { get; set; }
-        public string Pwd { get; set; }
     }
 }

@@ -51,14 +51,6 @@
             </div>
         </div>
     </div>
-    <div class="section-main-card card-fullsize card-account card-input-format" v-if="userStore.permission == '管理者'">
-        <div class="card-info">
-            <div class="item-group">
-                <label class="input-title">密碼</label>
-                <span class="input-value">{{ pwd }}</span>
-            </div>
-        </div>
-    </div>
   </el-scrollbar>
 </template>
 <script setup lang="ts">
@@ -81,7 +73,6 @@ const account = ref('')
 const email = ref('')
 const permission = ref('')
 const datastate = ref('')
-const pwd = ref('')
 const isAccessEdit = ref(false)
 
 const handleClick = () => {
@@ -118,8 +109,6 @@ $WebAPI.GetAccountList(
       email.value = _data.email
       permission.value = _data.permission
       datastate.value = _data.state
-      pwd.value = _data.pwd
-
       if ((userStore.permission == "編輯者" && _data.permission != "管理者") || userStore.permission == "管理者") {
         isAccessEdit.value = true
       }
