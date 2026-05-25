@@ -328,12 +328,49 @@ function getDeleteTargetLabel(row: any) {
   return label ? `${label}` : "這筆資料";
 }
 
+// 2026-05-25 #46 — 依不同資料類型給「影響範圍」說明,
+// 讓使用者刪除前知道會牽動哪些前台/關聯資料,避免誤刪
+function getDeleteImpactHint(tbName: string): string {
+  switch (tbName) {
+    case 'News':
+      return '影響範圍:前台「最新消息」列表會立即少一筆,已分享過的網址會 404。';
+    case 'Articles_Welfare':
+    case 'Articles_Lazy':
+      return '影響範圍:前台「福利專欄」會立即下架這篇,已分享過的網址會 404。';
+    case 'IFare_Policy':
+      return '影響範圍:訪客將無法在福利搜尋找到這筆政策。如只是暫停顯示,建議改用「停用」。';
+    case 'IFare_QA':
+      return '影響範圍:前台「常見福利問題」會少一筆。';
+    case 'IFare_OfficeUnit':
+      return '影響範圍:前台「聯絡單位」資訊將不再顯示。';
+    case 'Collaborator':
+      return '影響範圍:前台「合作夥伴」頁面該筆會消失。';
+    case 'Account':
+      return '影響範圍:該使用者帳號將無法登入,但歷史操作紀錄保留。';
+    case 'ImgManager':
+      return '影響範圍:若有頁面或文章引用此圖,前台會顯示破圖。建議先確認沒被使用再刪。';
+    case 'Code_Policy':
+    case 'Code_Recipient':
+    case 'Code_Keyword':
+    case 'Code_Income':
+    case 'Code_Identity':
+    case 'Code_Domicile':
+      return '影響範圍:若有福利政策使用此分類,該政策的相關欄位會顯示空白。建議改用「停用」取代刪除。';
+    default:
+      return '';
+  }
+}
+
 function openDeleteConfirm(row: any, apiName: string) {
   const label = getDeleteTargetLabel(row);
+  const impact = getDeleteImpactHint(props.tbName || '');
 
   param.value = { id: row.id };
   confirmApiName.value = apiName;
-  alertMsg.value = `確定要刪除「${label}」嗎？\n刪除後無法復原。`;
+  // 2026-05-25 #46 — 加影響範圍提示,讓使用者知道刪除後會牽動哪些地方
+  alertMsg.value = impact
+    ? `確定要刪除「${label}」嗎?\n\n${impact}\n\n刪除後無法復原。`
+    : `確定要刪除「${label}」嗎?\n刪除後無法復原。`;
   isDialogAlertVisible.value = true;
 }
 

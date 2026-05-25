@@ -75,9 +75,10 @@
 </template>
 <script setup lang="ts">
 import MainHeader from "@/components/MainHeader.vue";
-import { ref, reactive, watch, getCurrentInstance } from "vue";
+import { computed, ref, reactive, watch, onMounted, getCurrentInstance } from "vue";
 import {
   ElButton,
+  ElMessageBox,
   ElScrollbar,
   ElInput,
   ElSwitch,
@@ -87,6 +88,7 @@ import { Close, Check } from "@element-plus/icons-vue";
 import HtmlEditor from '@/components/CompHtmlEditor.vue'
 import { useUserStore } from "@/stores/user";
 import { useRouter } from "vue-router";
+import { useDraftAutosave } from "@/composables/useDraftAutosave";
 
 const app = getCurrentInstance();
 const $commonLib = app?.appContext.config.globalProperties.$CommonLib;
@@ -108,6 +110,44 @@ const datepicker_release = ref();
 const datepicker_discontinued = ref();
 
 const editorValue = ref()
+
+// 2026-05-25 #56 — 自動儲存草稿 + 離開提醒
+const NEWS_DRAFT_KEY = computed(() =>
+  `ifare:news-draft:v1:${routeNameType.indexOf('add') >= 0 ? 'new' : ids?.[0] ?? 'new'}`
+);
+const draftData = computed(() => ({
+  title: input_title.value,
+  editorValue: editorValue.value,
+  release: datepicker_release.value,
+  discontinued: datepicker_discontinued.value,
+  state: switch_state.value,
+}));
+const draft = useDraftAutosave({
+  storageKey: NEWS_DRAFT_KEY,
+  data: draftData,
+});
+
+// 進頁面後檢查是否有未存草稿,有的話問使用者要不要回復
+onMounted(async () => {
+  if (!draft.hasDraft()) return;
+  try {
+    await ElMessageBox.confirm(
+      '偵測到先前未儲存的草稿,要還原嗎?(取消會清掉草稿)',
+      '草稿提示',
+      { type: 'info', confirmButtonText: '還原草稿', cancelButtonText: '不要,清掉' },
+    );
+    const d = draft.restore();
+    if (d) {
+      input_title.value = d.title ?? '';
+      editorValue.value = d.editorValue ?? '';
+      datepicker_release.value = d.release;
+      datepicker_discontinued.value = d.discontinued;
+      switch_state.value = d.state ?? true;
+    }
+  } catch {
+    draft.clearDraft();
+  }
+});
 
 if (routeNameType.indexOf("edit") >= 0) {
   $WebAPI.GetNewsList(userStore.token, null, null, null, null, null, ids, (res:any) => {
@@ -155,6 +195,8 @@ function SaveAction() {
         }
 
         $Message({ message: '新增成功', type: "success" })
+        // 2026-05-25 #56 — 儲存成功後清掉草稿,避免下次進頁面又問要不要回復
+        draft.markClean();
         $commonLib.GuideToPage('News_DataList')
       }
     );
@@ -178,7 +220,8 @@ function SaveAction() {
         }
 
         $Message({ message: '編輯成功', type: "success" })
-        // $commonLib.GuideToPage('News_DataList')
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         _router.back();
       }
     );

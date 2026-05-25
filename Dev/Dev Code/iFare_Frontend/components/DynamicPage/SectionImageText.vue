@@ -4,10 +4,12 @@
     :class="{ 'image-right': section.imagePosition === 'right' }"
   >
     <div class="it-image">
+      <!-- 2026-05-25 #83 — 圖片 alt 統一規則:
+           有填 imageAlt 用之;否則用 title 當 fallback;若都沒有就空字串(視為裝飾性) -->
       <img
         v-if="resolvedImageSrc && !imageLoadFailed"
         :src="resolvedImageSrc"
-        :alt="section.imageAlt"
+        :alt="resolvedAlt"
         loading="lazy"
         @error="imageLoadFailed = true"
       />
@@ -38,6 +40,13 @@ import { resolveDynamicImageSrc } from '~/utils/dynamicImage';
 const props = defineProps<{ section: ImageTextSection }>();
 const imageLoadFailed = ref(false);
 const resolvedImageSrc = computed(() => resolveDynamicImageSrc(props.section.imageSrc));
+// 2026-05-25 #83 — alt fallback:imageAlt → title → '' (裝飾性)
+const resolvedAlt = computed(() => {
+  const alt = (props.section.imageAlt ?? '').trim();
+  if (alt) return alt;
+  const title = (props.section.title ?? '').trim();
+  return title || '';
+});
 
 watch(
   () => props.section.imageSrc,
