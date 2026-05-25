@@ -15,41 +15,94 @@
   </main-header>
 
   <el-scrollbar class="main-scrollbar">
-    <div class="section-main-card card-fullsize">
-      <div class="card-info summary-row">
-        <div class="summary-stat">
-          <span class="summary-num">{{ total }}</span>
-          <span class="summary-label">頁面總數</span>
+    <!-- 2026-05-25 #95v2 引導薄條 — 預設收合，點「使用指引」展開；第一次來會顯示 -->
+    <div v-if="guideOpen" class="guide-banner" role="region" aria-label="使用指引">
+      <div class="guide-banner-head">
+        <span class="guide-banner-icon">💡</span>
+        <div class="guide-banner-copy">
+          <strong>使用指引</strong>
+          <span class="guide-banner-sub">這是動態頁面 CMS，不用工程協助就能上架新頁面。三步驟：選版型 → 填內容 → 發布</span>
         </div>
-        <div class="summary-stat">
-          <span class="summary-num published">{{ published }}</span>
-          <span class="summary-label">已發布</span>
-        </div>
-        <div class="summary-stat">
-          <span class="summary-num drafts">{{ drafts }}</span>
-          <span class="summary-label">草稿</span>
-        </div>
-        <!-- 2026-05-25 T — 儲存空間使用量 -->
-        <div class="summary-stat storage-stat" :class="`storage-${storageLevel}`">
-          <span class="summary-num storage">{{ storageUsedLabel }}</span>
-          <span class="summary-label">
-            儲存空間
-            <span class="storage-hint">{{ storageHint }}</span>
-          </span>
-          <div class="storage-bar">
-            <div class="storage-bar-fill" :style="{ width: storagePercent + '%' }"></div>
-          </div>
-        </div>
+        <button type="button" class="guide-close" @click="dismissGuide" title="關閉指引" aria-label="關閉指引">×</button>
       </div>
+      <ol class="guide-steps">
+        <li>
+          <span class="step-dot">1</span>
+          <div><strong>選版型</strong><span>按右上「快速新增頁面」回答 5 題，系統會幫你組好骨架</span></div>
+        </li>
+        <li>
+          <span class="step-dot">2</span>
+          <div><strong>填內容</strong><span>拖區塊、輸入文字、挑圖片，右側即時預覽</span></div>
+        </li>
+        <li>
+          <span class="step-dot">3</span>
+          <div><strong>發布</strong><span>狀態切「已發布」按儲存，前台立刻看到</span></div>
+        </li>
+      </ol>
     </div>
 
+    <!-- 2026-05-25 #95v2 主卡 — 標題列 + KPI + toolbar + 表格統一在同一張 section card -->
     <div class="section-main-card card-fullsize">
       <div class="card-info list-head">
-        <div>
-          <h4 class="list-title">頁面清單</h4>
-          <p class="list-subtitle">不會寫程式也沒問題 — 按右上「快速新增頁面」回答 5 題就能建好頁面骨架。</p>
+        <div class="list-head-copy">
+          <div class="list-head-title-row">
+            <span class="list-head-bar"></span>
+            <h4 class="list-title">頁面總覽</h4>
+            <span class="list-head-count" v-if="total > 0">共 {{ total }} 筆</span>
+          </div>
+          <p class="list-subtitle">
+            既有頁面點「編輯」可調整內容；新建請按右上「快速新增頁面」答 5 題即可建好。
+          </p>
         </div>
-        <el-button text type="primary" @click="openQuickCreate">用問答精靈建立 →</el-button>
+        <div class="list-head-actions">
+          <el-button v-if="!guideOpen" text type="info" @click="guideOpen = true">? 使用指引</el-button>
+          <el-button text type="primary" @click="openQuickCreate">用問答精靈建立 →</el-button>
+        </div>
+      </div>
+
+      <!-- 2026-05-25 #95v2 KPI 列 — 緊湊，與主卡同層 -->
+      <div class="card-info kpi-strip">
+        <div class="kpi-cell">
+          <div class="kpi-icon-sm icon-total">📄</div>
+          <div class="kpi-text">
+            <span class="kpi-num">{{ total }}</span>
+            <span class="kpi-label">頁面總數</span>
+          </div>
+        </div>
+        <div class="kpi-divider"></div>
+
+        <div class="kpi-cell">
+          <div class="kpi-icon-sm icon-published">🌐</div>
+          <div class="kpi-text">
+            <span class="kpi-num published">{{ published }}</span>
+            <span class="kpi-label">已發布</span>
+          </div>
+        </div>
+        <div class="kpi-divider"></div>
+
+        <div class="kpi-cell">
+          <div class="kpi-icon-sm icon-drafts">✏️</div>
+          <div class="kpi-text">
+            <span class="kpi-num drafts">{{ drafts }}</span>
+            <span class="kpi-label">草稿</span>
+          </div>
+        </div>
+        <div class="kpi-divider"></div>
+
+        <!-- 2026-05-25 T — 儲存空間使用量 -->
+        <div class="kpi-cell kpi-storage-cell" :class="`storage-${storageLevel}`">
+          <div class="kpi-icon-sm icon-storage">💾</div>
+          <div class="kpi-text kpi-storage-body">
+            <div class="kpi-storage-row">
+              <span class="kpi-num storage">{{ storageUsedLabel }}</span>
+              <span class="kpi-label">儲存空間</span>
+            </div>
+            <div class="storage-bar">
+              <div class="storage-bar-fill" :style="{ width: storagePercent + '%' }"></div>
+            </div>
+            <span class="kpi-sub-inline" :title="storageHint">{{ storageHint }}</span>
+          </div>
+        </div>
       </div>
 
       <!-- 2026-05-25 M — 搜尋 / 篩選 / 排序 toolbar -->
@@ -58,14 +111,14 @@
           <el-input
             v-model="searchKeyword"
             placeholder="搜尋頁面名稱或網址"
-            size="default"
+            size="small"
             clearable
             :prefix-icon="Search"
           />
         </div>
         <div class="toolbar-group">
           <span class="toolbar-label">狀態</span>
-          <el-radio-group v-model="statusFilter" size="default">
+          <el-radio-group v-model="statusFilter" size="small">
             <el-radio-button label="all">全部</el-radio-button>
             <el-radio-button label="published">已發布</el-radio-button>
             <el-radio-button label="draft">草稿</el-radio-button>
@@ -74,7 +127,7 @@
         </div>
         <div class="toolbar-group">
           <span class="toolbar-label">排序</span>
-          <el-select v-model="sortBy" size="default" style="width: 150px;">
+          <el-select v-model="sortBy" size="small" style="width: 140px;">
             <el-option label="更新時間 ↓" value="updateDate" />
             <el-option label="建立時間 ↓" value="createDate" />
             <el-option label="標題 A→Z" value="title" />
@@ -402,6 +455,19 @@ const { success, error: showError, successWithUndo } = useFeedback();
 const FRONTEND_PREVIEW_BASE =
   (import.meta.env.VITE_FRONTEND_BASE as string | undefined) || 'http://localhost:3000';
 const fileInput = ref<HTMLInputElement | null>(null);
+
+// 2026-05-25 #95v2 — 使用指引 banner：第一次來會顯示，dismiss 後記憶於 localStorage
+const GUIDE_DISMISSED_KEY = 'ifare:page-management:guide-dismissed:v1';
+const guideOpen = ref<boolean>(!localStorage.getItem(GUIDE_DISMISSED_KEY));
+
+function dismissGuide() {
+  guideOpen.value = false;
+  try {
+    localStorage.setItem(GUIDE_DISMISSED_KEY, '1');
+  } catch {
+    /* localStorage 可能因隱私模式不可用，靜默失敗 */
+  }
+}
 
 // 2026-05-25 T — localStorage 容量估算 + 警示
 // 主流瀏覽器 localStorage 通常每 origin 約 5-10 MB；保守用 5 MB 當警示基準
@@ -795,93 +861,207 @@ async function onImport(event: Event) {
 </script>
 
 <style lang="scss" scoped>
-.summary-row {
-  display: flex;
-  gap: 32px;
-  padding: 16px 24px;
+// 2026-05-25 #95v2 — 使用指引 banner：薄條，可關閉
+.guide-banner {
+  margin-bottom: 12px;
+  padding: 14px 18px 16px;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.05) 0%, rgba(234, 85, 4, 0.03) 100%);
+  border: 1px solid rgba(64, 158, 255, 0.2);
+  border-radius: 12px;
 }
 
-.summary-stat {
+.guide-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.guide-banner-icon {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.guide-banner-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  flex: 1;
+  min-width: 0;
+
+  strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: #303133;
+  }
+}
+
+.guide-banner-sub {
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.5;
+}
+
+.guide-close {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: #909399;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+
+  &:hover {
+    background: rgba(144, 147, 153, 0.15);
+    color: #303133;
+  }
+}
+
+.guide-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #ffffff;
+    border: 1px solid #ebeef5;
+    border-radius: 10px;
+  }
+
+  strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #303133;
+    margin-bottom: 2px;
+  }
+
+  span {
+    font-size: 12px;
+    color: #606266;
+    line-height: 1.5;
+  }
+}
+
+.step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ea5504;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+// 2026-05-25 #95v2 — KPI 列：與主卡同層、緊湊、4 cell + divider
+.kpi-strip {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  padding: 8px 4px;
+  margin-bottom: 12px;
+  background: #fafbfc;
+  border: 1px solid #ebeef5;
+  border-radius: 10px;
+}
+
+.kpi-cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 14px;
+}
+
+.kpi-divider {
+  width: 1px;
+  background: #ebeef5;
+  flex-shrink: 0;
+  margin: 6px 0;
+}
+
+.kpi-icon-sm {
+  font-size: 15px;
+  line-height: 1;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #f5f7fa;
+  flex-shrink: 0;
+}
+
+.icon-total { background: rgba(64, 158, 255, 0.12); }
+.icon-published { background: rgba(103, 194, 58, 0.14); }
+.icon-drafts { background: rgba(230, 162, 60, 0.14); }
+.icon-storage { background: rgba(144, 147, 153, 0.14); }
+
+.kpi-text {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
 }
 
-.summary-num {
-  font-size: 28px;
+.kpi-num {
+  font-size: 18px;
   font-weight: 700;
   color: #303133;
+  line-height: 1.15;
 
-  &.published {
-    color: #67c23a;
-  }
-
-  &.drafts {
-    color: #e6a23c;
-  }
+  &.published { color: #67c23a; }
+  &.drafts { color: #e6a23c; }
+  &.storage { font-size: 14px; color: #67c23a; }
 }
 
-.summary-label {
-  font-size: 13px;
+.kpi-label {
+  font-size: 11px;
   color: #909399;
+  font-weight: 600;
 }
 
-// 2026-05-25 T — 儲存空間 stat
-.storage-stat {
-  flex: 1;
-  min-width: 240px;
-  max-width: 360px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid #ebeef5;
-  background: #fafbfc;
+.kpi-storage-cell {
+  flex: 1.4;
+}
 
-  .summary-num.storage {
-    font-size: 18px;
-  }
+.kpi-storage-body {
+  gap: 3px;
+}
 
-  .storage-hint {
-    display: block;
-    margin-top: 2px;
-    font-size: 11px;
-    color: #909399;
-    line-height: 1.4;
-  }
-
-  &.storage-safe .summary-num.storage {
-    color: #67c23a;
-  }
-
-  &.storage-warn {
-    background: rgba(230, 162, 60, 0.05);
-    border-color: rgba(230, 162, 60, 0.3);
-    .summary-num.storage {
-      color: #e6a23c;
-    }
-    .storage-hint {
-      color: #e6a23c;
-    }
-  }
-
-  &.storage-danger {
-    background: rgba(245, 108, 108, 0.06);
-    border-color: rgba(245, 108, 108, 0.35);
-    .summary-num.storage {
-      color: #f56c6c;
-    }
-    .storage-hint {
-      color: #f56c6c;
-      font-weight: 600;
-    }
-  }
+.kpi-storage-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .storage-bar {
-  margin-top: 6px;
-  height: 4px;
+  width: 100%;
+  height: 3px;
   border-radius: 999px;
   background: #ebeef5;
   overflow: hidden;
+  margin-top: 1px;
 }
 
 .storage-bar-fill {
@@ -890,44 +1070,108 @@ async function onImport(event: Event) {
   border-radius: 999px;
   transition: width 0.3s ease, background-color 0.3s ease;
 
-  .storage-warn & {
-    background: #e6a23c;
-  }
-
-  .storage-danger & {
-    background: #f56c6c;
-  }
+  .storage-warn & { background: #e6a23c; }
+  .storage-danger & { background: #f56c6c; }
 }
 
+.kpi-sub-inline {
+  font-size: 10px;
+  color: #909399;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpi-storage-cell.storage-warn {
+  .kpi-num.storage { color: #e6a23c; }
+  .kpi-sub-inline { color: #e6a23c; }
+}
+
+.kpi-storage-cell.storage-danger {
+  .kpi-num.storage { color: #f56c6c; }
+  .kpi-sub-inline { color: #f56c6c; font-weight: 600; }
+}
+
+// 2026-05-25 #95v2 — 「頁面總覽」標題列
 .list-head {
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
   margin-bottom: 12px;
 }
 
+.list-head-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.list-head-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.list-head-bar {
+  display: inline-block;
+  width: 3px;
+  height: 16px;
+  background: #ea5504;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.list-head-count {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f5f7fa;
+  color: #606266;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 // 2026-05-25 M — 搜尋 / 篩選 / 排序 toolbar
+// 2026-05-25 #95v2 — flex-direction: row 必要,避免被 .card-info 全域 column 繼承造成直列堆疊
+//                    視覺上拿掉獨立灰底+邊框,改用上下分隔線跟主卡融合
 .list-toolbar {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
-  gap: 12px 16px;
+  gap: 10px 14px;
   align-items: center;
-  margin-bottom: 12px;
-  padding: 12px 16px;
-  background: #fafbfc;
-  border: 1px solid #ebeef5;
-  border-radius: 12px;
+  margin-bottom: 0;
+  padding: 12px 0;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid #ebeef5;
+  border-bottom: 1px solid #ebeef5;
+  border-radius: 0;
 }
 
 .toolbar-search {
-  flex: 1 1 220px;
-  min-width: 200px;
-  max-width: 360px;
+  flex: 1 1 260px;
+  min-width: 220px;
+  max-width: 380px;
 }
 
 .toolbar-group {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
 }
@@ -942,6 +1186,7 @@ async function onImport(event: Event) {
   margin-left: auto;
   font-size: 12px;
   color: #909399;
+  font-weight: 600;
 }
 
 .list-pagination {
@@ -969,15 +1214,17 @@ async function onImport(event: Event) {
 
 .list-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: #303133;
+  letter-spacing: 0.2px;
 }
 
 .list-subtitle {
-  margin: 6px 0 0;
-  font-size: 13px;
+  margin: 0;
+  font-size: 12px;
   color: #909399;
+  line-height: 1.6;
 }
 
 .title-cell {
@@ -1226,14 +1473,57 @@ code {
   line-height: 1.5;
 }
 
+// 2026-05-25 #95v2 — RWD：guide-banner / kpi-strip 改 stack
+@media (max-width: 1024px) {
+  .guide-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .kpi-strip {
+    flex-wrap: wrap;
+    padding: 8px 4px;
+
+    .kpi-cell {
+      flex: 1 1 calc(50% - 1px);
+      padding: 10px 14px;
+    }
+
+    .kpi-divider {
+      display: none;
+    }
+  }
+
+  .kpi-storage-cell {
+    flex: 1 1 100% !important;
+  }
+}
+
 @media (max-width: 768px) {
-  .summary-row,
-  .list-head,
+  .guide-banner-head {
+    flex-wrap: wrap;
+  }
+
+  .guide-banner-copy {
+    width: 100%;
+  }
+
+  .kpi-strip .kpi-cell {
+    flex: 1 1 100%;
+  }
+
+  .list-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .list-head-actions {
+    justify-content: flex-end;
+  }
+
   .purpose-grid,
   .blocks-grid,
   .cta-row {
     grid-template-columns: 1fr;
-    flex-direction: column;
   }
 }
 </style>
