@@ -1,5 +1,7 @@
 <template>
   <div class="app-body-child" :name="$route.name">
+    <!-- 2026-05-25 UIUX #33 — 閱讀進度條 -->
+    <ReadingProgressBar />
     <section class="section section-top">
       <div class="article-btn-tags">
         <span class="btn btn-tag active">{{ welfareItem.codePolicy }}</span>
@@ -131,6 +133,10 @@ async function loadWelfareDetail(articleId: number) {
   welfareItem.releaseTime = data.releaseTime;
   welfareItem.codePolicy = data.codePolicy_LabelName;
   welfareItem.codeKeywords = data.codeKeywordList.map((_code: any) => _code.codeName);
+  // 2026-05-25 UIUX #34 — 打開詳情就標記為已讀
+  if (import.meta.client && welfareItem.id) {
+    useReadMarks('articles-welfare').markRead(welfareItem.id);
+  }
 }
 
 let relationRequestToken = 0;

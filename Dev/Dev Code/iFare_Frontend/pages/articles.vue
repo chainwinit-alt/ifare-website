@@ -54,11 +54,14 @@
               <p>目前沒有符合條件的福利專欄</p>
             </div>
             <ul class="list-unstyled article-list" v-else>
+              <!-- 2026-05-25 UIUX #34 — 已讀標記 -->
               <li
                 class="article-item transition-general"
+                :class="{ 'is-read': readMarksWelfare.isRead(_welfare.id) }"
                 v-for="_welfare in welfareList"
                 :key="_welfare.id"
               >
+                <span class="badge-read" v-if="readMarksWelfare.isRead(_welfare.id)">已讀</span>
                 <NuxtLink
                   class="item-page-link"
                   :to="{
@@ -133,11 +136,14 @@
               <p>目前沒有符合條件的懶人包</p>
             </div>
             <ul class="list-unstyled article-list" v-else>
+              <!-- 2026-05-25 UIUX #34 — 已讀標記 -->
               <li
                 class="article-item transition-general"
+                :class="{ 'is-read': readMarksLazy.isRead(_lazy.id) }"
                 v-for="_lazy in lazyList"
                 :key="_lazy.id"
               >
+                <span class="badge-read" v-if="readMarksLazy.isRead(_lazy.id)">已讀</span>
                 <NuxtLink
                   class="item-page-link"
                   :to="{ path: '/articles/lazy', query: { id: _lazy.id } }"
@@ -173,6 +179,14 @@
 <script setup lang="ts">
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue";
+
+// 2026-05-25 UIUX #34 — 已讀標記(welfare / lazy 各自獨立)
+const readMarksWelfare = useReadMarks('articles-welfare')
+const readMarksLazy = useReadMarks('articles-lazy')
+onMounted(() => {
+  readMarksWelfare.load()
+  readMarksLazy.load()
+})
 
 const isSelectOpened = ref(false);
 

@@ -1,5 +1,7 @@
 <template>
   <div class="app-body-child" :name="$route.name">
+    <!-- 2026-05-25 UIUX #33 — 閱讀進度條 -->
+    <ReadingProgressBar />
     <section class="section section-top">
       <h2 class="article-title">{{ lazyItem.title }}</h2>
       <h6 class="article-date">
@@ -111,6 +113,10 @@ async function loadLazyDetail(articleId: number) {
 
   lazyItem.id = data.id;
   lazyItem.title = data.title;
+  // 2026-05-25 UIUX #34 — 打開詳情就標記為已讀
+  if (import.meta.client && lazyItem.id) {
+    useReadMarks('articles-lazy').markRead(lazyItem.id);
+  }
   lazyItem.content = data.imageList
     .map(
       (_img: any, index: number) =>

@@ -139,6 +139,43 @@
             >請至少填一個篩選條件</p>
           </div>
         </div>
+
+        <!-- 2026-05-25 UIUX #5 — 最近搜尋紀錄,點 chip 直接執行同樣的搜尋 -->
+        <div v-if="recentSearches.items.value.length > 0" class="recent-searches" aria-label="最近搜尋紀錄">
+          <div class="recent-searches__head">
+            <h3 class="recent-searches__title">
+              <i class="ic-recent" aria-hidden="true"></i>
+              最近搜尋
+            </h3>
+            <button
+              type="button"
+              class="recent-searches__clear"
+              @click="recentSearches.clear"
+            >清除全部</button>
+          </div>
+          <ul class="recent-searches__list">
+            <li
+              v-for="(item, idx) in recentSearches.items.value"
+              :key="item.timestamp"
+              class="recent-search-item"
+            >
+              <button
+                type="button"
+                class="recent-search-chip transition-general"
+                @click="applyRecentSearch(item)"
+                :title="`再次搜尋:${item.label}`"
+              >
+                <span>{{ item.label }}</span>
+              </button>
+              <button
+                type="button"
+                class="recent-search-remove"
+                @click="recentSearches.remove(idx)"
+                :aria-label="`移除「${item.label}」`"
+              >×</button>
+            </li>
+          </ul>
+        </div>
       </section>
       <section class="section-agency bg-section">
         <div class="bg-radial"></div>
@@ -281,6 +318,29 @@ interface selectItem {
 const ALL_POLICY_VALUE = "__all_policy";
 const ALL_AREA_VALUE = "__all_area";
 
+// 2026-05-25 UIUX #5 — 最近搜尋紀錄
+const recentSearches = useRecentSearches();
+onMounted(() => recentSearches.load());
+
+/** 點最近搜尋 chip:用儲存的 query 直接跳到結果頁 */
+function applyRecentSearch(item: ReturnType<typeof useRecentSearches>['items']['value'][number]) {
+  $router.push({ path: '/ifare/result', query: item.query });
+}
+
+/** 從目前選的條件組「最近搜尋」label,顯示中文比較好認 */
+function buildRecentSearchLabel(): string {
+  const parts: string[] = [];
+  // 找 select-list 對應的中文名
+  const policyName = policySelectList.find((p) => p.val === codeSelect_policy.value)?.name;
+  const recipientName = recipientSelectList.find((p) => p.val === codeSelectRecipient.value)?.name;
+  const areaName = areaSelectList.find((p) => p.val === codeSelect_area.value)?.name;
+  if (policyName && policyName !== '全部') parts.push(policyName);
+  if (recipientName) parts.push(recipientName);
+  if (areaName && areaName !== '全國') parts.push(areaName);
+  if (searchQuery.value.trim()) parts.push(`「${searchQuery.value.trim()}」`);
+  return parts.join(' · ');
+}
+
 function isSelectOpen(type: string, val: boolean) {
   _isSelect.value = val
   // useHead({
@@ -406,6 +466,11 @@ function Search() {
     query: searchQuery.value.trim(),
     lifeEvent: selectedLifeEvent.value,
   });
+  // 2026-05-25 UIUX #5 — 把這次搜尋條件加入「最近搜尋」(自動 dedup,只留最近 5 筆)
+  const label = buildRecentSearchLabel();
+  if (label) {
+    recentSearches.add({ label, query });
+  }
   $router.push({ path: "/ifare/result", query: query });
   // Init value.
   codeSelect_policy.value = ""
@@ -428,6 +493,11 @@ function SearchByLifeEvent(event: any) {
   saveWelfareProfile({
     query: event.query,
     lifeEvent: event.key,
+  });
+  // 2026-05-25 UIUX #5 — 人生事件搜尋也加入「最近搜尋」
+  recentSearches.add({
+    label: event.name || event.query,
+    query: { query: event.query, event: event.key },
   });
   $router.push({
     path: "/ifare/result",
@@ -775,6 +845,120 @@ onMounted(() => {
 @media (max-width: 520px) {
   .life-event-list {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 2026-05-25 UIUX #5 — 最近搜尋 chips */
+.recent-searches {
+  width: min(100%, 980px);
+  margin: 16px auto 0;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(234, 85, 4, 0.18);
+  border-radius: 12px;
+}
+
+.recent-searches__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.recent-searches__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f3640;
+
+  &::before {
+    content: '🕒';
+    font-size: 14px;
+  }
+}
+
+.recent-searches__title .ic-recent {
+  display: none; /* 用 ::before emoji 代替 */
+}
+
+.recent-searches__clear {
+  border: 0;
+  background: transparent;
+  color: #909399;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.recent-searches__clear:hover {
+  background: rgba(245, 108, 108, 0.12);
+  color: #f56c6c;
+}
+
+.recent-searches__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recent-search-item {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid rgba(234, 85, 4, 0.25);
+  border-radius: 999px;
+  overflow: hidden;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.recent-search-item:hover {
+  border-color: #ea5504;
+  box-shadow: 0 4px 12px -6px rgba(234, 85, 4, 0.35);
+}
+
+.recent-search-chip {
+  border: 0;
+  background: transparent;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #1f3640;
+  cursor: pointer;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-search-chip:hover {
+  color: #ea5504;
+}
+
+.recent-search-remove {
+  border: 0;
+  background: transparent;
+  color: #c0c4cc;
+  cursor: pointer;
+  padding: 4px 10px 4px 4px;
+  font-size: 16px;
+  line-height: 1;
+  transition: color 0.18s ease;
+}
+
+.recent-search-remove:hover {
+  color: #f56c6c;
+}
+
+@media (max-width: 520px) {
+  .recent-searches {
+    margin: 12px 16px 0;
   }
 }
 </style>

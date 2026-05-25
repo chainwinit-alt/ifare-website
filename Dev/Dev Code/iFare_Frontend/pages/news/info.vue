@@ -1,5 +1,7 @@
 <template>
   <div class="app-body-child" :name="$route.name">
+    <!-- 2026-05-25 UIUX #33 — 閱讀進度條,fixed 在頁面頂部 -->
+    <ReadingProgressBar />
     <section class="section section-top">
       <h2 class="article-title">{{ newsItem.title }}</h2>
       <p class="article-date">{{ formatDisplayDate(newsItem.releaseTime) }}</p>
@@ -61,6 +63,10 @@ listNews.then((res:any) => {
     newsItem.title = _newsList[0].title
     newsItem.releaseTime = _newsList[0].releaseTime
     newsItem.content = _newsList[0].content
+    // 2026-05-25 UIUX #34 — 打開詳情就標記為已讀,列表頁再進時會顯示「已讀」
+    if (import.meta.client && newsItem.id) {
+      useReadMarks('news').markRead(newsItem.id);
+    }
 })
 
 </script>
