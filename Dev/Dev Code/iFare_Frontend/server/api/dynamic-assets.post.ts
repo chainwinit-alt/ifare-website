@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { applyCors } from '~/server/utils/cors';
+import { applyCors, requireDynamicApiToken } from '~/server/utils/cors';
 
 const ASSET_DIR = path.resolve(process.cwd(), 'server/data/dynamic-assets');
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
@@ -9,7 +9,6 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/gif',
   'image/jpeg',
   'image/png',
-  'image/svg+xml',
   'image/webp',
 ]);
 
@@ -26,8 +25,6 @@ function getExtension(filename: string, mimeType: string) {
       return '.jpg';
     case 'image/png':
       return '.png';
-    case 'image/svg+xml':
-      return '.svg';
     case 'image/webp':
       return '.webp';
     default:
@@ -56,6 +53,7 @@ function getRequestOrigin(event: any) {
 
 export default defineEventHandler(async (event) => {
   applyCors(event);
+  requireDynamicApiToken(event);
 
   const parts = await readMultipartFormData(event);
   const file = parts?.find((part) => part.name === 'file' && part.data?.length);

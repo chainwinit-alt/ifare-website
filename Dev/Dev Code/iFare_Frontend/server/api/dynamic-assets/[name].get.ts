@@ -10,7 +10,6 @@ const MIME_TYPES: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.jpg': 'image/jpeg',
   '.png': 'image/png',
-  '.svg': 'image/svg+xml',
   '.webp': 'image/webp',
 };
 
@@ -25,7 +24,11 @@ export default defineEventHandler((event) => {
     throw createError({ statusCode: 404, statusMessage: 'Image not found' });
   }
 
-  const mimeType = MIME_TYPES[path.extname(filename).toLowerCase()] || 'application/octet-stream';
+  const mimeType = MIME_TYPES[path.extname(filename).toLowerCase()];
+  if (!mimeType) {
+    throw createError({ statusCode: 415, statusMessage: 'Unsupported image type' });
+  }
+
   setHeader(event, 'Content-Type', mimeType);
   setHeader(event, 'Cache-Control', 'public, max-age=31536000, immutable');
 

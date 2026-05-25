@@ -14,12 +14,19 @@ import type { DynamicPage } from '@/composables/useDynamicPages';
 const FRONTEND_SYNC_URL =
   (import.meta.env.VITE_FRONTEND_SYNC_URL as string | undefined) ||
   'http://localhost:3000/api/dynamic-pages';
+const FRONTEND_DYNAMIC_API_TOKEN = (import.meta.env.VITE_FRONTEND_DYNAMIC_API_TOKEN as string | undefined) || '';
 
 export function syncPagesToFrontend(pages: DynamicPage[]): void {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+  if (FRONTEND_DYNAMIC_API_TOKEN) {
+    headers['X-iFare-Sync-Token'] = FRONTEND_DYNAMIC_API_TOKEN;
+  }
+
   // fire-and-forget — 不 await，不阻塞 caller
   fetch(FRONTEND_SYNC_URL, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(pages),
   }).catch((err) => {
     console.warn('[frontend-sync] 同步到前端失敗，localStorage 仍寫入成功', err);

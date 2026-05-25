@@ -298,6 +298,7 @@ const uploadingImage = ref(false);
 const FRONTEND_ASSET_UPLOAD_URL =
   (import.meta.env.VITE_FRONTEND_ASSET_UPLOAD_URL as string | undefined) ||
   'http://localhost:3000/api/dynamic-assets';
+const FRONTEND_DYNAMIC_API_TOKEN = (import.meta.env.VITE_FRONTEND_DYNAMIC_API_TOKEN as string | undefined) || '';
 const MAX_IMAGE_UPLOAD_SIZE = 8 * 1024 * 1024;
 const isEmbeddedImage = computed(() => section.value.type === 'image-text' && section.value.imageSrc.startsWith('data:image/'));
 const isLocalImagePath = computed(() => (
@@ -404,10 +405,16 @@ function clearSelectedImage() {
 
 async function uploadImageFile(file: File) {
   const formData = new FormData();
+  const headers: Record<string, string> = {};
   formData.append('file', file);
+
+  if (FRONTEND_DYNAMIC_API_TOKEN) {
+    headers['X-iFare-Sync-Token'] = FRONTEND_DYNAMIC_API_TOKEN;
+  }
 
   const response = await fetch(FRONTEND_ASSET_UPLOAD_URL, {
     method: 'POST',
+    headers,
     body: formData,
   });
 

@@ -8,13 +8,14 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { applyCors } from '~/server/utils/cors';
+import { applyCors, requireDynamicApiToken } from '~/server/utils/cors';
 import type { DynamicPage } from '~/types/dynamic-page';
 
 const DATA_FILE = path.resolve(process.cwd(), 'server/data/dynamic-pages.json');
 
 export default defineEventHandler(async (event) => {
   applyCors(event);
+  requireDynamicApiToken(event);
 
   const body = await readBody<DynamicPage[]>(event);
 
