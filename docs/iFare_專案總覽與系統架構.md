@@ -1,6 +1,6 @@
 # iFare 基金會網站 — 專案總覽與系統架構
 
-> 版本：v2.1（2026-05-19 補充版）
+> 版本：v2.2（2026-05-25 安全補充版）
 > 建立日期：2026-04-14
 > 整併日期：2026-04-28
 > 負責人：昀臻
@@ -525,6 +525,9 @@ Method:     get / post / get/file / post/file
 | `VITE_FRONTEND_BASE` | 後台 Vite | 儲存成功後 toast 前往前台預覽的 base URL |
 | `VITE_FRONTEND_SYNC_URL` | 後台 Vite | PageBuilder 儲存後同步到前台 `/api/dynamic-pages` |
 | `VITE_FRONTEND_ASSET_UPLOAD_URL` | 後台 Vite | 圖文區塊本機圖片上傳到前台 `/api/dynamic-assets` |
+| `VITE_FRONTEND_DYNAMIC_API_TOKEN` | 後台 Vite | 後台呼叫前台 dynamic-pages / dynamic-assets 寫入 API 的同步 token |
+| `NUXT_DYNAMIC_API_TOKEN` | 前台 Nuxt runtimeConfig | 前台 Nuxt server route 驗證 PageBuilder 寫入與圖片上傳 |
+| `NUXT_DYNAMIC_API_ALLOWED_ORIGINS` | 前台 Nuxt runtimeConfig | 正式環境 PageBuilder bridge CORS 白名單，逗號分隔 |
 
 ---
 
@@ -591,6 +594,17 @@ Kestrel + IIS 反向代理，詳見 `iFare_部署維運與異常處理手冊.md`
 - TODO：API 速率限制（rate limit）
 - TODO：登入失敗鎖定機制
 - TODO：審計 log 完整性
+
+### 8.6 2026-05-25 安全修補狀態
+
+| 項目 | 目前狀態 | 後續建議 |
+|------|----------|----------|
+| PageBuilder Nuxt bridge 寫入 API | 已補 `NUXT_DYNAMIC_API_TOKEN` / `VITE_FRONTEND_DYNAMIC_API_TOKEN`；production 未設 token 會拒絕寫入 | 長期仍建議改 .NET API + SQL Server / 正式檔案儲存 |
+| PageBuilder CORS | 已由 wildcard 改為 localhost 開發白名單與 `NUXT_DYNAMIC_API_ALLOWED_ORIGINS` | 正式部署需列出實際後台 origin，不可留空或 wildcard |
+| PageBuilder 圖片上傳 | 已限制 8MB 與 avif / gif / jpeg / png / webp；不再允許新上傳 SVG | 仍需正式圖片掃描 / CDN / 檔案儲存策略 |
+| 後台 SysUser 密碼 | 新增 / 改密碼寫入 PBKDF2；舊明文密碼登入成功後自動 rehash | 建議安排強制重設或一次性 migration，清掉未登入的舊明文 |
+| 停用帳號取 JWT | `TokenAuth/Authenticate` 已檢查 `SysUser.State == Enabled` | 仍需補登入失敗鎖定、審計與告警 |
+| DTO 密碼外洩 | `AccountResultDto` 不再回傳 `Pwd`，後台列表不應顯示密碼 | 確認正式 API response 與 Swagger 範例同步更新 |
 
 ---
 
@@ -688,3 +702,4 @@ Kestrel + IIS 反向代理，詳見 `iFare_部署維運與異常處理手冊.md`
 | v1.0 | 2026-04-14 | 初版（系統架構書目錄 + 系統技術說明 各自獨立） |
 | v2.0 | 2026-04-28 | 整併兩份文件：用「架構書目錄」9 章結構為骨架，把「系統技術說明」實質內容填入。第 5/6/7 章內容改為指向專屬文件（API/DB/部署） |
 | v2.1 | 2026-05-19 | 補充 PageBuilder 動態頁、圖片上傳 API、後台 PageManagement 與部署 runtime 資料說明 |
+| v2.2 | 2026-05-25 | 補充 PageBuilder bridge 安全環境變數、SysUser 密碼雜湊、停用帳號 JWT 阻擋與 DTO 密碼外洩修正狀態 |

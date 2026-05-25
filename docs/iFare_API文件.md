@@ -1,15 +1,16 @@
 # iFare 基金會網站 — API 文件
 
-> 版本：v2.3（FarePolicy + BM25 細節補完版）
+> 版本：v2.4（2026-05-25 Auth / SysUser 安全補充版）
 > 建立日期：2026-04-14
 > 整併日期：2026-04-28
-> 最後補完日期：2026-05-05
+> 最後補完日期：2026-05-25
 > 負責人：昀臻
 >
 > **本版說明**：v2.3 在主管合併 master `b89f5b9` (v1.0.3) 後對程式碼再校對一輪，補完：
 > - §2.3.4 / §3.4.2 FarePolicy 完整 DTO 結構（含後台所有 Insert / Update 欄位、巢狀關聯）
 > - §6.7 BM25 演算法精確參數（`k1=1.2` / `b=0.75`、欄位權重表、Hybrid 評分公式、閾值 0.08）
 > - §4.3 錯誤碼狀態確認（前台 15 個、後台 16 個 — v1.0.3 在後台新增 `-3 PermissionFail`，前台未跟進）
+> - v2.4 補入 2026-05-25 後台 `SysUser` 密碼雜湊、停用帳號阻擋 JWT、Account DTO 不回傳密碼與 PageBuilder bridge 安全設定摘要。
 >
 > 本版 [TBD] 項目大幅縮減為 5 項業務 / 部署細節（需主管確認，非 code 可解）。
 
@@ -409,6 +410,16 @@ JWT 開啟。所有端點需在 Header 帶 `Authorization: Bearer <token>`。
 
 **Token refresh 流程：** 系統未實作 refresh token endpoint。Token 過期（1 天）後須使用帳密重新呼叫 `Authenticate` 端點重取。前端遇到 401 應導向登入頁。
 
+### 3.3.1 2026-05-25 SysUser 登入與密碼安全補充
+
+後台登入目前同時牽涉 ABP `TokenAuth/Authenticate` 與自訂 `SysUser` 帳號資料。2026-05-25 已補以下規則：
+
+- 自訂登入流程會先確認 `SysUser.State == DataState.Enabled`；停用 / 刪除帳號不可登入。
+- `TokenAuth/Authenticate` 取 JWT 前也會檢查對應 `SysUser` 是否存在且啟用，避免停用帳號仍可透過 JWT endpoint 取得 token。
+- `SysUser.Password` 不再以明文新寫入；新格式為 `IFARE_PBKDF2_V1$iterations$salt$hash`。
+- 既有明文密碼採過渡策略：使用者第一次用正確舊密碼登入或改密碼時，系統會重新寫成 PBKDF2 hash。
+- 本地若沒有 `dotnet` / `msbuild`，只能完成程式碼審查與前端 build；C# 編譯仍需在 CI、Visual Studio 或具備 SDK 的主機驗證。
+
 ### 3.4 業務 CRUD 端點
 
 #### 3.4.1 News / ArticlesWelfare / ArticlesLazy / FareQA / FareOfficeUnit / Collaborator
@@ -548,6 +559,12 @@ JWT 開啟。所有端點需在 Header 帶 `Authorization: Bearer <token>`。
 
 **`AccountEditorDataDto`：** `ID` + `UserName` / `Account` / `Email` / `Permission` / `IsEnabled`（**不含密碼**，密碼改走 Personal 端點）
 
+**2026-05-25 安全補充：**
+
+- `Account/InsertAccount` 收到 `Pwd` / `PwdConfirm` 後，寫入 DB 前會用 `SysUserPasswordHasher.HashPassword()` 轉成 PBKDF2，不再新增明文密碼。
+- `AccountResultDto` / 帳號清單不再回傳 `Pwd`，後台 Account 頁面也不應顯示或匯出密碼欄位。
+- 若需重設密碼，應走個人密碼修改或另設正式的重設密碼流程，不應由帳號列表讀回既有密碼。
+
 #### 3.4.4 Personal（個人資料）
 
 | 方法 | 端點 | 用途 |
@@ -561,6 +578,12 @@ JWT 開啟。所有端點需在 Header 帶 `Authorization: Bearer <token>`。
 **`PersonalReqDto` 欄位：** `UserID` / `UserName` / `Email` / `Password_Old` / `Password_New`
 
 **`PersonalResultDto`：** `ID` / `Account` / `UserName` / `Email` / `Permission` / `State`
+
+**2026-05-25 密碼修改補充：**
+
+- `UpdatePersonalPwd` 會用 `SysUserPasswordHasher.VerifyPassword()` 驗證舊密碼。
+- 若舊密碼是合法明文舊資料且驗證成功，修改後會寫入 PBKDF2 hash。
+- 前端與 API 回應不得回傳舊密碼或新密碼。
 
 #### 3.4.5 ImgManager（圖片管理）
 
@@ -1109,12 +1132,13 @@ hybridScore    = (fuzzyScore × 0.68) + (normalizedBm25 × 0.32);
 | v2.1 | 2026-05-05 | 第一波補完：對照 source code 修正錯誤碼系統（5 → 16 個）、CRUD 方法簽章、DTO 結構、CORS 實值、Personal / ImgManager 命名修正、Img/GetmImg 補入；新增章節「六、部署 / 維運」 |
 | v2.2 | 2026-05-05 | 補完待審版：將 v2.1 標 [TBD] 項目透過 source code 進一步驗證；補完 JWT TTL / 演算法、圖片上傳實際機制、Code 6 表 Entity 額外欄位、permissions 實際位置、前台 logging 設定、首次部署 SOP 初稿；新增 §6.7 BM25 / Jieba 演算法說明；FarePolicy 章節改為「依 round4 現況」描述 |
 | **v2.3** | **2026-05-05** | **第二波補完（master `b89f5b9` 合併後）：§2.3.4 FarePolicy 前台補上完整 DataDto / DetailDataDto 欄位 + BM25 欄位權重表（Title 0.5 / Keyword 0.16 / Qualification 0.12 ...）；§3.4.2 FarePolicy 後台補上 18 欄 InputDataDto 完整結構；§6.7 BM25 演算法精確化（k1=1.2 / b=0.75 / 閾值 0.08 / Hybrid 公式 fuzzy×0.68 + bm25×0.32）；§4.3 錯誤碼確認後台 v1.0.3 新增 `-3` PermissionFail；附錄縮減為 5 項業務 / 部署細節** |
+| **v2.4** | **2026-05-25** | **補充後台 Auth / SysUser 安全狀態：停用帳號不可取 JWT、`SysUser.Password` 新寫入採 PBKDF2、舊明文密碼登入後自動 rehash、AccountResult 不回傳 `Pwd`，並標註 C# 編譯需在具備 .NET SDK / CI 的環境驗證** |
 
 ---
 
 ## 附錄：尚需校對 / 補完的項目
 
-v2.3 已將 master `b89f5b9` 合併後的所有 code 端可確認事實補入。以下 5 項屬於業務領域知識 / 部署環境細節，**需要主管 / DevOps 確認**，code 端解不了：
+v2.4 已將 2026-05-25 可由 code 端確認的 Auth / SysUser 安全變更補入。以下 5 項仍屬於業務領域知識 / 部署環境細節，**需要主管 / DevOps 確認**，code 端解不了：
 
 ### 待主管 / 業務確認
 1. **§3.3 `rememberClient` 細節** — 實際 cookie / session 持續時間、跨裝置行為

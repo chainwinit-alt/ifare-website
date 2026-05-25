@@ -1,6 +1,6 @@
 # iFare 基金會網站 — 資料庫文件
 
-> 版本：v2.0（整併版）
+> 版本：v2.1（2026-05-25 安全補充版）
 > 建立日期：2026-04-14
 > 整併日期：2026-04-28
 > 負責人：昀臻
@@ -209,6 +209,30 @@ IfareOfficeUnit ──── IfareOfficeUnitDomicile ──── IfareOfficeUni
 | `CodeIdentity` | 特殊身分（身障 / 原住民 / 新住民…） |
 | `CodeDomicile` | 戶籍地（中央 = 1，再加 22 個直轄市/縣市） |
 
+### 2.11 SysUser — 自訂後台帳號表
+
+`SysUser` 位於 `IFare` 主資料庫，不是 ABP `AbpUsers`。後台內容模組的 `CreateUserId` / `UpdateUserId` 多數都關聯到此表，後台登入與帳號管理也主要讀寫此表。
+
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `Id` | bigint | PK |
+| `CreateTime` | datetime | 建立時間 |
+| `UpdateTime` | datetime? | 最後更新時間 |
+| `Account` | nvarchar | 登入帳號，EF 設定有 unique index `IX_SysUser` |
+| `Password` | nvarchar | 密碼雜湊；2026-05-25 起新寫入使用 `IFARE_PBKDF2_V1$iterations$salt$hash` |
+| `UserName` | nvarchar | 顯示名稱 |
+| `Email` | nvarchar | Email |
+| `Permissions` | nvarchar | 後台角色 / 權限字串 |
+| `State` | varchar | `Enabled` / `Disabled` / `Delete` 等狀態 |
+| `CreateUserId` / `UpdateUserId` | bigint? | FK → SysUser |
+
+**2026-05-25 密碼資料補充**
+
+- 新增帳號與修改密碼會寫入 PBKDF2 hash，不再寫明文密碼。
+- 既有明文密碼採過渡策略：使用者第一次用正確舊密碼登入，或成功修改密碼時，會重新寫成 PBKDF2 hash。
+- `AccountResultDto` 不再回傳 `Pwd`；後台列表、匯出與文件範例都不應揭露密碼欄位。
+- 若要一次性清掉仍未登入的明文資料，需另排 migration 或強制重設密碼流程；不要直接用 SQL 產生可逆或固定密碼。
+
 ---
 
 ## 三、IFare_BDAPIDb — 後台系統表
@@ -375,3 +399,5 @@ WHERE r.Name = 'Admin';
 |------|------|----------|
 | v1.0 | 2026-04-14 | 初版目錄骨架建立 |
 | v1.1 | 2026-04-28 | 補完所有資料表欄位定義；新增關聯圖；加入 SQL 查詢範例；說明 IfarePolicy 5 層關聯與 v1.1 `AsSplitQuery` 改善 |
+| v2.0 | 2026-04-28 | 整併版正式釋出 |
+| v2.1 | 2026-05-25 | 補充 `SysUser` 自訂後台帳號表、PBKDF2 密碼格式、舊明文過渡 rehash 與密碼欄位不可回傳規則 |

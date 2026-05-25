@@ -1,6 +1,6 @@
 # iFare 基金會網站 — 開發上手與協作規範
 
-> 版本：v2.1（2026-05-19 補充版）
+> 版本：v2.2（2026-05-25 安全補充版）
 > 建立日期：2026-04-14
 > 整併日期：2026-04-28
 > 負責人：昀臻
@@ -177,6 +177,8 @@ npm run build
 git status --short
 ```
 
+後端 C# 專案仍需在有 .NET SDK / Visual Studio Build Tools 的環境跑 `dotnet build` 或 CI。若本機沒有 `dotnet` / `msbuild`，只能完成前後台 npm build 與程式碼檢查，不能宣稱 API 已本機編譯通過。
+
 ### 3. commit / push
 
 ```bash
@@ -201,8 +203,18 @@ PageBuilder 預覽、同步、圖片上傳需要前台與後台 dev server 同�
 | `VITE_FRONTEND_BASE` | 前往前台預覽的 base URL |
 | `VITE_FRONTEND_SYNC_URL` | 儲存 PageBuilder 後同步到 `/api/dynamic-pages` |
 | `VITE_FRONTEND_ASSET_UPLOAD_URL` | 圖片上傳到 `/api/dynamic-assets` |
+| `VITE_FRONTEND_DYNAMIC_API_TOKEN` | 後台呼叫前台動態頁 / 圖片 API 的同步 token |
 
 不要直接貼 `C:\Users\...\image.png` 到圖片網址欄位，瀏覽器正式站讀不到本機檔。需要顯示本機圖片時，請用 PageBuilder 的圖片上傳功能。
+
+前台 Nuxt 需配合設定：
+
+| 變數 | 預設用途 |
+|------|----------|
+| `NUXT_DYNAMIC_API_TOKEN` | 驗證 PageBuilder 寫入與圖片上傳 API；需與後台 token 相同 |
+| `NUXT_DYNAMIC_API_ALLOWED_ORIGINS` | 正式環境 CORS 白名單，逗號分隔 |
+
+本機開發可暫時不設定 token；正式環境必須設定，否則 production 寫入 API 會回 503。
 
 ### 5. 遠端部署前檢查
 
@@ -219,3 +231,4 @@ PageBuilder 預覽、同步、圖片上傳需要前台與後台 dev server 同�
 | v1.0 | 2026-04-14 | 初版（新人上手指南 + 開發規範各自獨立） |
 | v2.0 | 2026-04-28 | 整併兩份骨架成單一文件，依入職時間軸重排章節 |
 | v2.1 | 2026-05-19 | 補充 UIUX 修改、PageBuilder 開發環境、分支驗證與遠端部署前流程 |
+| v2.2 | 2026-05-25 | 補充 PageBuilder dynamic API token / CORS 設定與 C# build 驗證注意事項 |

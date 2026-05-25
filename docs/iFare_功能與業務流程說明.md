@@ -1,6 +1,6 @@
 # iFare 基金會網站 — 功能與業務流程說明
 
-> 版本：v2.1（2026-05-19 補充版）
+> 版本：v2.2（2026-05-25 PageBuilder 安全補充版）
 > 建立日期：2026-04-14
 > 整併日期：2026-04-28
 > 負責人：昀臻
@@ -75,7 +75,7 @@
 
 ## 2026-05-19 補充：PageManagement / PageBuilder 業務流程
 
-本段補上「後台新增頁面」目前的實際流程，對應 PageBuilder PoC v3。這個流程目前可支援本機與 staging 驗證；正式長期架構仍建議改成 .NET API + 正式圖片儲存。
+本段補上「後台新增頁面」目前的實際流程，對應 PageBuilder PoC v4。這個流程目前可支援本機與 staging 驗證；Nuxt bridge 已補 token 與 CORS 白名單，但正式長期架構仍建議改成 .NET API + 正式圖片儲存。
 
 ### 3.8 後台頁面管理（PageManagement）
 
@@ -99,15 +99,21 @@
    - 補充資訊
 6. 使用前台預覽檢查桌機 / 平板 / 手機版面。
 7. 儲存。
-8. 後台將內容同步到前台 Nuxt server route。
+8. 後台帶 `VITE_FRONTEND_DYNAMIC_API_TOKEN` 將內容同步到前台 Nuxt server route。
 9. 前台使用 `/<slug>` 顯示已發布頁面。
 
 **圖片上傳流程**
 
 1. 在圖文區塊選擇「選擇本機圖片」。
-2. 後台上傳到 `VITE_FRONTEND_ASSET_UPLOAD_URL`，預設為 `/api/dynamic-assets`。
+2. 後台上傳到 `VITE_FRONTEND_ASSET_UPLOAD_URL`，預設為 `/api/dynamic-assets`，並帶 `X-iFare-Sync-Token`。
 3. 前台以 `/api/dynamic-assets/<filename>` 讀取圖片。
 4. 儲存頁面後，前台重整即可看到圖片。
+
+**目前允許的新上傳圖片**
+
+- MIME：`image/avif`、`image/gif`、`image/jpeg`、`image/png`、`image/webp`
+- 大小：8MB 以下
+- SVG：不允許新上傳；既有 SVG 不會透過動態圖片讀取 route 送出
 
 **不能使用的圖片來源**
 
@@ -135,6 +141,9 @@
 |------|----------|----------|
 | 前台 dev server 未啟動 | 後台仍可儲存 localStorage，但同步失敗 | 啟動前台後重新儲存或發布一次 |
 | 圖片上傳失敗 | 顯示錯誤，不應讓儲存按鈕一直 loading | 檢查 `VITE_FRONTEND_ASSET_UPLOAD_URL` 與前台 server |
+| 同步或上傳回 401 | token 不一致或未帶 token | 確認 `VITE_FRONTEND_DYNAMIC_API_TOKEN` 與 `NUXT_DYNAMIC_API_TOKEN` |
+| 正式環境寫入回 503 | 前台 Nuxt 未設定 `NUXT_DYNAMIC_API_TOKEN` | 補正式環境變數後重啟前台 |
+| 跨域被瀏覽器擋下 | 後台 origin 不在白名單 | 補 `NUXT_DYNAMIC_API_ALLOWED_ORIGINS` |
 | 前台破圖 | 顯示 fallback 文案 | 確認圖片 URL 是否為 `/api/dynamic-assets/...` |
 | slug 重複或撞靜態路由 | 目前仍需人工避免 | 後續應補即時 slug 衝突檢查 |
 | 遠端部署後內容消失 | 多半是 runtime 資料被覆蓋 | 保留 / 備份 `server/data/` |
@@ -147,6 +156,7 @@
 - 切換草稿後確認前台不顯示。
 - 用桌機、平板、手機 viewport 檢查 Hero、圖文、CTA、Footer 不重疊。
 - 確認 `server/data/dynamic-pages.json` 與 `server/data/dynamic-assets/` 已納入部署保留策略。
+- 正式環境確認 PageBuilder token、CORS 白名單與寫入 API smoke test 都通過。
 
 ---
 
@@ -156,3 +166,4 @@
 |------|------|----------|
 | v2.0 | 2026-04-28 | 整併業務邏輯說明為功能與業務流程文件 |
 | v2.1 | 2026-05-19 | 補充 PageManagement / PageBuilder 新增頁面、圖片上傳、前台顯示與部署前驗收流程 |
+| v2.2 | 2026-05-25 | 補充 PageBuilder token、CORS、圖片格式限制與部署驗收項目 |

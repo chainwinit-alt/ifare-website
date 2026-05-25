@@ -1,7 +1,7 @@
 # iFare PageBuilder — 前端顯示 PoC
 
 **建立日期**：2026-05-18
-**狀態**：PoC v3（2026-05-19：自動同步 + SSR + 圖片上傳 + 預覽穩定性）
+**狀態**：PoC v4（2026-05-25：同步 token + CORS 白名單 + 圖片上傳防護）
 **對應 xlsx 條目**：sheet2「後臺優化」#66
 
 ---
@@ -13,6 +13,7 @@
 **v1（commit 20dcad6）** 走通整條渲染鏈路，資料同步用「手動貼 JSON 到 localStorage」代替後端 API。
 **v2（本次升級）** 改用 Nuxt server routes 當中介層自動同步：後台儲存 → fire-and-forget PUT 到 `/api/dynamic-pages` → 寫進 `server/data/dynamic-pages.json` → 前端 useAsyncData 讀取，達成「後台按下儲存 → 前端重整就看得到」端到端體驗。
 **v3（2026-05-19）** 補齊圖片與預覽穩定性：後台可把本機圖片上傳到 Nuxt server route，前端正式路由可解析 `/api/dynamic-assets/...`；同時修正預覽裝置切換 class、儲存錯誤卡住 loading、`IPv4://` 圖片路徑等問題。
+**v4（2026-05-25）** 補上 Nuxt bridge 寫入防護：`PUT /api/dynamic-pages`、`POST /api/dynamic-assets`、媒體庫清單需通過同步 token；CORS 改為 localhost 白名單或 `NUXT_DYNAMIC_API_ALLOWED_ORIGINS`；圖片上傳 MIME 白名單移除 SVG。
 
 ---
 
@@ -89,7 +90,7 @@
 **前端（iFare_Frontend）**
 
 - `server/api/dynamic-assets.post.ts` / `server/api/dynamic-assets.options.ts`
-  - 提供 dev/staging 用圖片上傳 API，支援 `avif/gif/jpeg/png/svg/webp`，限制 8MB。
+  - 提供 dev/staging 用圖片上傳 API；v3 原支援 `avif/gif/jpeg/png/svg/webp` 並限制 8MB，v4 起新上傳已移除 SVG。
 - `server/api/dynamic-assets/[name].get.ts`
   - 以 API route 回傳圖片檔，避免直接暴露伺服器檔案路徑。
 - `utils/dynamicImage.ts`
@@ -98,6 +99,29 @@
   - 圖片載入失敗時顯示明確 fallback，不再只留下破圖 icon。
 - `server/utils/cors.ts`
   - CORS method 補齊 `POST` / `PUT`，讓後台同步與圖片上傳都能通過 preflight。
+
+### v4（2026-05-25 — bridge hardening）
+
+**後台（iFare_Backend）**
+
+- `src/utils/frontendSync.ts`
+  - 後台同步 PageBuilder JSON 與圖片上傳時，會從 `VITE_FRONTEND_DYNAMIC_API_TOKEN` 帶入 `X-iFare-Sync-Token`。
+  - 若正式環境未設定 token，前台寫入 API 應視為未完成部署，不可放行內容異動。
+- `src/components/PageBuilder/SectionEditor.vue`
+  - 圖片上傳仍走 `VITE_FRONTEND_ASSET_UPLOAD_URL`，但前台 API 已要求 token 與 MIME 白名單。
+
+**前端（iFare_Frontend）**
+
+- `nuxt.config.ts`
+  - 新增 `NUXT_DYNAMIC_API_TOKEN`：Nuxt server route 驗證後台同步與圖片上傳。
+  - 新增 `NUXT_DYNAMIC_API_ALLOWED_ORIGINS`：正式環境明確列出允許跨域來源，逗號分隔。
+- `server/utils/cors.ts`
+  - 不再使用 wildcard CORS；開發預設只允許 localhost / 127.0.0.1 的 `3000`、`3001`、`4173`、`5173`。
+  - production 若未設定 token，寫入 API 回 503；token 不符回 401。
+- `server/api/dynamic-assets.post.ts`
+  - 圖片上傳限制 8MB。
+  - 允許 MIME：`image/avif`、`image/gif`、`image/jpeg`、`image/png`、`image/webp`。
+  - SVG 不再允許新上傳；既有 SVG 檔即使被媒體庫列到，也不會被 `[name].get.ts` 當圖片送出。
 
 ### 重用，沒改
 

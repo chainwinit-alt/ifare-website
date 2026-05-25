@@ -1,6 +1,6 @@
 # iFare 基金會網站 — 部署維運與異常處理手冊
 
-> 版本：v2.1（2026-05-19 補充版）
+> 版本：v2.2（2026-05-25 安全補充版）
 > 建立日期：2026-04-14
 > 整併日期：2026-04-28
 > 負責人：昀臻
@@ -183,6 +183,7 @@ npm run build
 | `VITE_FRONTEND_BASE` | 後台 toast「前往前端預覽」的站台根網址 | 本地 `http://localhost:3000`；正式改正式前台網址 |
 | `VITE_FRONTEND_SYNC_URL` | 後台儲存後同步 PageBuilder JSON | 本地 `http://localhost:3000/api/dynamic-pages` |
 | `VITE_FRONTEND_ASSET_UPLOAD_URL` | PageBuilder 圖片上傳 API | 本地 `http://localhost:3000/api/dynamic-assets` |
+| `VITE_FRONTEND_DYNAMIC_API_TOKEN` | 後台呼叫前台動態頁 / 圖片寫入 API 的同步 token | 必須與前台 `NUXT_DYNAMIC_API_TOKEN` 相同；正式環境必填 |
 
 前台 Nuxt：
 
@@ -191,6 +192,8 @@ npm run build
 | `NUXT_PUBLIC_SITE_URL` / `NUXT_SITE_URL` | 前台 canonical / sitemap 站台 URL | 正式部署需改正式網址 |
 | `NUXT_PUBLIC_FRONTEND_API_BASE` | 前台 client 端 API base | 依目前環境設定 |
 | `NUXT_FRONTEND_API_SERVER_BASE` | 前台 server 端 API base | 依目前環境設定 |
+| `NUXT_DYNAMIC_API_TOKEN` | 驗證 PageBuilder 寫入與圖片上傳 API | 正式環境必填；缺值時 production 寫入 API 會回 503 |
+| `NUXT_DYNAMIC_API_ALLOWED_ORIGINS` | PageBuilder bridge CORS 白名單 | 逗號分隔，例如 `https://www.i-fare.org.tw,https://admin.example.com` |
 | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | AI 相關功能 | 沒用到可不設定 |
 
 ### 3. Runtime 資料要保留
@@ -202,17 +205,28 @@ npm run build
 
 正式環境若仍沿用 Nuxt server route，主機上的執行帳號必須能寫入 `server/data/`。若部署流程每次會整包覆蓋前台目錄，應先把 `server/data/` 移到持久化位置，或在部署前備份、部署後還原。
 
-### 4. 正式化建議
+### 4. 2026-05-25 PageBuilder bridge 安全設定
+
+- `PUT /api/dynamic-pages`、`POST /api/dynamic-assets`、`GET /api/dynamic-assets` 皆需通過 `NUXT_DYNAMIC_API_TOKEN`。
+- 後台需用 `VITE_FRONTEND_DYNAMIC_API_TOKEN` 帶 `X-iFare-Sync-Token`；兩端 token 不一致會回 401。
+- CORS 不再 wildcard。開發環境預設允許 localhost / 127.0.0.1 的 `3000`、`3001`、`4173`、`5173`；正式環境需設定 `NUXT_DYNAMIC_API_ALLOWED_ORIGINS`。
+- 圖片上傳 MIME 白名單為 avif / gif / jpeg / png / webp，大小上限 8MB；SVG 不允許新上傳，既有 SVG 也不會透過 `[name].get.ts` 當圖片送出。
+- 部署 smoke test 需額外確認：token 缺失時 production 寫入 API 回 503、token 錯誤時回 401、允許 origin 以外的跨域請求沒有 `Access-Control-Allow-Origin`。
+
+### 5. 正式化建議
 
 - 短期：可以先讓 Nuxt `/api/dynamic-pages` 與 `/api/dynamic-assets` 作為 staging bridge，但要限制 CORS origin，不要長期 wildcard。
 - 中期：把 PageBuilder 資料與圖片上傳改進 .NET API，資料進 SQL Server，圖片進正式儲存位置。
 - 長期：加入 slug 衝突、版本歷史、審核流程與多人編輯鎖定，避免內容互蓋。
 
-### 5. 常見排查
+### 6. 常見排查
 
 - 前台頁面 404：確認該頁狀態是 `published`，且 `dynamic-pages.json` 內有該 slug。
 - 圖片破圖：確認圖片 URL 是 `/api/dynamic-assets/...`，不是 `C:\...`、`file://...` 或 `IPv4://...`。
 - 儲存一直轉：看後台 console 與前台 Nuxt server log，通常是同步 API 或圖片上傳 API 沒啟動。
+- 寫入 API 回 401：確認 `VITE_FRONTEND_DYNAMIC_API_TOKEN` 與 `NUXT_DYNAMIC_API_TOKEN` 完全一致。
+- 寫入 API 回 503：正式環境的 `NUXT_DYNAMIC_API_TOKEN` 未設定。
+- 跨域被瀏覽器擋下：確認後台 origin 已列入 `NUXT_DYNAMIC_API_ALLOWED_ORIGINS`。
 - 遠端主機更新後內容消失：優先檢查 `server/data/` 是否被部署流程覆蓋。
 
 ---
@@ -224,3 +238,4 @@ npm run build
 | v1.0 | 2026-04-14 | 初版（部署環境說明 + 維護SOP 各自獨立） |
 | v2.0 | 2026-04-28 | 整併兩份文件，依「部署 → 維運 → 異常 → 緊急 → 交接」時間軸排列；移除與「Git 工作流程」「新人環境建置」重複的內容（已歸入 `iFare_開發上手與協作規範.md`） |
 | v2.1 | 2026-05-19 | 補充 PageBuilder 動態頁、圖片上傳、runtime 資料保留與部署前驗證項目 |
+| v2.2 | 2026-05-25 | 補充 PageBuilder bridge token、CORS 白名單、圖片 MIME 限制與部署 smoke test |
