@@ -1,11 +1,18 @@
 <template>
+  <!--
+    2026-05-25 UIUX #57 — 統一 CompSelect / CompSelectRecipient 為單一元件
+    variant="list" (預設) — 下拉清單 <ul><li>(原 CompSelect)
+    variant="tags"        — 橫排按鈕 tag 樣式(原 CompSelectRecipient)
+    allow-deselect="true" — 重複點選會清空(Recipient 行為)
+  -->
   <div
     class="component-select no-userselect"
-    :class="{ active: isShow}"
+    :class="[{ active: isShow }, `variant-${variant}`]"
+    :name="selectType"
     tabindex="0"
     role="combobox"
     :aria-expanded="isShow"
-    aria-haspopup="listbox"
+    :aria-haspopup="variant === 'tags' ? 'listbox' : 'listbox'"
     :aria-label="props.selectTitle || props.placeholder"
     @click="ToggleSelectDialog"
     @keydown.enter.prevent="onEnterSelect"
@@ -26,12 +33,14 @@
         <div class="part-top">
           <h5 class="select-title">{{ props.selectTitle }}</h5>
         </div>
-        <ul class="list-unstyled select-list" role="listbox">
+
+        <!-- variant="list":垂直清單 -->
+        <ul v-if="variant === 'list'" class="list-unstyled select-list" role="listbox">
           <li
-            class="select-item"
-            :class="{ active: _item.name == selectName, focused: idx === focusedIndex }"
             v-for="(_item, idx) in selectList"
             :key="_item.val"
+            class="select-item"
+            :class="{ active: _item.name == selectName, focused: idx === focusedIndex }"
             role="option"
             :aria-selected="_item.name == selectName"
             tabindex="-1"
@@ -40,6 +49,23 @@
             {{ _item.name }}
           </li>
         </ul>
+
+        <!-- variant="tags":橫排 tag 按鈕 -->
+        <div v-else class="btn-tag-list" role="listbox">
+          <span
+            v-for="(_item, idx) in selectList"
+            :key="_item.val"
+            class="btn btn-tag"
+            :class="{ active: _item.name == selectName, focused: idx === focusedIndex }"
+            role="option"
+            :aria-selected="_item.name == selectName"
+            tabindex="-1"
+            @click.stop.prevent="ClickSelectItem(_item.name, _item.val)"
+          >
+            {{ _item.name }}
+          </span>
+        </div>
+
         <div class="part-bottom">
           <button class="btn btn-select-close transition-general" @click.stop.prevent="ToggleSelectDialog">關閉</button>
         </div>
@@ -56,17 +82,32 @@ const selectName = ref("");
 const isShow = ref(false);
 const focusedIndex = ref(-1);
 
+const props = defineProps<{
+  placeholder?: string;
+  selectList?: Array<{ name: string; val: string }>;
+  selectValue?: string;
+  selectType?: string;
+  selectTitle?: string;
+  selectDefault?: string;
+  /** 2026-05-25 UIUX #57 — 視覺變體 */
+  variant?: 'list' | 'tags';
+  /** 2026-05-25 UIUX #57 — 重複點同選項 = 清空(原 Recipient 行為) */
+  allowDeselect?: boolean;
+}>();
+const emits = defineEmits(["update:selectValue", "isOpened"]);
+
+const variant = computed(() => props.variant ?? 'list');
+
 function ToggleSelectDialog() {
   isShow.value = !isShow.value;
   if (isShow.value) {
-    // 開啟時，預設 focus 已選項目，無則 focus 第一個
     const list = (props.selectList || []) as any[];
     const cur = list.findIndex((p: any) => p.name === selectName.value);
     focusedIndex.value = cur >= 0 ? cur : 0;
   } else {
     focusedIndex.value = -1;
   }
-  emits("isOpened", props.selectType, isShow.value)
+  emits("isOpened", props.selectType, isShow.value);
 }
 
 function CloseDialog() {
@@ -79,7 +120,6 @@ function CloseDialog() {
 
 function onArrow(delta: number) {
   if (!isShow.value) {
-    // 關閉狀態下方向鍵也可開啟
     ToggleSelectDialog();
     return;
   }
@@ -89,25 +129,28 @@ function onArrow(delta: number) {
   if (next < 0) next = list.length - 1;
   if (next >= list.length) next = 0;
   focusedIndex.value = next;
-  // Enter 在 focused option 上會觸發 click
-  const item = list[next];
-  if (item) {
-    // 視覺反饋：滾到可視範圍 (簡單版)
-  }
 }
 
-function PreventClick(e:any) {
+function PreventClick(_e: any) {
   return false;
 }
 
 function ClickSelectItem(name: string, val: string) {
+  // 2026-05-25 UIUX #57 — allowDeselect 時,重複點 = 清空(原 Recipient 行為)
+  if (props.allowDeselect && selectVal.value === val) {
+    selectName.value = "";
+    selectVal.value = "";
+    emits("update:selectValue", props.selectType, "");
+    ToggleSelectDialog();
+    return;
+  }
+
   selectName.value = name;
   selectVal.value = val;
   emits("update:selectValue", props.selectType, selectVal.value);
-  ToggleSelectDialog()
+  ToggleSelectDialog();
 }
 
-// 讓 Enter 在外層 keydown 時，如果有 focusedIndex，選中該項
 function onEnterSelect() {
   if (isShow.value && focusedIndex.value >= 0) {
     const list = (props.selectList || []) as any[];
@@ -118,35 +161,28 @@ function onEnterSelect() {
   }
 }
 
-const props = defineProps([
-  "placeholder",
-  "selectList",
-  "selectValue",
-  "selectType",
-  "selectTitle",
-  "selectDefault"
-]);
-const emits = defineEmits(["update:selectValue", "isOpened"]);
+watch(
+  () => props.selectList,
+  (newList) => {
+    if (!newList || !Array.isArray(newList)) return;
 
-watch(props.selectList, (newList, oldList) => {
-  if (!newList || !Array.isArray(newList)) return;  // null / undefined / 非 array 防呆
-
-  if (props.selectDefault) {
-    const _defaultItem = newList.find((p:any) => p.val == props.selectDefault)
-    if (_defaultItem) {
-      selectName.value = _defaultItem.name
-      selectVal.value = _defaultItem.val
-    } else {
-      selectName.value = ""
-      selectVal.value = ""
+    if (props.selectDefault) {
+      const _defaultItem = newList.find((p: any) => p.val == props.selectDefault);
+      if (_defaultItem) {
+        selectName.value = _defaultItem.name;
+        selectVal.value = _defaultItem.val;
+      } else {
+        selectName.value = "";
+        selectVal.value = "";
+      }
     }
-  }
 
-  if (props.selectDefault == "") {
-    selectName.value = ""
-    selectVal.value = ""
-  }
-})
+    if (props.selectDefault === "") {
+      selectName.value = "";
+      selectVal.value = "";
+    }
+  },
+);
 
 const modelValue = computed({
   get() {

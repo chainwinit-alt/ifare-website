@@ -1,9 +1,9 @@
 <template>
   <main-header>
     <template #btnsRight>
-      <!-- 2026-05-25 #95v3 — 4 個動作按鈕全收進 main-header 同一列,主卡內不再放重複入口 -->
-      <el-button :icon="Download" size="large" plain @click="onExport">匯出 JSON</el-button>
-      <el-button :icon="Upload" size="large" plain @click="triggerImport">匯入 JSON</el-button>
+      <!-- 2026-05-25 #95v4 — 4 個按鈕統一樣式:default size、次要動作都 plain + icon、主 CTA 維持 primary -->
+      <el-button :icon="Download" plain @click="onExport">匯出 JSON</el-button>
+      <el-button :icon="Upload" plain @click="triggerImport">匯入 JSON</el-button>
       <input
         ref="fileInput"
         type="file"
@@ -11,8 +11,8 @@
         style="display: none"
         @change="onImport"
       />
-      <el-button size="large" plain @click="openQuickCreate">用問答精靈建立 →</el-button>
-      <el-button :icon="Plus" type="primary" size="large" @click="openQuickCreate">快速新增頁面</el-button>
+      <el-button :icon="MagicStick" plain @click="openQuickCreate">用問答精靈建立</el-button>
+      <el-button :icon="Plus" type="primary" @click="openQuickCreate">快速新增頁面</el-button>
     </template>
   </main-header>
 
@@ -107,37 +107,57 @@
         </div>
       </div>
 
-      <!-- 2026-05-25 M — 搜尋 / 篩選 / 排序 toolbar -->
+      <!-- 2026-05-25 #95v4 — toolbar 重新呈現:雙列分區
+           Row 1:搜尋(主導) + 結果計數
+           Row 2:狀態 tab-style 含計數 + 排序 dropdown -->
       <div class="card-info list-toolbar">
-        <div class="toolbar-search">
+        <div class="toolbar-row toolbar-search-row">
           <el-input
             v-model="searchKeyword"
             placeholder="搜尋頁面名稱或網址"
-            size="small"
+            size="default"
             clearable
             :prefix-icon="Search"
+            class="toolbar-search-input"
           />
+          <span class="toolbar-result-inline" v-if="filteredCount !== total">
+            符合 <strong>{{ filteredCount }}</strong> / 共 {{ total }} 筆
+          </span>
+          <span class="toolbar-result-inline" v-else-if="total > 0">
+            共 <strong>{{ total }}</strong> 筆
+          </span>
         </div>
-        <div class="toolbar-group">
-          <span class="toolbar-label">狀態</span>
-          <el-radio-group v-model="statusFilter" size="small">
-            <el-radio-button label="all">全部</el-radio-button>
-            <el-radio-button label="published">已發布</el-radio-button>
-            <el-radio-button label="draft">草稿</el-radio-button>
-            <el-radio-button label="unpublished">已下架</el-radio-button>
-          </el-radio-group>
-        </div>
-        <div class="toolbar-group">
-          <span class="toolbar-label">排序</span>
-          <el-select v-model="sortBy" size="small" style="width: 140px;">
-            <el-option label="更新時間 ↓" value="updateDate" />
-            <el-option label="建立時間 ↓" value="createDate" />
-            <el-option label="標題 A→Z" value="title" />
-          </el-select>
-        </div>
-        <div class="toolbar-result">
-          <span v-if="filteredCount !== total">符合 {{ filteredCount }} / 共 {{ total }} 筆</span>
-          <span v-else>共 {{ total }} 筆</span>
+
+        <div class="toolbar-row toolbar-filter-row">
+          <div class="filter-tabs" role="tablist" aria-label="狀態篩選">
+            <button
+              v-for="opt in STATUS_TABS"
+              :key="opt.value"
+              type="button"
+              class="filter-tab"
+              :class="{ active: statusFilter === opt.value }"
+              :aria-selected="statusFilter === opt.value"
+              role="tab"
+              @click="statusFilter = opt.value"
+            >
+              {{ opt.label }}
+              <span class="filter-tab-count">{{ statusCounts[opt.value] }}</span>
+            </button>
+          </div>
+
+          <div class="sort-control">
+            <el-icon class="sort-icon" aria-hidden="true"><Sort /></el-icon>
+            <el-select
+              v-model="sortBy"
+              size="small"
+              class="sort-select"
+              aria-label="排序方式"
+            >
+              <el-option label="更新時間 ↓" value="updateDate" />
+              <el-option label="建立時間 ↓" value="createDate" />
+              <el-option label="標題 A→Z" value="title" />
+            </el-select>
+          </div>
         </div>
       </div>
 
@@ -353,6 +373,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import {
   ElButton,
   ElDialog,
+  ElIcon,
   ElInput,
   ElMessageBox,
   ElOption,
@@ -365,7 +386,7 @@ import {
   ElTableColumn,
   ElTag,
 } from 'element-plus';
-import { Download, Plus, Search, Upload } from '@element-plus/icons-vue';
+import { Download, MagicStick, Plus, Search, Sort, Upload } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import MainHeader from '@/components/MainHeader.vue';
 import {
@@ -518,6 +539,24 @@ const statusFilter = ref<'all' | 'published' | 'draft' | 'unpublished'>('all');
 const sortBy = ref<'updateDate' | 'createDate' | 'title'>('updateDate');
 const currentPage = ref(1);
 const pageSize = ref(20);
+
+// 2026-05-25 #95v4 — 狀態 tab 設定 + 各狀態數量(顯示在 tab 旁邊)
+const STATUS_TABS = [
+  { value: 'all' as const, label: '全部' },
+  { value: 'published' as const, label: '已發布' },
+  { value: 'draft' as const, label: '草稿' },
+  { value: 'unpublished' as const, label: '已下架' },
+];
+
+const statusCounts = computed<Record<typeof STATUS_TABS[number]['value'], number>>(() => {
+  const unpub = pages.value.filter((p) => p.status === 'unpublished').length;
+  return {
+    all: total.value,
+    published: published.value,
+    draft: drafts.value,
+    unpublished: unpub,
+  };
+});
 
 const filteredPages = computed(() => {
   let arr = pages.value.slice();
@@ -1167,16 +1206,12 @@ async function onImport(event: Event) {
   font-weight: 600;
 }
 
-// 2026-05-25 M — 搜尋 / 篩選 / 排序 toolbar
-// 2026-05-25 #95v2 — flex-direction: row 必要,避免被 .card-info 全域 column 繼承造成直列堆疊
-//                    視覺上拿掉獨立灰底+邊框,改用上下分隔線跟主卡融合
-// 2026-05-25 #95v3 — 加大上下 padding 給更多透氣空間,跟 KPI / 表格不要太擠
+// 2026-05-25 #95v4 — toolbar 雙列分區:row1 搜尋+結果 / row2 狀態 tabs + 排序
 .list-toolbar {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
   margin-bottom: 12px;
   padding: 16px 4px;
   background: transparent;
@@ -1186,30 +1221,127 @@ async function onImport(event: Event) {
   border-radius: 0;
 }
 
-.toolbar-search {
-  flex: 1 1 260px;
-  min-width: 220px;
-  max-width: 380px;
-}
-
-.toolbar-group {
+.toolbar-row {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 12px 16px;
 }
 
-.toolbar-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #606266;
+.toolbar-search-row {
+  // 搜尋列:搜尋框 grow,計數靠右
 }
 
-.toolbar-result {
+.toolbar-search-input {
+  flex: 1;
+  max-width: 460px;
+}
+
+.toolbar-result-inline {
   margin-left: auto;
-  font-size: 12px;
-  color: #909399;
+  font-size: 13px;
+  color: #606266;
+
+  strong {
+    color: #ea5504;
+    font-weight: 700;
+  }
+}
+
+.toolbar-filter-row {
+  // 篩選列:狀態 tabs 左,排序 control 右
+}
+
+// 狀態 tabs — tab-style(底線標 active,而不是 button-group 的填色感)
+.filter-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+  flex: 1;
+}
+
+.filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 0;
+  background: transparent;
+  color: #606266;
+  font-size: 13px;
   font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  position: relative;
+  transition: background-color 0.18s ease, color 0.18s ease;
+
+  &:hover {
+    background: #f5f7fa;
+    color: #303133;
+  }
+
+  &.active {
+    color: #ea5504;
+    background: rgba(234, 85, 4, 0.08);
+
+    .filter-tab-count {
+      background: #ea5504;
+      color: #ffffff;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid #ea5504;
+    outline-offset: 2px;
+  }
+}
+
+.filter-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ebeef5;
+  color: #606266;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+// 排序 — icon + label + select 一組
+.sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.sort-icon {
+  color: #909399;
+  font-size: 14px;
+}
+
+.sort-select {
+  width: 140px;
+}
+
+@media (max-width: 720px) {
+  .toolbar-search-input {
+    max-width: 100%;
+  }
+
+  .toolbar-result-inline {
+    margin-left: 0;
+  }
+
+  .sort-control {
+    margin-left: 0;
+  }
 }
 
 .list-pagination {

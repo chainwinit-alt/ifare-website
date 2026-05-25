@@ -177,8 +177,8 @@
             </ul>
           </div>
           <div v-if="!isLoadingOffice && !hasErrorOffice && officeList.length > 0" class="part-pages">
-            <!-- <CompPage :page-list="pageNums_office" @change-page="PageChange_Office"/> -->
-            <CompPageNum :page-list="pageNums_office" @change-page="PageChange_Office"/>
+            <!-- 2026-05-25 UIUX #51 — 合併後 CompPage 用 mode="num" 取代原 CompPageNum -->
+            <CompPage mode="num" :page-list="pageNums_office" @change-page="PageChange_Office"/>
           </div>
         </div>
       </section>
@@ -238,8 +238,7 @@
             </ul>
           </div>
           <div v-if="!isLoadingQA && !hasErrorQA && qaList.length > 0" class="part-pages">
-            <!-- <CompPage :page-list="pageNums_QA" @change-page="PageChange_QA"/> -->
-            <CompPageNum :page-list="pageNums_QA" @change-page="PageChange_QA"/>
+            <CompPage mode="num" :page-list="pageNums_QA" @change-page="PageChange_QA"/>
           </div>
         </div>
       </section>
@@ -272,7 +271,6 @@ const { loadWelfareProfile, saveWelfareProfile } = useWelfareProfile();
 const $router = useRouter();
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue"
-import CompPageNum from "../components/CompPageNum.vue";
 
 interface selectItem {
   name: string;

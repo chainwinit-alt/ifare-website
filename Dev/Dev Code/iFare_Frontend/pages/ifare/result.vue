@@ -106,7 +106,10 @@
                 @is-opened="isSelectOpen"
                 @update:select-value="getSelectValue"
               />
-            <CompSelectRecipient 
+            <!-- 2026-05-25 UIUX #57 — 原 CompSelectRecipient 改用 CompSelect variant="tags" + allow-deselect -->
+            <CompSelect
+                variant="tags"
+                :allow-deselect="true"
                 placeholder="受助者年齡區間"
                 select-title="受助者年齡區間"
                 select-type="recipient"
@@ -246,7 +249,6 @@ const { loadWelfareProfile, saveWelfareProfile, clearWelfareProfile } = useWelfa
 const { getLifeEventByKey } = useWelfareLifeEvents();
 const { count: compareCount, isSaved: isPolicySaved, togglePolicy } = useWelfareCompare();
 import CompSelect from "../components/CompSelect.vue";
-import CompSelectRecipient from "../components/CompSelectRecipient.vue";
 import CompSelectElse from "~/components/CompSelectElse.vue";
 import CompPage from "../components/CompPage.vue"
 
