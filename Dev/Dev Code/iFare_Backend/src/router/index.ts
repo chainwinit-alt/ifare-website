@@ -129,6 +129,13 @@ import PageManagement_DataListViewVue from '@/views/PageManagement/PageManagemen
 import PageManagement_AddEditViewVue from '@/views/PageManagement/PageManagement_AddEditView.vue'
 //#endregion
 
+//#region [View.vue] Search governance
+import SearchGovernance_IndexViewVue from '@/views/SearchGovernance/SearchGovernance_IndexView.vue'
+import SearchGovernance_DashboardViewVue from '@/views/SearchGovernance/SearchGovernance_DashboardView.vue'
+import SearchGovernance_TermListViewVue from '@/views/SearchGovernance/SearchGovernance_TermListView.vue'
+import SearchGovernance_AliasListViewVue from '@/views/SearchGovernance/SearchGovernance_AliasListView.vue'
+//#endregion
+
 // 輸出基礎路徑（開發除錯用）
 console.log(import.meta.env.BASE_URL)
 
@@ -936,6 +943,48 @@ const router = createRouter({
     },
     {
       // 無權限提示頁
+      //#region Search governance
+      path: '/Search-Governance',
+      name: 'SearchGovernance_Index',
+      component: SearchGovernance_IndexViewVue,
+      meta: {
+        indexKey: 'SearchGovernance',
+        requiresAuth: true,
+        title_parent: '搜尋治理',
+        urlName_parent: 'SearchGovernance_Dashboard'
+      },
+      children: [
+        {
+          path: '',
+          name: 'SearchGovernance_Dashboard',
+          component: SearchGovernance_DashboardViewVue,
+          meta: {
+            requiresAuth: true,
+            title: '搜尋治理'
+          }
+        },
+        {
+          path: 'Terms',
+          name: 'SearchGovernance_Terms',
+          component: SearchGovernance_TermListViewVue,
+          meta: {
+            requiresAuth: true,
+            title: '搜尋詞'
+          }
+        },
+        {
+          path: 'Aliases',
+          name: 'SearchGovernance_Aliases',
+          component: SearchGovernance_AliasListViewVue,
+          meta: {
+            requiresAuth: true,
+            title: '搜尋別名'
+          }
+        }
+      ]
+      //#endregion
+    },
+    {
       path: '/NoPermission',
       name: 'NoPermission',
       component: NoPermission,

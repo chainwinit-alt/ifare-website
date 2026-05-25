@@ -803,6 +803,59 @@ export default {
                 this.ajax(ajaxRef, callback)
             },
             //#endregion
+            //#region SearchGovernance
+            GetSearchGovernanceDashboard(token: string, callback: any){
+                const ajaxRef = new AjaxRef('/SearchGovernance/GetDashboard')
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                this.ajax(ajaxRef, callback)
+            },
+            GetSearchGovernanceTerms(token: string, callback: any){
+                const ajaxRef = new AjaxRef('/SearchGovernance/GetTerms')
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                this.ajax(ajaxRef, callback)
+            },
+            GetSearchGovernanceAliases(token: string, callback: any){
+                const ajaxRef = new AjaxRef('/SearchGovernance/GetAliases')
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                this.ajax(ajaxRef, callback)
+            },
+            CreateSearchGovernanceTerm(token: string, payload: any, callback: any){
+                const ajaxRef = new AjaxRef('/SearchGovernance/CreateTerm', "post")
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                ajaxRef.setData(payload)
+                this.ajax(ajaxRef, callback)
+            },
+            UpdateSearchGovernanceTerm(token: string, payload: any, callback: any){
+                const ajaxRef = new AjaxRef('/SearchGovernance/UpdateTerm', "post")
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                ajaxRef.setData(payload)
+                this.ajax(ajaxRef, callback)
+            },
+            CreateSearchGovernanceAlias(token: string, payload: any, callback: any){
+                const ajaxRef = new AjaxRef('/SearchGovernance/CreateAlias', "post")
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                ajaxRef.setData(payload)
+                this.ajax(ajaxRef, callback)
+            },
+            UpdateSearchGovernanceAlias(token: string, payload: any, callback: any){
+                const ajaxRef = new AjaxRef('/SearchGovernance/UpdateAlias', "post")
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                ajaxRef.setData(payload)
+                this.ajax(ajaxRef, callback)
+            },
+            RefreshSearchGovernanceHotStats(token: string, payload: any, callback: any){
+                const ajaxRef = new AjaxRef('/SearchGovernance/RefreshHotStats', "post")
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                ajaxRef.setData(payload)
+                this.ajax(ajaxRef, callback)
+            },
+            SyncSearchGovernanceTerms(token: string, payload: any, callback: any){
+                const ajaxRef = new AjaxRef('/SearchGovernance/SyncTerms', "post")
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                ajaxRef.setData(payload)
+                this.ajax(ajaxRef, callback)
+            },
+            //#endregion
             ajax(ajaxRef: AjaxRef, callback: any) {
                 // 統一在這裡把 AjaxRef 轉成真正的 Axios 請求。
                 // 各個 API 方法只要負責描述需求，不必重複處理底層傳輸細節。

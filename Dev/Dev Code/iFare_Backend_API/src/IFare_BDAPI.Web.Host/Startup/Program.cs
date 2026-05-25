@@ -1,7 +1,8 @@
-﻿using Abp.AspNetCore.Dependency;
+using Abp.AspNetCore.Dependency;
 using Abp.Dependency;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace IFare_BDAPI.Web.Host.Startup
 {
@@ -14,6 +15,13 @@ namespace IFare_BDAPI.Web.Host.Startup
 
         internal static IHostBuilder CreateHostBuilder(string[] args) =>
             Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder(args)
+                .ConfigureLogging((context, logging) =>
+                {
+                    logging.ClearProviders();
+                    logging.AddConfiguration(context.Configuration.GetSection("Logging"));
+                    logging.AddConsole();
+                    logging.AddDebug();
+                })
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
