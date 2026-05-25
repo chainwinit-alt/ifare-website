@@ -1,12 +1,14 @@
 <template>
   <div class="app-body" :name="$route.name">
+    <!-- 2026-05-25 UIUX #18 — Hero 背景改 JS-driven 可手動切換,加 pagination dots + 標題進場動畫 -->
     <div class="part-bg-top" aria-hidden="true">
-      <div class="bg-img-list slider-animate">
-        <i class="bg-img ic-index-img-0"></i>
-        <i class="bg-img ic-index-img-1"></i>
-        <i class="bg-img ic-index-img-2"></i>
-        <i class="bg-img ic-index-img-3"></i>
-        <i class="bg-img ic-index-img-4"></i>
+      <div class="bg-img-list" :class="{ 'is-paused': !autoPlayBg }">
+        <i
+          v-for="(_, i) in heroBgCount"
+          :key="i"
+          class="bg-img bg-img-controlled"
+          :class="[`ic-index-img-${i}`, { 'is-active': activeBgIndex === i }]"
+        ></i>
       </div>
       <div class="bg-border-sector">
         <div class="bg-sector sector-fill"></div>
@@ -18,16 +20,52 @@
       <section class="section-top">
         <div class="index-top-title">
           <div class="title-group">
-            <h1 class="index-title main-title">為生命給力，邁向長穩未來。</h1>
-            <p class="index-title sub-title">
+            <h1 class="index-title main-title hero-fade-in">為生命給力，邁向長穩未來。</h1>
+            <p class="index-title sub-title hero-fade-in hero-fade-in-delay-1">
               Empowering Lives, A Steady Tomorrow.
             </p>
           </div>
-          <NuxtLink to="/ifare" class="btn btn-ifare-start transition-general">
+          <NuxtLink to="/ifare" class="btn btn-ifare-start transition-general hero-fade-in hero-fade-in-delay-2">
             <span class="txt-ifare">i-Fare</span>
             <span class="txt-end">，你的福利好幫手</span>
             <i class="icon ic-arrow-simple-white"></i>
           </NuxtLink>
+          <!-- 2026-05-25 UIUX #18 — Hero 背景 pagination dots,可手動切換 -->
+          <ul class="hero-dots" role="tablist" aria-label="背景輪播切換">
+            <li v-for="i in heroBgCount" :key="i - 1">
+              <button
+                type="button"
+                class="hero-dot"
+                :class="{ active: activeBgIndex === i - 1 }"
+                :aria-current="activeBgIndex === i - 1 ? 'true' : 'false'"
+                :aria-label="`切換到背景 ${i} / ${heroBgCount}`"
+                @click="onSelectBg(i - 1)"
+              />
+            </li>
+          </ul>
+        </div>
+      </section>
+<!-- 2026-05-25 UIUX #19 — 影響力數字區塊,首頁強化「故事感」+ 滾動到此區觸發 count-up 動畫 -->
+      <section class="section-impact bg-section" ref="impactSectionRef">
+        <div class="part-top">
+          <div class="title-component">
+            <i class="ic-title-pattern"></i>
+            <h3 class="comp-title">基金會影響力</h3>
+            <span class="comp-shadow">IMPACT</span>
+          </div>
+          <p class="impact-subtitle">2017 年成立至今,長穩持續推動環境保育、人才培育、社會關懷</p>
+        </div>
+        <div class="part-body">
+          <ul class="impact-list list-unstyled" role="list">
+            <li v-for="(item, idx) in impactStats" :key="item.key" class="impact-item" :style="{ animationDelay: `${idx * 0.12}s` }">
+              <span class="impact-icon" :class="`ic-impact-${item.key}`" aria-hidden="true"></span>
+              <div class="impact-num-row">
+                <span class="impact-num">{{ impactShown[idx] }}</span>
+                <span class="impact-unit">{{ item.unit }}</span>
+              </div>
+              <span class="impact-label">{{ item.label }}</span>
+            </li>
+          </ul>
         </div>
       </section>
       <section class="section-news bg-section">
@@ -152,6 +190,143 @@ const newsList = reactive<Array<newsItem>>([]);
 const welfareList = reactive<Array<welfareItem>>([]);
 const codePolicyList = reactive<Array<codeItem>>([]);
 const selectPolicy = ref(1);
+
+// 2026-05-25 UIUX #18 — Hero 背景輪播 JS 控制
+// 取代原 CSS keyframe slider-animate,改成 ref 控制 active index,可手動 dot 切換
+const heroBgCount = 5;
+const HERO_AUTO_INTERVAL = 5000; // 5 秒換一張
+const HERO_RESUME_DELAY = 12000; // 手動切換後 12 秒恢復自動
+const activeBgIndex = ref(0);
+const autoPlayBg = ref(true);
+let heroAutoTimer: ReturnType<typeof setInterval> | null = null;
+let heroResumeTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearHeroAuto() {
+  if (heroAutoTimer) {
+    clearInterval(heroAutoTimer);
+    heroAutoTimer = null;
+  }
+}
+
+function clearHeroResume() {
+  if (heroResumeTimer) {
+    clearTimeout(heroResumeTimer);
+    heroResumeTimer = null;
+  }
+}
+
+function startHeroAuto() {
+  clearHeroAuto();
+  autoPlayBg.value = true;
+  heroAutoTimer = setInterval(() => {
+    activeBgIndex.value = (activeBgIndex.value + 1) % heroBgCount;
+  }, HERO_AUTO_INTERVAL);
+}
+
+function onSelectBg(i: number) {
+  activeBgIndex.value = i;
+  clearHeroAuto();
+  autoPlayBg.value = false;
+  // 使用者操作後暫停一段時間,讓他看清楚選中的圖,再恢復自動
+  clearHeroResume();
+  heroResumeTimer = setTimeout(() => startHeroAuto(), HERO_RESUME_DELAY);
+}
+
+onMounted(() => {
+  startHeroAuto();
+});
+
+onBeforeUnmount(() => {
+  clearHeroAuto();
+  clearHeroResume();
+  if (impactObserver) {
+    impactObserver.disconnect();
+    impactObserver = null;
+  }
+});
+
+// 2026-05-25 UIUX #19 — 影響力數字 + 滾動到區塊觸發 count-up
+interface ImpactStat {
+  key: string;
+  target: number;
+  unit: string;
+  label: string;
+}
+
+const impactStats: ImpactStat[] = [
+  { key: 'service', target: 50000, unit: '+', label: '服務人次' },
+  { key: 'partner', target: 30, unit: '+', label: '合作夥伴' },
+  { key: 'project', target: 500, unit: '+', label: '補助專案' },
+  { key: 'year', target: 9, unit: '年', label: '深耕台灣' },
+];
+
+const impactShown = ref<string[]>(impactStats.map(() => '0'));
+const impactSectionRef = ref<HTMLElement | null>(null);
+let impactObserver: IntersectionObserver | null = null;
+let impactStarted = false;
+
+function formatImpactNum(n: number): string {
+  return n.toLocaleString('en-US');
+}
+
+function startImpactCountUp() {
+  if (impactStarted) return;
+  impactStarted = true;
+
+  const DURATION = 1600;
+  const startAt = performance.now();
+
+  function frame(now: number) {
+    const elapsed = now - startAt;
+    const progress = Math.min(1, elapsed / DURATION);
+    // ease-out cubic
+    const eased = 1 - Math.pow(1 - progress, 3);
+
+    impactStats.forEach((stat, idx) => {
+      const current = Math.floor(stat.target * eased);
+      impactShown.value[idx] = formatImpactNum(current);
+    });
+
+    if (progress < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      // 結束時直接顯示精確 target,避免 floor 誤差
+      impactStats.forEach((stat, idx) => {
+        impactShown.value[idx] = formatImpactNum(stat.target);
+      });
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+onMounted(() => {
+  if (typeof IntersectionObserver === 'undefined') {
+    // 不支援 IO 就直接顯示最終值,不做動畫
+    impactStats.forEach((stat, idx) => {
+      impactShown.value[idx] = formatImpactNum(stat.target);
+    });
+    return;
+  }
+
+  impactObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          startImpactCountUp();
+          impactObserver?.disconnect();
+          impactObserver = null;
+          break;
+        }
+      }
+    },
+    { threshold: 0.3 },
+  );
+
+  if (impactSectionRef.value) {
+    impactObserver.observe(impactSectionRef.value);
+  }
+});
 
 const topNews = $WebApiGet("/News/GetTopsNewsList");
 topNews.then((res: any) => {

@@ -140,15 +140,28 @@ if (userStore.permission == "編輯者") {
 
 // 響應式選單清單
 const menuList = reactive<Array<AsideMenu>>(_asideMenu);
-// 當前選單預設選取的 indexKey
-const activeDefault = ref('')
 
-// 監聽 route prop 變化，當路由切換時更新選單高亮
-watch(props, async (newProps, oldProps) => {
-  console.log("new:", newProps);
-  console.log("old:", oldProps);
-  activeDefault.value = newProps.route.meta.indexKey
-});
+// 2026-05-25 #29 — 從 route.matched 找有 indexKey 的 ancestor,確保編輯/詳情頁返回後側邊欄正確高亮
+//
+// 原本只取 props.route.meta.indexKey,但 Vue Router 子路由不會繼承 parent meta,
+// 子頁(News_Edit / News_Detail 等)的 meta.indexKey 是 undefined → 高亮失效。
+// 改成由內到外掃 matched 陣列,撿第一個有設定的 indexKey 用。
+//
+// 同時改用 computed 派生,免去 watch + 預設空字串造成的初始 flash。
+function resolveIndexKey(route: any): string {
+  if (!route) return '';
+  // 先看當前 route.meta(對應到 matched 的 leaf)
+  if (route.meta?.indexKey) return route.meta.indexKey;
+  // 再從 matched chain 由內到外撿
+  const matched = route.matched ?? [];
+  for (let i = matched.length - 1; i >= 0; i--) {
+    const key = matched[i]?.meta?.indexKey;
+    if (key) return key as string;
+  }
+  return '';
+}
+
+const activeDefault = computed(() => resolveIndexKey(props.route));
 
 //{ "indexKey": "ImgManager", "title": "圖片管理", "url": {"name": "ImgManager"}, "permission": "Editor" },
 </script>

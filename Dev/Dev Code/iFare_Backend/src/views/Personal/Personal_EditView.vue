@@ -1,6 +1,8 @@
 <template>
     <main-header>
       <template #btnsRight>
+          <!-- 2026-05-25 #33 — 編輯頁也加「變更密碼」入口,跟詳情頁一致,免得使用者要回詳情頁才能找到 -->
+          <el-button :icon="Lock" color="white" size="large" @click="$commonLib.GuideToPage('Personal_ChangePwd')">變更密碼</el-button>
           <el-button :icon="Close" color="white" size="large" @click="$router.go(-1)">取消</el-button>
           <el-button :icon="Check" type="primary" size="large" @click="SaveAction">儲存</el-button>
       </template>
@@ -39,7 +41,7 @@
   <script setup lang="ts">
   import { ref, getCurrentInstance } from "vue";
   import { ElButton, ElInput, ElScrollbar } from "element-plus";
-  import { Close, Check } from "@element-plus/icons-vue";
+  import { Close, Check, Lock } from "@element-plus/icons-vue";
   import { useUserStore } from "@/stores/user";
   import { useRouter } from "vue-router";
   import MainHeader from "@/components/MainHeader.vue";

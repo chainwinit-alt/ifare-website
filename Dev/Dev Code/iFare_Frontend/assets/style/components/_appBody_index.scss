@@ -284,7 +284,7 @@ $sector-lines-height: $sector-height - $sector-lines-border-width;
             width: 100%;
             max-width: 136px;
           }
-  
+
           .card-bottom {
             display: flex;
             justify-content: right;
@@ -292,4 +292,229 @@ $sector-lines-height: $sector-height - $sector-lines-border-width;
         }
       }
     }
+
+// 2026-05-25 UIUX #18 — Hero JS-driven 背景輪播 + dots + 標題進場動畫
+// 取代原 .slider-animate 的 CSS keyframe;由 JS 控制 active class
+.bg-img.bg-img-controlled {
+  opacity: 0;
+  animation: none !important;
+  transition: opacity 1.2s ease-in-out;
+
+  &.is-active {
+    opacity: 1;
+  }
+}
+
+// 自動播放暫停時,active 圖仍顯示(opacity 1),其他 0
+// (預設行為已經如此,is-paused class 留作未來想加暫停 indicator 用)
+.bg-img-list.is-paused {
+  // 預留 hook
+}
+
+// Hero pagination dots
+.hero-dots {
+  display: flex;
+  gap: 10px;
+  padding: 0;
+  margin: 24px 0 0;
+  list-style: none;
+  justify-content: center;
+
+  li { margin: 0; padding: 0; }
+}
+
+.hero-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.25s ease, transform 0.25s ease, width 0.25s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.75);
+    transform: scale(1.2);
+  }
+
+  &.active {
+    background: #ffffff;
+    width: 26px;
+    border-radius: 6px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 3px;
+  }
+}
+
+// 標題進場動畫 — fade + slide-up,分段 delay 形成 stagger
+@keyframes heroFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-fade-in {
+  animation: heroFadeInUp 0.7s ease-out both;
+}
+
+.hero-fade-in-delay-1 {
+  animation-delay: 0.15s;
+}
+
+.hero-fade-in-delay-2 {
+  animation-delay: 0.3s;
+}
+
+// 使用者偏好減少動效時(prefers-reduced-motion),關掉動畫 + 背景輪播改瞬切
+@media (prefers-reduced-motion: reduce) {
+  .hero-fade-in {
+    animation: none;
+  }
+
+  .bg-img.bg-img-controlled {
+    transition: none;
+  }
+}
+
+// 2026-05-25 UIUX #19 — 影響力數字區塊
+.section-impact {
+  padding: 64px 32px 48px;
+
+  .part-top {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+
+  .impact-subtitle {
+    margin: 14px 0 0;
+    font-size: 15px;
+    color: rgba(23, 24, 24, 0.65);
+    line-height: 1.7;
+  }
+}
+
+.impact-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.impact-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #fff7f0 100%);
+  border: 1px solid rgba(234, 85, 4, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 10px 28px -22px rgba(234, 85, 4, 0.35);
+  opacity: 0;
+  transform: translateY(20px);
+  animation: heroFadeInUp 0.6s ease-out forwards;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 32px -18px rgba(234, 85, 4, 0.45);
+  }
+}
+
+.impact-icon {
+  display: inline-block;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 12px;
+  background: rgba(234, 85, 4, 0.1);
+  border-radius: 50%;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 12px;
+    background: #ea5504;
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+  }
+
+  // 4 個 icon 用 emoji-style fallback,沒設定 mask-image 時用文字
+  &.ic-impact-service::after { content: '\1F465'; background: none; font-size: 28px; line-height: 32px; text-align: center; color: #ea5504; }
+  &.ic-impact-partner::after { content: '\1F91D'; background: none; font-size: 28px; line-height: 32px; text-align: center; color: #ea5504; }
+  &.ic-impact-project::after { content: '\2728'; background: none; font-size: 28px; line-height: 32px; text-align: center; color: #ea5504; }
+  &.ic-impact-year::after { content: '\1F331'; background: none; font-size: 28px; line-height: 32px; text-align: center; color: #ea5504; }
+}
+
+.impact-num-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.impact-num {
+  font-size: 38px;
+  font-weight: 800;
+  color: #ea5504;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.impact-unit {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ea5504;
+}
+
+.impact-label {
+  font-size: 14px;
+  color: rgba(23, 24, 24, 0.7);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+@media (max-width: 1024px) {
+  .impact-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 540px) {
+  .section-impact {
+    padding: 48px 20px 32px;
+  }
+
+  .impact-list {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .impact-num {
+    font-size: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .impact-item {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
   }

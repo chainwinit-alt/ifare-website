@@ -187,6 +187,50 @@ export function useFeedback() {
   }
 
   /**
+   * 2026-05-25 #62 後台版 — 標題 + 描述 + 可選 action 按鈕的成功訊息
+   * 跟前端 toast 風格對齊：主訊息 + 描述 + 立即動作（例如「立即編輯」「再來一筆」）
+   *
+   * 用法:
+   *   successWithAction({
+   *     title: '頁面已建立',
+   *     description: '已存為草稿,可繼續編輯內容',
+   *     action: { label: '立即編輯 →', onClick: () => router.push(...) },
+   *   });
+   */
+  function successWithAction(options: {
+    title: string;
+    description?: string;
+    action?: { label: string; onClick: () => void };
+    duration?: number;
+  }) {
+    const notif = ElNotification({
+      type: 'success',
+      title: options.title,
+      message: h('div', { style: 'line-height: 1.7' }, [
+        options.description
+          ? h('div', { style: 'color: #606266; margin-bottom: 6px;' }, options.description)
+          : null,
+        options.action
+          ? h(
+              'button',
+              {
+                type: 'button',
+                style:
+                  'background: #67c23a; border: 0; color: #fff; cursor: pointer; padding: 4px 14px; border-radius: 6px; font-weight: 700; font-size: 12px;',
+                onClick: () => {
+                  options.action!.onClick();
+                  notif.close();
+                },
+              },
+              options.action.label,
+            )
+          : null,
+      ]),
+      duration: options.duration ?? 5000,
+    });
+  }
+
+  /**
    * 2026-05-25 N — 操作 + 可點擊「復原」按鈕（給刪除類的後悔藥用）
    * 例如刪除頁面後 toast 帶「復原」可在 8 秒內救回。
    */
@@ -254,6 +298,7 @@ export function useFeedback() {
     info,
     warning,
     successWithLink,
+    successWithAction,
     successWithUndo,
     runAsync,
   };

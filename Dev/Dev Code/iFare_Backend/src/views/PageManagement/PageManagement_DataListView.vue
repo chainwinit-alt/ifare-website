@@ -1,6 +1,7 @@
 <template>
   <main-header>
     <template #btnsRight>
+      <!-- 2026-05-25 #95v3 — 4 個動作按鈕全收進 main-header 同一列,主卡內不再放重複入口 -->
       <el-button :icon="Download" size="large" plain @click="onExport">匯出 JSON</el-button>
       <el-button :icon="Upload" size="large" plain @click="triggerImport">匯入 JSON</el-button>
       <input
@@ -10,6 +11,7 @@
         style="display: none"
         @change="onImport"
       />
+      <el-button size="large" plain @click="openQuickCreate">用問答精靈建立 →</el-button>
       <el-button :icon="Plus" type="primary" size="large" @click="openQuickCreate">快速新增頁面</el-button>
     </template>
   </main-header>
@@ -55,8 +57,8 @@
           </p>
         </div>
         <div class="list-head-actions">
+          <!-- 2026-05-25 #95v3 — 用問答精靈建立 / 快速新增頁面 / 匯入 / 匯出 都集中在頂部 main-header,主卡只留「使用指引」 -->
           <el-button v-if="!guideOpen" text type="info" @click="guideOpen = true">? 使用指引</el-button>
-          <el-button text type="primary" @click="openQuickCreate">用問答精靈建立 →</el-button>
         </div>
       </div>
 
@@ -451,7 +453,7 @@ const {
   total,
   update,
 } = useDynamicPages();
-const { success, error: showError, successWithUndo } = useFeedback();
+const { success, error: showError, successWithAction, successWithUndo, errorWithNextStep } = useFeedback();
 const FRONTEND_PREVIEW_BASE =
   (import.meta.env.VITE_FRONTEND_BASE as string | undefined) || 'http://localhost:3000';
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -697,11 +699,15 @@ function submitQuickCreate() {
   });
 
   quickCreateOpen.value = false;
-  success(
-    quickCreateForm.publishNow
-      ? `頁面「${title}」已建立並發布。`
-      : `頁面「${title}」已建立為草稿，可繼續調整。`,
-  );
+  // 2026-05-25 #62 — 用 successWithAction:標題 + 描述 + 「立即編輯」action
+  // 因為 wizard 完成後馬上 router.push 進 edit 頁,action 在 toast 開啟期間其實已導頁;
+  // 仍保留 toast 給看到通知的人後續可循
+  successWithAction({
+    title: quickCreateForm.publishNow ? `已建立並發布「${title}」` : `已建立草稿「${title}」`,
+    description: quickCreateForm.publishNow
+      ? `頁面已上線到前台,網址 /${finalSlug}。可繼續編輯內容,或前往前台預覽。`
+      : `已存為草稿,前台不會顯示。可在編輯頁填妥內容後切「已發布」上線。`,
+  });
   router.push({ name: 'PageManagement_Edit', query: { id: newPage.id } });
 }
 
@@ -784,12 +790,17 @@ function onExport() {
   const json = exportJson();
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
+  const filename = `dynamic-pages-${new Date().toISOString().slice(0, 10)}.json`;
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = `dynamic-pages-${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
-  success('已匯出 JSON');
+  // 2026-05-25 #62 後台版 — 加描述告訴使用者檔案在哪 + 用途
+  successWithAction({
+    title: 'JSON 已匯出',
+    description: `已下載 ${filename}(共 ${total.value} 筆頁面)。可用於備份或匯入到其他環境。`,
+  });
 }
 
 // 2026-05-25 S — 匯入前先 analyze，若會覆蓋既有頁面則彈 confirm 列出，使用者確認後才 apply
@@ -807,7 +818,12 @@ async function onImport(event: Event) {
     };
 
     if (!analysis.ok) {
-      showError(`匯入失敗：${analysis.error}`);
+      // 2026-05-25 #48 + #62 — 匯入失敗附下一步建議
+      errorWithNextStep({
+        title: '匯入失敗',
+        reason: analysis.error,
+        nextStep: '請確認 JSON 檔格式正確(由本系統匯出),或重新匯出一份對照。若仍失敗,請截圖 JSON 內容回報管理員。',
+      });
       resetFileInput();
       return;
     }
@@ -851,7 +867,11 @@ async function onImport(event: Event) {
     const parts: string[] = [];
     if (analysis.added) parts.push(`新增 ${analysis.added} 筆`);
     if (analysis.overwritten) parts.push(`覆蓋 ${analysis.overwritten} 筆`);
-    success(`已匯入 ${count} 筆${parts.length ? `（${parts.join('、')}）` : ''}`);
+    // 2026-05-25 #62 — 匯入成功用 successWithAction,描述列出新增/覆蓋細項
+    successWithAction({
+      title: `已匯入 ${count} 筆頁面`,
+      description: parts.length ? parts.join('、') + '。列表已自動重新整理。' : '列表已自動重新整理。',
+    });
     reload();
     resetFileInput();
   };
@@ -975,8 +995,8 @@ async function onImport(event: Event) {
   flex-direction: row;
   align-items: stretch;
   gap: 0;
-  padding: 8px 4px;
-  margin-bottom: 12px;
+  padding: 14px 6px;
+  margin-bottom: 18px;
   background: #fafbfc;
   border: 1px solid #ebeef5;
   border-radius: 10px;
@@ -987,8 +1007,8 @@ async function onImport(event: Event) {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 14px;
+  gap: 12px;
+  padding: 6px 20px;
 }
 
 .kpi-divider {
@@ -1102,7 +1122,9 @@ async function onImport(event: Event) {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f2f5;
 }
 
 .list-head-copy {
@@ -1148,14 +1170,15 @@ async function onImport(event: Event) {
 // 2026-05-25 M — 搜尋 / 篩選 / 排序 toolbar
 // 2026-05-25 #95v2 — flex-direction: row 必要,避免被 .card-info 全域 column 繼承造成直列堆疊
 //                    視覺上拿掉獨立灰底+邊框,改用上下分隔線跟主卡融合
+// 2026-05-25 #95v3 — 加大上下 padding 給更多透氣空間,跟 KPI / 表格不要太擠
 .list-toolbar {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   gap: 10px 14px;
   align-items: center;
-  margin-bottom: 0;
-  padding: 12px 0;
+  margin-bottom: 12px;
+  padding: 16px 4px;
   background: transparent;
   border: 0;
   border-top: 1px solid #ebeef5;
@@ -1224,7 +1247,8 @@ async function onImport(event: Event) {
   margin: 0;
   font-size: 12px;
   color: #909399;
-  line-height: 1.6;
+  line-height: 1.7;
+  max-width: 580px;
 }
 
 .title-cell {
