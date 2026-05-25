@@ -108,10 +108,11 @@
   </el-scrollbar>
 </template>
 <script setup lang="ts">
-import { ref, reactive, getCurrentInstance } from "vue";
+import { computed, ref, reactive, onMounted, getCurrentInstance } from "vue";
 import {
   ElInput,
   ElButton,
+  ElMessageBox,
   ElSelect,
   ElSwitch,
   ElDatePicker,
@@ -125,6 +126,7 @@ import HtmlEditor from '@/components/CompHtmlEditor.vue'
 import { useUserStore } from "@/stores/user";
 import type { SelectOption } from "@/interface/SelectOptions";
 import { useRouter, useRoute } from "vue-router";
+import { useDraftAutosave } from "@/composables/useDraftAutosave";
 
 const app = getCurrentInstance();
 const $commonLib = app?.appContext.config.globalProperties.$CommonLib;
@@ -154,6 +156,44 @@ const codeKeywordList = reactive<Array<SelectOption>>([])
 // el-select v-model
 const codePolicyID = ref()
 const codeKeywordIDs = ref()
+
+// 2026-05-25 #56 — 自動儲存草稿 + 離開提醒
+const DRAFT_KEY = computed(() =>
+  `ifare:articles-welfare-draft:v1:${routeNameType.indexOf('add') >= 0 ? 'new' : ids?.[0] ?? 'new'}`
+);
+const draftData = computed(() => ({
+  title: input_title.value,
+  editor: editorValue.value,
+  release: datepicker_release.value,
+  discontinued: datepicker_discontinued.value,
+  state: switch_state.value,
+  policyId: codePolicyID.value,
+  keywordIds: codeKeywordIDs.value,
+}));
+const draft = useDraftAutosave({ storageKey: DRAFT_KEY, data: draftData });
+
+onMounted(async () => {
+  if (!draft.hasDraft()) return;
+  try {
+    await ElMessageBox.confirm(
+      '偵測到先前未儲存的草稿,要還原嗎?(圖片不會還原,需重新上傳)',
+      '草稿提示',
+      { type: 'info', confirmButtonText: '還原草稿', cancelButtonText: '不要,清掉' },
+    );
+    const d = draft.restore();
+    if (d) {
+      input_title.value = d.title ?? '';
+      editorValue.value = d.editor;
+      datepicker_release.value = d.release;
+      datepicker_discontinued.value = d.discontinued;
+      switch_state.value = d.state ?? true;
+      codePolicyID.value = d.policyId;
+      codeKeywordIDs.value = d.keywordIds;
+    }
+  } catch {
+    draft.clearDraft();
+  }
+});
 
 
 function GetCodePoliceList(callback:any){
@@ -336,6 +376,8 @@ function SaveAction() {
         }
 
         $Message({ message: '新增成功', type: "success" })
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         $commonLib.GuideToPage('Articles_Welfare_DataList')
       }
     );
@@ -359,7 +401,8 @@ function SaveAction() {
         }
 
         $Message({ message: '編輯成功', type: "success" })
-        // $commonLib.GuideToPage('Articles_Welfare_DataList')
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         _router.back()
       }
     );

@@ -284,10 +284,11 @@
   </el-scrollbar>
 </template>
 <script setup lang="ts">
-import { ref, reactive, getCurrentInstance, computed } from "vue";
+import { ref, reactive, onMounted, getCurrentInstance, computed } from "vue";
 import {
   ElInput,
   ElButton,
+  ElMessageBox,
   ElSelect,
   ElSwitch,
   ElDatePicker,
@@ -301,6 +302,7 @@ import HtmlEditor from "@/components/CompHtmlEditor.vue";
 import { useUserStore } from "@/stores/user";
 import type { SelectOption } from "@/interface/SelectOptions";
 import { useRouter } from "vue-router";
+import { useDraftAutosave } from "@/composables/useDraftAutosave";
 
 const app = getCurrentInstance();
 const $commonLib = app?.appContext.config.globalProperties.$CommonLib;
@@ -347,6 +349,66 @@ const codeIncomeIDs = ref()
 const codeIdentityIDs = ref()
 const codeKeywordIDs = ref()
 const fareOfficeUnitID = ref()
+
+// 2026-05-25 #56 — 自動儲存草稿 + 離開提醒(範圍最大的 form,所有文字欄位都納入)
+const DRAFT_KEY = computed(() =>
+  `ifare:ifarepolicy-draft:v1:${routeNameType.indexOf('add') >= 0 ? 'new' : ids?.[0] ?? 'new'}`
+);
+const draftData = computed(() => ({
+  title: input_title.value,
+  editor: editorValue.value,
+  evidence: input_evidence.value,
+  qualification: input_qualification.value,
+  competentAuthority: input_competentAuthority.value,
+  officeTel: input_officeTel.value,
+  officeInfo: input_officeInfo.value,
+  remark: input_remark.value,
+  state: switch_state.value,
+  release: datepicker_release.value,
+  discontinued: datepicker_discontinued.value,
+  policyId: codePolicyID.value,
+  domicileId: codeDomicileID.value,
+  recipientIds: codeRecipientIDs.value,
+  incomeIds: codeIncomeIDs.value,
+  identityIds: codeIdentityIDs.value,
+  keywordIds: codeKeywordIDs.value,
+  officeUnitId: fareOfficeUnitID.value,
+}));
+const draft = useDraftAutosave({ storageKey: DRAFT_KEY, data: draftData });
+
+onMounted(async () => {
+  if (!draft.hasDraft()) return;
+  try {
+    await ElMessageBox.confirm(
+      '偵測到先前未儲存的草稿,要還原嗎?(取消會清掉)',
+      '草稿提示',
+      { type: 'info', confirmButtonText: '還原草稿', cancelButtonText: '不要,清掉' },
+    );
+    const d = draft.restore();
+    if (d) {
+      input_title.value = d.title ?? '';
+      editorValue.value = d.editor;
+      input_evidence.value = d.evidence ?? '';
+      input_qualification.value = d.qualification ?? '';
+      input_competentAuthority.value = d.competentAuthority ?? '';
+      input_officeTel.value = d.officeTel ?? '';
+      input_officeInfo.value = d.officeInfo ?? '';
+      input_remark.value = d.remark ?? '';
+      switch_state.value = d.state ?? true;
+      datepicker_release.value = d.release;
+      datepicker_discontinued.value = d.discontinued;
+      codePolicyID.value = d.policyId;
+      codeDomicileID.value = d.domicileId;
+      codeRecipientIDs.value = d.recipientIds;
+      codeIncomeIDs.value = d.incomeIds;
+      codeIdentityIDs.value = d.identityIds;
+      codeKeywordIDs.value = d.keywordIds;
+      fareOfficeUnitID.value = d.officeUnitId;
+    }
+  } catch {
+    draft.clearDraft();
+  }
+});
 
 function normalizeText(value: any) {
   return String(value ?? "")
@@ -844,6 +906,8 @@ function SaveAction() {
         }
 
         $Message({ message: '新增成功', type: "success" })
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         $commonLib.GuideToPage('IFare_Policy_DataList')
       }
     );
@@ -869,7 +933,8 @@ function SaveAction() {
         }
 
         $Message({ message: '編輯成功', type: "success" })
-        // $commonLib.GuideToPage('IFare_Policy_DataList')
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         _router.back();
       }
     );

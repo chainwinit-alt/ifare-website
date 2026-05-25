@@ -122,9 +122,10 @@
  *   編輯模式 → GetCollaboratorList API 取回現有資料填入表單
  *   儲存時   → 圖片轉 Base64 後呼叫 InsertCollaborator / UpdateCollaborator API
  */
-import { ref, reactive, getCurrentInstance } from "vue";
+import { computed, ref, reactive, onMounted, getCurrentInstance } from "vue";
 import {
   ElButton,
+  ElMessageBox,
   ElScrollbar,
   ElSwitch,
   ElInput,
@@ -137,6 +138,7 @@ import { Close, Check, Plus, UploadFilled } from "@element-plus/icons-vue";
 import MainHeader from "@/components/MainHeader.vue";
 import { useUserStore } from "@/stores/user";
 import { useRouter } from "vue-router";
+import { useDraftAutosave } from "@/composables/useDraftAutosave";
 
 // 取得全域工具：CommonLib（共用函式）、$message（訊息提示）、WebAPI（API 呼叫）、$route（路由資訊）
 const app = getCurrentInstance();
@@ -171,6 +173,40 @@ const imgList = ref<UploadUserFile[]>([])
 
 const IMAGE_MAX_SIZE = 500 * 1024;
 const ACCEPTED_IMAGE_TYPES = ['image/jpg', 'image/jpeg', 'image/png'];
+
+// 2026-05-25 #56 — 自動儲存草稿 + 離開提醒(圖片不存草稿,只存文字欄位)
+const DRAFT_KEY = computed(() =>
+  `ifare:collaborator-draft:v1:${routeNameType.indexOf('add') >= 0 ? 'new' : ids?.[0] ?? 'new'}`
+);
+const draftData = computed(() => ({
+  title: input_title.value,
+  serve: input_serve.value,
+  tel: input_tel.value,
+  url: input_url.value,
+  state: switch_state.value,
+}));
+const draft = useDraftAutosave({ storageKey: DRAFT_KEY, data: draftData });
+
+onMounted(async () => {
+  if (!draft.hasDraft()) return;
+  try {
+    await ElMessageBox.confirm(
+      '偵測到先前未儲存的草稿,要還原嗎?(圖片不會還原,需重新上傳)',
+      '草稿提示',
+      { type: 'info', confirmButtonText: '還原草稿', cancelButtonText: '不要,清掉' },
+    );
+    const d = draft.restore();
+    if (d) {
+      input_title.value = d.title ?? '';
+      input_serve.value = d.serve ?? '';
+      input_tel.value = d.tel ?? '';
+      input_url.value = d.url ?? '';
+      switch_state.value = d.state ?? true;
+    }
+  } catch {
+    draft.clearDraft();
+  }
+});
 
 function clearFieldError(field: string) {
   if (fieldErrors[field]) {
@@ -319,6 +355,8 @@ function SaveAction() {
           }
 
           $Message({ message: '新增成功', type: "success" })
+          // 2026-05-25 #56 — 儲存成功後清掉草稿
+          draft.markClean();
           saving.value = false;
           $commonLib.GuideToPage('Collaborator_DataList')  // 新增成功後跳轉至列表頁
         }
@@ -346,7 +384,8 @@ function SaveAction() {
           }
 
           $Message({ message: '編輯成功', type: "success" })
-          // $commonLib.GuideToPage('Collaborator_DataList')
+          // 2026-05-25 #56 — 儲存成功後清掉草稿
+          draft.markClean();
           saving.value = false;
           _router.back();  // 編輯成功後返回上一頁（詳情頁）
         }

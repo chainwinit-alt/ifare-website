@@ -66,12 +66,13 @@
   </el-scrollbar>
 </template>
 <script setup lang="ts">
-import { ref, reactive, getCurrentInstance } from "vue";
-import { ElButton, ElScrollbar, ElSwitch, ElInput } from "element-plus";
+import { computed, ref, reactive, onMounted, getCurrentInstance } from "vue";
+import { ElButton, ElMessageBox, ElScrollbar, ElSwitch, ElInput } from "element-plus";
 import { Close, Check } from "@element-plus/icons-vue";
 import MainHeader from "@/components/MainHeader.vue";
 import { useUserStore } from "@/stores/user";
 import { useRouter } from "vue-router";
+import { useDraftAutosave } from "@/composables/useDraftAutosave";
 
 const app = getCurrentInstance();
 const $commonLib = app?.appContext.config.globalProperties.$CommonLib;
@@ -89,6 +90,36 @@ const input_qa = ref('')
 const input_answer = ref('')
 
 const switch_state = ref(true);
+
+// 2026-05-25 #56 — 自動儲存草稿 + 離開提醒
+const DRAFT_KEY = computed(() =>
+  `ifare:ifareqa-draft:v1:${routeNameType.indexOf('add') >= 0 ? 'new' : ids?.[0] ?? 'new'}`
+);
+const draftData = computed(() => ({
+  qa: input_qa.value,
+  answer: input_answer.value,
+  state: switch_state.value,
+}));
+const draft = useDraftAutosave({ storageKey: DRAFT_KEY, data: draftData });
+
+onMounted(async () => {
+  if (!draft.hasDraft()) return;
+  try {
+    await ElMessageBox.confirm(
+      '偵測到先前未儲存的草稿,要還原嗎?(取消會清掉草稿)',
+      '草稿提示',
+      { type: 'info', confirmButtonText: '還原草稿', cancelButtonText: '不要,清掉' },
+    );
+    const d = draft.restore();
+    if (d) {
+      input_qa.value = d.qa ?? '';
+      input_answer.value = d.answer ?? '';
+      switch_state.value = d.state ?? true;
+    }
+  } catch {
+    draft.clearDraft();
+  }
+});
 
 if (routeNameType.indexOf("edit") >= 0) {
   $WebAPI.GetFareQAList(
@@ -143,6 +174,8 @@ function SaveAction() {
         }
 
         $Message({ message: '新增成功', type: "success" })
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         $commonLib.GuideToPage('IFare_QA_DataList')
       }
     );
@@ -166,7 +199,8 @@ function SaveAction() {
         }
 
         $Message({ message: '編輯成功', type: "success" })
-        // $commonLib.GuideToPage('IFare_QA_DataList')
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         _router.back();
       }
     );
