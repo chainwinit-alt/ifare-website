@@ -78,6 +78,40 @@ export function useFeedback() {
     });
   }
 
+  /**
+   * 2026-05-25 N — 操作 + 可點擊「復原」按鈕（給刪除類的後悔藥用）
+   * 例如刪除頁面後 toast 帶「復原」可在 8 秒內救回。
+   */
+  function successWithUndo(options: {
+    title: string;
+    message: string;
+    undoLabel?: string;
+    onUndo: () => void;
+    duration?: number;
+  }) {
+    const notif = ElNotification({
+      type: 'warning',
+      title: options.title,
+      message: h('span', [
+        `${options.message} · `,
+        h(
+          'button',
+          {
+            type: 'button',
+            style:
+              'background: transparent; border: 1px solid #e6a23c; color: #e6a23c; cursor: pointer; padding: 2px 10px; border-radius: 999px; font-weight: 700; font-size: 12px;',
+            onClick: () => {
+              options.onUndo();
+              notif.close();
+            },
+          },
+          options.undoLabel || '↶ 復原',
+        ),
+      ]),
+      duration: options.duration ?? 8000,
+    });
+  }
+
   async function runAsync<T>(
     fn: () => Promise<T> | T,
     options: RunAsyncOptions,
@@ -100,5 +134,5 @@ export function useFeedback() {
     }
   }
 
-  return { success, error, info, warning, successWithLink, runAsync };
+  return { success, error, info, warning, successWithLink, successWithUndo, runAsync };
 }

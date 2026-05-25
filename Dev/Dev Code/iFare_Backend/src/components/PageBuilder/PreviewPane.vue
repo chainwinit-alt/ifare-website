@@ -63,7 +63,8 @@ import type { DynamicPage } from '@/composables/useDynamicPages';
 
 const props = defineProps<{ page: DynamicPage }>();
 
-const FRONTEND_URL = 'http://localhost:3000';
+const FRONTEND_URL =
+  (import.meta.env.VITE_FRONTEND_BASE as string | undefined) || 'http://localhost:3000';
 const previewUrl = `${FRONTEND_URL}/preview`;
 const ALLOWED_ORIGIN = FRONTEND_URL;
 
