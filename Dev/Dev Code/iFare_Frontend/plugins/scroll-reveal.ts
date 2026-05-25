@@ -8,7 +8,9 @@
  * 進入 viewport 30% 時加 .is-revealed class,觸發 CSS transition。
  * 自動尊重 prefers-reduced-motion(直接顯示,不做動畫)。
  *
- * 樣式由全域 _animation.scss 統一處理,這裡只負責加 / 移除 class。
+ * 2026-05-25 fix — 從 .client.ts 改 universal,並補 getSSRProps,
+ * 避免 SSR 找不到 directive → 'Cannot read properties of undefined
+ * (reading getSSRProps)' 500 錯誤。
  */
 
 interface ScrollRevealValue {
@@ -18,19 +20,21 @@ interface ScrollRevealValue {
 }
 
 export default defineNuxtPlugin((nuxtApp) => {
-  // 只在 client 跑(用 .client.ts 後綴已限定)
-  const prefersReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
   nuxtApp.vueApp.directive('scroll-reveal', {
+    // 提供 SSR 預設(必須有,即使是 noop;否則 SSR 用 ssrGetDirectiveProps 會炸)
+    getSSRProps() {
+      return {};
+    },
     mounted(el: HTMLElement, binding) {
+      // 只在 client 跑
+      if (typeof window === 'undefined') return;
+
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const opts: ScrollRevealValue = binding.value ?? {};
       const delay = opts.delay ?? 0;
       const distance = opts.distance ?? 16;
       const threshold = opts.threshold ?? 0.15;
 
-      // 設定起始狀態(隱藏 + 下移)
       if (prefersReducedMotion) {
         el.classList.add('is-revealed');
         return;
