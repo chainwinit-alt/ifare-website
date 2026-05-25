@@ -56,6 +56,18 @@ export default defineNuxtConfig({
     'normalize.css/normalize.css',
     '~/assets/style/styleIFare.scss'
   ],
+  // 2026-05-25 UIUX #64-66 — 把 _color / _design-tokens 注入每個 component scss,
+  // 讓 scoped style 也能直接用 $color-brand-primary / $space-md / $fs-md 等 token,
+  // 不必每個 component 自己 @import。
+  vite: {
+    css: {
+      preprocessorOptions: {
+        scss: {
+          additionalData: `@import "@/assets/style/_color"; @import "@/assets/style/_design-tokens";`
+        }
+      }
+    }
+  },
   app: {
     head: {
       charset: 'utf-8',
