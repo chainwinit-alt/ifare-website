@@ -1,0 +1,358 @@
+{
+  "generatedAt": "2026-05-26 17:27:02",
+  "entries": [
+    {
+      "id": "1779787622435-25164a",
+      "timestamp": "2026-05-26 17:27:02",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "task.excel.failed",
+      "status": "failed",
+      "taskId": "TASK-2026-05-26-001",
+      "stderrTail": "EBUSY: resource busy or locked, open 'C:\\Users\\emma.chung\\ifare-website\\docs\\iFare_AI任務看板.xlsx'"
+    },
+    {
+      "id": "1779787622423-c17f08",
+      "timestamp": "2026-05-26 17:27:02",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "task.failed",
+      "status": "failed",
+      "taskId": "TASK-2026-05-26-001",
+      "stderrTail": "nextAction=manual 不會執行腳本"
+    },
+    {
+      "id": "1779787622418-84a7ae",
+      "timestamp": "2026-05-26 17:27:02",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "task.running",
+      "status": "running",
+      "taskId": "TASK-2026-05-26-001",
+      "command": "manual"
+    },
+    {
+      "id": "1779787620777-615e18",
+      "timestamp": "2026-05-26 17:27:00",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "task.excel.failed",
+      "status": "failed",
+      "taskId": "TASK-2026-05-26-001",
+      "stderrTail": "EBUSY: resource busy or locked, open 'C:\\Users\\emma.chung\\ifare-website\\docs\\iFare_AI任務看板.xlsx'"
+    },
+    {
+      "id": "1779787620761-fb09b2",
+      "timestamp": "2026-05-26 17:27:00",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "task.approved",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "人工核准"
+    },
+    {
+      "id": "1779787605894-f69492",
+      "timestamp": "2026-05-26 17:26:45",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "task.excel.failed",
+      "status": "failed",
+      "taskId": "TASK-2026-05-26-001",
+      "stderrTail": "EBUSY: resource busy or locked, open 'C:\\Users\\emma.chung\\ifare-website\\docs\\iFare_AI任務看板.xlsx'"
+    },
+    {
+      "id": "1779787605867-701993",
+      "timestamp": "2026-05-26 17:26:45",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "task.updated",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "{\"priority\":\"critical\"}"
+    },
+    {
+      "id": "1779787314643-97aac0",
+      "timestamp": "2026-05-26 17:21:54",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "task.created",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "幫我後台AI維護中心調整畫面呈現",
+      "stdoutTail": "backend-optimization / medium / next=manual"
+    },
+    {
+      "id": "1779786726991-79044e",
+      "timestamp": "2026-05-26 17:12:06",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.done",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "command": "node scripts/ai-maintenance-report.mjs",
+      "durationMs": 604,
+      "exitCode": 0,
+      "outputFiles": [
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.docx",
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.md",
+        "Dev/Dev Code/iFare_Backend/public/agent/latest-report.json",
+        "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json"
+      ],
+      "stdoutTail": "[ai-maintenance-report] start (write, since=7 days)\n[ai-maintenance-report] collected in 388ms\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.md\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.docx\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\ifare-website\\Dev\\Dev Code\\iFare_Backend\\public\\agent\\latest-report.json\n[ai-maintenance-report] done in 396ms total\n",
+      "stderrTail": ""
+    },
+    {
+      "id": "1779786726988-41d11d",
+      "timestamp": "2026-05-26 17:12:06",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "report.run.finish",
+      "command": "node scripts/ai-maintenance-report.mjs",
+      "status": "success",
+      "durationMs": 604,
+      "exitCode": 0,
+      "stdoutTail": "[ai-maintenance-report] start (write, since=7 days)\n[ai-maintenance-report] collected in 388ms\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.md\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.docx\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\ifare-website\\Dev\\Dev Code\\iFare_Backend\\public\\agent\\latest-report.json\n[ai-maintenance-report] done in 396ms total\n",
+      "stderrTail": "",
+      "outputFiles": [
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.docx",
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.md",
+        "Dev/Dev Code/iFare_Backend/public/agent/latest-report.json",
+        "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json"
+      ]
+    },
+    {
+      "id": "1779786726964-d1d9d3",
+      "timestamp": "2026-05-26 17:12:06",
+      "actor": "emma.chung",
+      "source": "agent-cli",
+      "action": "report.write",
+      "command": "node scripts/ai-maintenance-report.mjs",
+      "status": "success",
+      "durationMs": 394,
+      "outputFiles": [
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.docx",
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.md",
+        "Dev/Dev Code/iFare_Backend/public/agent/latest-report.json",
+        "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json"
+      ]
+    },
+    {
+      "id": "1779786726383-61bd2e",
+      "timestamp": "2026-05-26 17:12:06",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "report.run.start",
+      "command": "node scripts/ai-maintenance-report.mjs",
+      "status": "running",
+      "request": "幫我重產今日報告"
+    },
+    {
+      "id": "1779786726380-f87d83",
+      "timestamp": "2026-05-26 17:12:06",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.running",
+      "status": "running",
+      "taskId": "TASK-2026-05-26-001",
+      "command": "node scripts/ai-maintenance-report.mjs"
+    },
+    {
+      "id": "1779786726377-8cc7ca",
+      "timestamp": "2026-05-26 17:12:06",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.approved",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "白名單動作自動核准"
+    },
+    {
+      "id": "1779786726223-880045",
+      "timestamp": "2026-05-26 17:12:06",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.created",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "幫我重產今日報告",
+      "stdoutTail": "report-ops / medium / next=report"
+    },
+    {
+      "id": "1779786033193-4fa589",
+      "timestamp": "2026-05-26 17:00:33",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.refreshed-from-excel",
+      "status": "success",
+      "stdoutTail": "imported=1 updated=0 added=0"
+    },
+    {
+      "id": "1779786033174-d2dbda",
+      "timestamp": "2026-05-26 17:00:33",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.updated",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "{\"priority\":\"critical\"}"
+    },
+    {
+      "id": "1779786033159-4f2ab3",
+      "timestamp": "2026-05-26 17:00:33",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.blocked",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "等資料庫"
+    },
+    {
+      "id": "1779786033132-d39ffb",
+      "timestamp": "2026-05-26 17:00:33",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.approved",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "人工核准"
+    },
+    {
+      "id": "1779786032974-2443b2",
+      "timestamp": "2026-05-26 17:00:32",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.created",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "緊急：後台登入有時候會卡住",
+      "stdoutTail": "backend-optimization / critical / next=manual"
+    },
+    {
+      "id": "1779785962925-5a177a",
+      "timestamp": "2026-05-26 16:59:22",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.refreshed-from-excel",
+      "status": "success",
+      "stdoutTail": "匯入 2 筆"
+    },
+    {
+      "id": "1779785962904-a5b6b1",
+      "timestamp": "2026-05-26 16:59:22",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.updated",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "{\"priority\":\"critical\"}"
+    },
+    {
+      "id": "1779785962890-a5c245",
+      "timestamp": "2026-05-26 16:59:22",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.blocked",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "等資料庫團隊"
+    },
+    {
+      "id": "1779785962874-e7efb0",
+      "timestamp": "2026-05-26 16:59:22",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.approved",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "OK"
+    },
+    {
+      "id": "1779785962844-ab3bad",
+      "timestamp": "2026-05-26 16:59:22",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.created",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-002",
+      "request": "幫我重新產生今日的維護報告",
+      "stdoutTail": "report-ops / medium / next=report"
+    },
+    {
+      "id": "1779785962682-72b706",
+      "timestamp": "2026-05-26 16:59:22",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.created",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-001",
+      "request": "緊急：後台登入有時候會卡住，要看一下",
+      "stdoutTail": "backend-optimization / critical / next=manual"
+    },
+    {
+      "id": "1779785594139-f1970c",
+      "timestamp": "2026-05-26 16:53:14",
+      "actor": "test",
+      "source": "agent-runner",
+      "action": "task.excel.failed",
+      "status": "failed",
+      "taskId": "TASK-2026-05-26-003",
+      "stderrTail": "Cannot find module 'C:\\Users\\emma.chung\\ifare-website\\scripts\\agent\\excel-sync.mjs' imported from C:\\Users\\emma.chung\\ifare-website\\scripts\\ai-maintenance-runner.mjs"
+    },
+    {
+      "id": "1779785594136-45685c",
+      "timestamp": "2026-05-26 16:53:14",
+      "actor": "test",
+      "source": "agent-runner",
+      "action": "task.done",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-003",
+      "command": "node scripts/ai-maintenance-report.mjs",
+      "durationMs": 619,
+      "exitCode": 0,
+      "outputFiles": [
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.docx",
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.md",
+        "Dev/Dev Code/iFare_Backend/public/agent/latest-report.json",
+        "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json"
+      ],
+      "stdoutTail": "[ai-maintenance-report] start (write, since=7 days)\n[ai-maintenance-report] collected in 400ms\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.md\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.docx\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\ifare-website\\Dev\\Dev Code\\iFare_Backend\\public\\agent\\latest-report.json\n[ai-maintenance-report] done in 408ms total\n",
+      "stderrTail": ""
+    },
+    {
+      "id": "1779785594134-dbc8a1",
+      "timestamp": "2026-05-26 16:53:14",
+      "actor": "backend-admin",
+      "source": "agent-runner",
+      "action": "report.run.finish",
+      "command": "node scripts/ai-maintenance-report.mjs",
+      "status": "success",
+      "durationMs": 619,
+      "exitCode": 0,
+      "stdoutTail": "[ai-maintenance-report] start (write, since=7 days)\n[ai-maintenance-report] collected in 400ms\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.md\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.docx\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\ifare-website\\Dev\\Dev Code\\iFare_Backend\\public\\agent\\latest-report.json\n[ai-maintenance-report] done in 408ms total\n",
+      "stderrTail": "",
+      "outputFiles": [
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.docx",
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.md",
+        "Dev/Dev Code/iFare_Backend/public/agent/latest-report.json",
+        "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json"
+      ]
+    },
+    {
+      "id": "1779785594110-c1f6c1",
+      "timestamp": "2026-05-26 16:53:14",
+      "actor": "emma.chung",
+      "source": "agent-cli",
+      "action": "report.write",
+      "command": "node scripts/ai-maintenance-report.mjs",
+      "status": "success",
+      "durationMs": 406,
+      "outputFiles": [
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.docx",
+        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.md",
+        "Dev/Dev Code/iFare_Backend/public/agent/latest-report.json",
+        "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json"
+      ]
+    }
+  ]
+}

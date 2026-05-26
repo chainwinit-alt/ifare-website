@@ -159,6 +159,10 @@ import HealthCheckView from '@/views/Health/HealthCheckView.vue'
 import SmokeTestView from '@/views/Health/SmokeTestView.vue'
 //#endregion
 
+//#region [View.vue] AI 維護中心 — 後臺優化 #105
+import AdminAgentView from '@/views/AdminAgent/AdminAgentView.vue'
+//#endregion
+
 // 輸出基礎路徑（開發除錯用）
 
 // 建立路由實例，使用 HTML5 History 模式（無 # 號的 URL）
@@ -1032,6 +1036,20 @@ const router = createRouter({
         title: '無此權限',
         viewerCanAccess: true
       }
+    },
+    {
+      //#region AI 維護中心 — 後臺優化 #105
+      path: '/AdminAgent',
+      name: 'AdminAgent',
+      component: AdminAgentView,
+      meta: {
+        indexKey: 'AdminAgent',
+        requiresAuth: true,
+        requiresAdmin: true,
+        title: 'AI 維護中心',
+        tip: 'read-only：顯示 AI 維護報告、Excel 高優先待辦與可複製的 agent 指令。'
+      }
+      //#endregion
     },
     {
       //#region 部署健康檢查 — 後臺優化 #87

@@ -1,0 +1,79 @@
+{
+  "generatedAt": "2026-05-26 17:27:02",
+  "counts": {
+    "new": 0,
+    "triaged": 0,
+    "pending_review": 0,
+    "approved": 0,
+    "running": 0,
+    "done": 0,
+    "failed": 1,
+    "blocked": 0
+  },
+  "entries": [
+    {
+      "id": "TASK-2026-05-26-001",
+      "title": "幫我後台AI維護中心調整畫面呈現",
+      "source": "intake-text",
+      "category": "backend-optimization",
+      "priority": "critical",
+      "status": "failed",
+      "requestText": "幫我後台AI維護中心調整畫面呈現",
+      "summary": "分類為「後台優化」、優先級「中」，建議動作：需人工處理。",
+      "nextAction": "manual",
+      "needsApproval": true,
+      "syncToExcel": true,
+      "excelRowRef": {
+        "sheet": "tasks",
+        "rowIndex": 1
+      },
+      "auditIds": [
+        "1779787314643-97aac0",
+        "1779787605867-701993",
+        "1779787620761-fb09b2",
+        "1779787622418-84a7ae",
+        "1779787622423-c17f08"
+      ],
+      "actor": "backend-admin",
+      "createdAt": "2026-05-26 17:21:54",
+      "updatedAt": "2026-05-26 17:27:02",
+      "history": [
+        {
+          "at": "2026-05-26 17:21:54",
+          "from": null,
+          "to": "pending_review",
+          "actor": "backend-admin",
+          "note": "由 intake 建立"
+        },
+        {
+          "at": "2026-05-26 17:26:45",
+          "from": "pending_review",
+          "to": "pending_review",
+          "actor": "backend-admin",
+          "note": "欄位更新：priority"
+        },
+        {
+          "at": "2026-05-26 17:27:00",
+          "from": "pending_review",
+          "to": "approved",
+          "actor": "backend-admin",
+          "note": "人工核准"
+        },
+        {
+          "at": "2026-05-26 17:27:02",
+          "from": "approved",
+          "to": "running",
+          "actor": "backend-admin",
+          "note": "開始執行"
+        },
+        {
+          "at": "2026-05-26 17:27:02",
+          "from": "running",
+          "to": "failed",
+          "actor": "backend-admin",
+          "note": "非可執行動作（manual 或 status 不會跑腳本）"
+        }
+      ]
+    }
+  ]
+}

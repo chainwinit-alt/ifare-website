@@ -45,29 +45,6 @@
           </ul>
         </div>
       </section>
-<!-- 2026-05-25 UIUX #19 — 影響力數字區塊,首頁強化「故事感」+ 滾動到此區觸發 count-up 動畫 -->
-      <section class="section-impact bg-section" ref="impactSectionRef" v-scroll-reveal>
-        <div class="part-top">
-          <div class="title-component">
-            <i class="ic-title-pattern"></i>
-            <h3 class="comp-title">基金會影響力</h3>
-            <span class="comp-shadow">IMPACT</span>
-          </div>
-          <p class="impact-subtitle">2017 年成立至今,長穩持續推動環境保育、人才培育、社會關懷</p>
-        </div>
-        <div class="part-body">
-          <ul class="impact-list list-unstyled" role="list">
-            <li v-for="(item, idx) in impactStats" :key="item.key" class="impact-item" :style="{ animationDelay: `${idx * 0.12}s` }">
-              <span class="impact-icon" :class="`ic-impact-${item.key}`" aria-hidden="true"></span>
-              <div class="impact-num-row">
-                <span class="impact-num">{{ impactShown[idx] }}</span>
-                <span class="impact-unit">{{ item.unit }}</span>
-              </div>
-              <span class="impact-label">{{ item.label }}</span>
-            </li>
-          </ul>
-        </div>
-      </section>
       <!-- 2026-05-25 UIUX #20 — 滾動觸發進場動畫 -->
       <section class="section-news bg-section" v-scroll-reveal>
         <div class="bg-radial"></div>
@@ -254,93 +231,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearHeroAuto();
   clearHeroResume();
-  if (impactObserver) {
-    impactObserver.disconnect();
-    impactObserver = null;
-  }
-});
-
-// 2026-05-25 UIUX #19 — 影響力數字 + 滾動到區塊觸發 count-up
-interface ImpactStat {
-  key: string;
-  target: number;
-  unit: string;
-  label: string;
-}
-
-const impactStats: ImpactStat[] = [
-  { key: 'service', target: 50000, unit: '+', label: '服務人次' },
-  { key: 'partner', target: 30, unit: '+', label: '合作夥伴' },
-  { key: 'project', target: 500, unit: '+', label: '補助專案' },
-  { key: 'year', target: 9, unit: '年', label: '深耕台灣' },
-];
-
-const impactShown = ref<string[]>(impactStats.map(() => '0'));
-const impactSectionRef = ref<HTMLElement | null>(null);
-let impactObserver: IntersectionObserver | null = null;
-let impactStarted = false;
-
-function formatImpactNum(n: number): string {
-  return n.toLocaleString('en-US');
-}
-
-function startImpactCountUp() {
-  if (impactStarted) return;
-  impactStarted = true;
-
-  const DURATION = 1600;
-  const startAt = performance.now();
-
-  function frame(now: number) {
-    const elapsed = now - startAt;
-    const progress = Math.min(1, elapsed / DURATION);
-    // ease-out cubic
-    const eased = 1 - Math.pow(1 - progress, 3);
-
-    impactStats.forEach((stat, idx) => {
-      const current = Math.floor(stat.target * eased);
-      impactShown.value[idx] = formatImpactNum(current);
-    });
-
-    if (progress < 1) {
-      requestAnimationFrame(frame);
-    } else {
-      // 結束時直接顯示精確 target,避免 floor 誤差
-      impactStats.forEach((stat, idx) => {
-        impactShown.value[idx] = formatImpactNum(stat.target);
-      });
-    }
-  }
-
-  requestAnimationFrame(frame);
-}
-
-onMounted(() => {
-  if (typeof IntersectionObserver === 'undefined') {
-    // 不支援 IO 就直接顯示最終值,不做動畫
-    impactStats.forEach((stat, idx) => {
-      impactShown.value[idx] = formatImpactNum(stat.target);
-    });
-    return;
-  }
-
-  impactObserver = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          startImpactCountUp();
-          impactObserver?.disconnect();
-          impactObserver = null;
-          break;
-        }
-      }
-    },
-    { threshold: 0.3 },
-  );
-
-  if (impactSectionRef.value) {
-    impactObserver.observe(impactSectionRef.value);
-  }
 });
 
 const topNews = $WebApiGet("/News/GetTopsNewsList");

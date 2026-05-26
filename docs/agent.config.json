@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "agentVersion": "1.0.0-mvp",
+  "report": {
+    "outputDir": "~/Desktop/iFare-AI-Maintenance-Reports",
+    "backendPublicJson": "Dev/Dev Code/iFare_Backend/public/agent/latest-report.json",
+    "backendAuditJson": "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json",
+    "filenamePattern": "YYYY-MM-DD.md",
+    "wordFilenamePattern": "YYYY-MM-DD.docx",
+    "retentionDays": 90
+  },
+  "audit": {
+    "logFile": "docs/ai-agent-reports/_audit.jsonl",
+    "backendPublicJson": "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json",
+    "maxPublicEntries": 30
+  },
+  "runner": {
+    "host": "127.0.0.1",
+    "port": 4873,
+    "allowedOrigins": [
+      "http://127.0.0.1:5173",
+      "http://localhost:5173",
+      "http://127.0.0.1:4173",
+      "http://localhost:4173"
+    ]
+  },
+  "readPaths": [
+    "docs/**/*.md",
+    "docs/**/*.xlsx",
+    "scripts/**/*.mjs",
+    "Dev/Dev Code/iFare_Backend/src/**",
+    "Dev/Dev Code/iFare_Frontend/**",
+    "README.md",
+    ".github/**"
+  ],
+  "denyPaths": [
+    ".env",
+    ".env.*",
+    "**/.env",
+    "**/.env.*",
+    "**/appsettings*.json",
+    "**/secrets/**",
+    "**/*.key",
+    "**/*.pem",
+    "**/node_modules/**",
+    "**/.nuxt/**",
+    "**/.output/**",
+    "**/dist/**"
+  ],
+  "commands": {
+    "backendBuild": "npm --prefix \"Dev/Dev Code/iFare_Backend\" run build",
+    "backendTypeCheck": "npm --prefix \"Dev/Dev Code/iFare_Backend\" run type-check",
+    "frontendBuild": "npm --prefix \"Dev/Dev Code/iFare_Frontend\" run build"
+  },
+  "git": {
+    "logSinceDays": 7,
+    "ignorePaths": [
+      "*.lock",
+      "node_modules/**",
+      ".nuxt/**",
+      ".output/**",
+      "dist/**"
+    ]
+  },
+  "xlsx": {
+    "trackingFile": "docs/iFare_問題追蹤與AI維運規劃.xlsx",
+    "sheets": ["後臺優化", "UIUX問題追蹤清單", "PoC研究", "統計摘要"]
+  },
+  "task": {
+    "storeFile": "docs/ai-agent-reports/_tasks-cache.json",
+    "publicMirror": "Dev/Dev Code/iFare_Backend/public/agent/tasks-latest.json",
+    "excelFile": "docs/iFare_AI任務看板.xlsx",
+    "excelSheet": "tasks",
+    "autoApproveActions": ["report", "dryRun", "verify", "status"],
+    "maxPublicEntries": 50,
+    "maxExcelSizeMB": 5,
+    "lockFile": "docs/ai-agent-reports/_tasks-write.lock"
+  }
+}

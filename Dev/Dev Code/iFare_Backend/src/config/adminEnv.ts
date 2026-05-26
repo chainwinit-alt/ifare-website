@@ -56,3 +56,8 @@ export const FRONTEND_ASSET_UPLOAD_URL =
   joinUrl(FRONTEND_BASE_URL, '/api/dynamic-assets');
 
 export const FRONTEND_DYNAMIC_API_TOKEN = readEnv('VITE_FRONTEND_DYNAMIC_API_TOKEN');
+
+export const AGENT_RUNNER_URL = optionalUrlEnv(
+  'VITE_AGENT_RUNNER_URL',
+  'http://127.0.0.1:4873',
+);

@@ -8,7 +8,7 @@
           <div>
             <span class="welcome-kicker">i-Fare 後台</span>
             <h2 class="welcome-title">{{ displayUserName }}，今天想做什麼？</h2>
-            <p class="welcome-desc">下方有最常用的 6 個動作，點下去就會帶到對應的頁面；其他模組都可以從左側選單找到。</p>
+            <p class="welcome-desc">下方有最常用的動作，點下去就會帶到對應的頁面；其他模組都可以從左側選單找到。</p>
           </div>
           <span class="welcome-date">{{ dateNow }}</span>
         </div>
@@ -87,7 +87,7 @@ import MainHeader from "@/components/MainHeader.vue";
 import { useUserStore } from "@/stores/user";
 import { FRONTEND_BASE_URL } from "@/config/adminEnv";
 
-type TaskTone = "page" | "news" | "article" | "image" | "policy" | "preview" | "health";
+type TaskTone = "page" | "news" | "article" | "image" | "policy" | "preview" | "health" | "agent";
 
 interface TaskItem {
   key: string;
@@ -113,6 +113,15 @@ const { error: showError } = useFeedback();
 
 // 任務型入口：用「我要 XX」口吻、按權限過濾、依直覺操作順序排列
 const taskItems: TaskItem[] = [
+  {
+    key: "task-ai-agent",
+    title: "打開 AI 維護中心",
+    description: "產出主管用 Word 維護報告，查看高優先待辦與執行紀錄。",
+    icon: markRaw(Monitor),
+    tone: "agent",
+    routeName: "AdminAgent",
+    permissions: ["管理者"],
+  },
   {
     key: "task-add-news",
     title: "發布最新消息",
@@ -402,6 +411,7 @@ onBeforeUnmount(() => {
   &.task-icon--policy  { background: linear-gradient(135deg, #0f4c5c, #5897a8); }
   &.task-icon--preview { background: linear-gradient(135deg, #909399, #b1b3b8); }
   &.task-icon--health  { background: linear-gradient(135deg, #5a8dee, #7faaff); }
+  &.task-icon--agent   { background: linear-gradient(135deg, #7c3aed, #06b6d4); }
 }
 
 .task-title {
