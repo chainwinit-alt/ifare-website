@@ -105,177 +105,40 @@
         </div>
       </section>
 
+      <!-- 主流程：輸入需求 → 任務收件匣 → 執行結果 -->
       <section class="section-main-card card-fullsize">
-        <div class="card-info agent-panel run-panel" :class="`run-panel--${lastRun.status}`">
+        <div class="card-info agent-panel">
           <div class="panel-head">
-            <h3>執行結果</h3>
-            <p>按「重新產生報告」後，這裡會顯示是否成功、耗時、產出位置與終端輸出。</p>
+            <h3>跟 AI 說要做什麼</h3>
+            <p>輸入需求後 agent 會先整理成任務卡並等核准，再依白名單動作執行。</p>
           </div>
 
-          <div class="run-summary">
-            <el-tag :type="lastRunTagType" size="large">{{ lastRunLabel }}</el-tag>
-            <strong>{{ lastRun.message }}</strong>
-            <span v-if="lastRun.time">{{ lastRun.time }}</span>
-            <span v-if="lastRun.durationMs">{{ lastRun.durationMs }}ms</span>
-          </div>
+          <el-input
+            v-model="agentRequest"
+            type="textarea"
+            :rows="3"
+            resize="none"
+            placeholder="例如：幫我整理今天高優先的後台優化"
+          />
 
-          <div class="output-grid">
-            <div v-for="item in outputLocations" :key="item.path" class="output-item">
-              <span>{{ item.label }}</span>
-              <code>{{ item.path }}</code>
-            </div>
-          </div>
-
-          <div v-if="lastRun.stdoutTail || lastRun.stderrTail" class="run-log">
-            <div v-if="lastRun.stdoutTail">
-              <span>stdout</span>
-              <pre>{{ lastRun.stdoutTail }}</pre>
-            </div>
-            <div v-if="lastRun.stderrTail">
-              <span>stderr</span>
-              <pre>{{ lastRun.stderrTail }}</pre>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="agent-grid">
-        <div class="section-main-card card-fullsize">
-          <div class="card-info agent-panel">
-            <div class="panel-head">
-              <h3>快速任務</h3>
-              <p>一鍵執行常用白名單任務，不用再手動輸入句子。</p>
-            </div>
-
-            <div class="task-grid">
-              <button
-                v-for="task in quickTasks"
-                :key="task.key"
-                type="button"
-                class="task-item"
-                :class="`task-item--${task.key}`"
-                @click="runQuickTask(task)"
-              >
-                <strong>{{ task.label }}</strong>
-                <code>{{ task.command }}</code>
-                <small>{{ task.description }}</small>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="section-main-card card-fullsize">
-          <div class="card-info agent-panel">
-            <div class="panel-head">
-              <h3>資料新鮮度</h3>
-              <p>這裡顯示報告最後更新時間、相對時間與是否過期。</p>
-            </div>
-
-            <div class="freshness-grid">
-              <div class="freshness-item">
-                <span>報告時間</span>
-                <strong>{{ report?.generatedAt || '尚無資料' }}</strong>
-              </div>
-              <div class="freshness-item">
-                <span>距今</span>
-                <strong>{{ reportAgeLabel }}</strong>
-              </div>
-              <div class="freshness-item">
-                <span>狀態</span>
-                <strong>{{ reportFreshnessLabel }}</strong>
-              </div>
-              <div class="freshness-item">
-                <span>自動刷新</span>
-                <strong>{{ autoRefreshEnabled ? '開啟' : '關閉' }}</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="agent-metrics">
-        <div class="section-main-card metric-card" v-for="item in metrics" :key="item.label">
-          <div class="card-info metric-card__inner">
-            <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-            <small>{{ item.caption }}</small>
-          </div>
-        </div>
-      </section>
-
-      <section class="agent-grid">
-        <div class="section-main-card card-fullsize">
-          <div class="card-info agent-panel">
-            <div class="panel-head">
-              <h3>高優先待辦</h3>
-              <p>先列後臺優化與 PoC 高優先項目，方便每天快速收斂。</p>
-            </div>
-
-            <div class="pending-table">
-              <div class="pending-row pending-row--head">
-                <span>#</span>
-                <span>區塊</span>
-                <span>標題</span>
-              </div>
-              <div
-                v-for="item in highPending"
-                :key="`${item.source}-${item.id}`"
-                class="pending-row"
-              >
-                <strong>{{ item.id }}</strong>
-                <span>{{ item.source }} / {{ item.area }}</span>
-                <span>{{ item.title }}</span>
-              </div>
-              <div v-if="highPending.length === 0" class="empty-state">
-                目前沒有高優先待辦資料。
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section-main-card card-fullsize">
-          <div class="card-info agent-panel">
-            <div class="panel-head">
-              <h3>跟 AI 說要做什麼</h3>
-              <p>輸入任務後會由本機 runner 判斷意圖，只執行白名單內的維護動作。</p>
-            </div>
-
-            <el-input
-              v-model="agentRequest"
-              type="textarea"
-              :rows="4"
-              resize="none"
-              placeholder="例如：幫我產生今天的維護報告"
-            />
-
-            <div class="intent-result">
-              <span>建議動作</span>
-              <strong>{{ matchedCommand.label }}</strong>
-              <code>{{ matchedCommand.command }}</code>
-              <p>{{ matchedCommand.description }}</p>
-              <div class="intent-actions">
-                <el-button
-                  type="primary"
-                  :loading="isIntakingTask"
-                  @click="intakeFromInput"
-                >
-                  整理成任務
-                </el-button>
-                <el-button
-                  :icon="VideoPlay"
-                  :loading="isRunningTask"
-                  @click="runAgentRequest"
-                >
-                  直接執行（不留任務卡）
-                </el-button>
-                <el-button :icon="CopyDocument" plain @click="copyCommand(matchedCommand.command)">
-                  複製指令
-                </el-button>
-              </div>
-              <p class="intent-hint">
-                建議用「整理成任務」：agent 會先把句子分類成任務卡並等核准，可在下方收件匣追蹤。
-              </p>
-            </div>
+          <div class="intent-actions intent-actions--compact">
+            <el-button
+              type="primary"
+              :loading="isIntakingTask"
+              @click="intakeFromInput"
+            >
+              整理成任務
+            </el-button>
+            <el-button
+              :icon="VideoPlay"
+              :loading="isRunningTask"
+              @click="runAgentRequest"
+            >
+              直接執行
+            </el-button>
+            <el-button :icon="CopyDocument" plain @click="copyCommand(matchedCommand.command)">
+              複製 {{ matchedCommand.label }}
+            </el-button>
           </div>
         </div>
       </section>
@@ -307,140 +170,298 @@
         @patch="patchTask"
       />
 
-      <section class="section-main-card card-fullsize">
-        <div class="card-info agent-panel">
-            <div class="panel-head">
-              <h3>Agent 指令</h3>
-              <p>啟動 `npm run agent:runner` 後可在本頁一鍵重產；未啟動時仍可複製指令到專案根目錄執行。</p>
-            </div>
-
-          <div class="command-grid">
-            <button
-              v-for="command in suggestedCommands"
-              :key="command.command"
-              type="button"
-              class="command-item"
-              @click="copyCommand(command.command)"
-            >
-              <span>{{ command.label }}</span>
-              <code>{{ command.command }}</code>
-              <small>{{ command.description }}</small>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section class="section-main-card card-fullsize">
-        <div class="card-info agent-panel">
+      <!-- 執行結果：跟著主流程留在主畫面 -->
+      <section
+        v-if="lastRun.status !== 'idle'"
+        class="section-main-card card-fullsize"
+      >
+        <div class="card-info agent-panel run-panel" :class="`run-panel--${lastRun.status}`">
           <div class="panel-head">
-            <h3>最近操作紀錄</h3>
-            <p>記錄 agent 指令執行結果，後續開放寫入 Excel 前會以這裡作為 audit log 基礎。</p>
+            <h3>最近執行結果</h3>
+            <p>顯示最近一次 agent 任務的執行狀態、耗時、產出位置與終端輸出。</p>
           </div>
 
-          <div class="audit-toolbar">
-            <el-input
-              v-model="auditSearch"
-              clearable
-              placeholder="搜尋 action / command / actor"
-            />
-            <el-select v-model="auditStatusFilter" placeholder="狀態篩選" style="width: 160px">
-              <el-option label="全部" value="all" />
-              <el-option label="成功" value="success" />
-              <el-option label="失敗" value="failed" />
-              <el-option label="執行中" value="running" />
-            </el-select>
+          <div class="run-summary">
+            <el-tag :type="lastRunTagType" size="large">{{ lastRunLabel }}</el-tag>
+            <strong>{{ lastRun.message }}</strong>
+            <span v-if="lastRun.time">{{ lastRun.time }}</span>
+            <span v-if="lastRun.durationMs">{{ lastRun.durationMs }}ms</span>
           </div>
 
-          <div class="audit-list">
-            <div v-for="entry in filteredAuditEntries" :key="entry.id" class="audit-row">
-              <el-tag :type="entry.status === 'success' ? 'success' : entry.status === 'failed' ? 'danger' : 'info'">
-                {{ entry.status }}
-              </el-tag>
-              <div>
-                <strong>{{ entry.action }}</strong>
-                <span>{{ entry.timestamp }} / {{ entry.actor || '-' }}</span>
-                <code>{{ entry.command || '-' }}</code>
-              </div>
-              <small v-if="entry.durationMs">{{ entry.durationMs }}ms</small>
+          <div class="output-grid">
+            <div v-for="item in outputLocations" :key="item.path" class="output-item">
+              <span>{{ item.label }}</span>
+              <code>{{ item.path }}</code>
             </div>
-            <div v-if="filteredAuditEntries.length === 0" class="empty-state">
-              尚無操作紀錄。可先執行 `npm run agent:report` 或啟動 runner 後按「重新產生報告」。
+          </div>
+
+          <div v-if="lastRun.stdoutTail || lastRun.stderrTail" class="run-log">
+            <div v-if="lastRun.stdoutTail">
+              <span>stdout</span>
+              <pre>{{ lastRun.stdoutTail }}</pre>
+            </div>
+            <div v-if="lastRun.stderrTail">
+              <span>stderr</span>
+              <pre>{{ lastRun.stderrTail }}</pre>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="agent-grid">
-        <div class="section-main-card card-fullsize">
-          <div class="card-info agent-panel">
-            <div class="panel-head">
-              <h3>Excel 摘要</h3>
-              <p>{{ report?.xlsx.trackingFile || '尚未載入追蹤檔資訊' }}</p>
-            </div>
+      <!-- 次要資訊：報告/操作/Audit/設定 全部收進 tabs，預設折疊 -->
+      <el-tabs v-model="activeTab" class="agent-tabs">
+        <el-tab-pane name="status">
+          <template #label>
+            <span class="agent-tab-label">專案狀態</span>
+          </template>
 
-            <div class="sheet-list">
-              <div v-for="sheet in report?.xlsx.summary || []" :key="sheet.name" class="sheet-item">
-                <div>
-                  <strong>{{ sheet.name }}</strong>
-                  <span>待處理 {{ sheet.pending }} / 總計 {{ sheet.total }}</span>
+          <section class="agent-metrics">
+            <div class="section-main-card metric-card" v-for="item in metrics" :key="item.label">
+              <div class="card-info metric-card__inner">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+                <small>{{ item.caption }}</small>
+              </div>
+            </div>
+          </section>
+
+          <section class="agent-grid">
+            <div class="section-main-card card-fullsize">
+              <div class="card-info agent-panel">
+                <div class="panel-head">
+                  <h3>資料新鮮度</h3>
+                  <p>報告最後更新時間與自動刷新狀態。</p>
                 </div>
-                <el-progress
-                  :percentage="completionRate(sheet)"
-                  :stroke-width="10"
-                  :show-text="false"
+
+                <div class="freshness-grid">
+                  <div class="freshness-item">
+                    <span>報告時間</span>
+                    <strong>{{ report?.generatedAt || '尚無資料' }}</strong>
+                  </div>
+                  <div class="freshness-item">
+                    <span>距今</span>
+                    <strong>{{ reportAgeLabel }}</strong>
+                  </div>
+                  <div class="freshness-item">
+                    <span>狀態</span>
+                    <strong>{{ reportFreshnessLabel }}</strong>
+                  </div>
+                  <div class="freshness-item">
+                    <span>自動刷新</span>
+                    <strong>{{ autoRefreshEnabled ? '開啟' : '關閉' }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-main-card card-fullsize">
+              <div class="card-info agent-panel">
+                <div class="panel-head">
+                  <h3>Excel 摘要</h3>
+                  <p>{{ report?.xlsx.trackingFile || '尚未載入追蹤檔資訊' }}</p>
+                </div>
+
+                <div class="sheet-list">
+                  <div v-for="sheet in report?.xlsx.summary || []" :key="sheet.name" class="sheet-item">
+                    <div>
+                      <strong>{{ sheet.name }}</strong>
+                      <span>待處理 {{ sheet.pending }} / 總計 {{ sheet.total }}</span>
+                    </div>
+                    <el-progress
+                      :percentage="completionRate(sheet)"
+                      :stroke-width="10"
+                      :show-text="false"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section-main-card card-fullsize">
+            <div class="card-info agent-panel">
+              <div class="panel-head">
+                <h3>高優先待辦（來自報告）</h3>
+                <p>後臺優化與 PoC 高優先項目，從每日報告匯總。</p>
+              </div>
+
+              <div class="pending-table">
+                <div class="pending-row pending-row--head">
+                  <span>#</span>
+                  <span>區塊</span>
+                  <span>標題</span>
+                </div>
+                <div
+                  v-for="item in highPending"
+                  :key="`${item.source}-${item.id}`"
+                  class="pending-row"
+                >
+                  <strong>{{ item.id }}</strong>
+                  <span>{{ item.source }} / {{ item.area }}</span>
+                  <span>{{ item.title }}</span>
+                </div>
+                <div v-if="highPending.length === 0" class="empty-state">
+                  目前沒有高優先待辦資料。
+                </div>
+              </div>
+            </div>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane name="operations">
+          <template #label>
+            <span class="agent-tab-label">快速操作</span>
+          </template>
+
+          <section class="section-main-card card-fullsize">
+            <div class="card-info agent-panel">
+              <div class="panel-head">
+                <h3>快速任務（白名單一鍵執行）</h3>
+                <p>不用打字，直接點按鈕。這些動作預設無需核准。</p>
+              </div>
+
+              <div class="task-grid">
+                <button
+                  v-for="task in quickTasks"
+                  :key="task.key"
+                  type="button"
+                  class="task-item"
+                  :class="`task-item--${task.key}`"
+                  @click="runQuickTask(task)"
+                >
+                  <strong>{{ task.label }}</strong>
+                  <code>{{ task.command }}</code>
+                  <small>{{ task.description }}</small>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="section-main-card card-fullsize">
+            <div class="card-info agent-panel">
+              <div class="panel-head">
+                <h3>Agent 指令庫</h3>
+                <p>啟動 `npm run agent:runner` 後可在本頁一鍵重產；未啟動時仍可複製指令到專案根目錄執行。</p>
+              </div>
+
+              <div class="command-grid">
+                <button
+                  v-for="command in suggestedCommands"
+                  :key="command.command"
+                  type="button"
+                  class="command-item"
+                  @click="copyCommand(command.command)"
+                >
+                  <span>{{ command.label }}</span>
+                  <code>{{ command.command }}</code>
+                  <small>{{ command.description }}</small>
+                </button>
+              </div>
+            </div>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane name="audit">
+          <template #label>
+            <span class="agent-tab-label">Audit log</span>
+          </template>
+
+          <section class="section-main-card card-fullsize">
+            <div class="card-info agent-panel">
+              <div class="panel-head">
+                <h3>最近操作紀錄</h3>
+                <p>所有 agent 觸發的動作（含任務狀態轉移）都會留軌跡在此。</p>
+              </div>
+
+              <div class="audit-toolbar">
+                <el-input
+                  v-model="auditSearch"
+                  clearable
+                  placeholder="搜尋 action / command / actor"
                 />
+                <el-select v-model="auditStatusFilter" placeholder="狀態篩選" style="width: 160px">
+                  <el-option label="全部" value="all" />
+                  <el-option label="成功" value="success" />
+                  <el-option label="失敗" value="failed" />
+                  <el-option label="執行中" value="running" />
+                </el-select>
+              </div>
+
+              <div class="audit-list">
+                <div v-for="entry in filteredAuditEntries" :key="entry.id" class="audit-row">
+                  <el-tag :type="entry.status === 'success' ? 'success' : entry.status === 'failed' ? 'danger' : 'info'">
+                    {{ entry.status }}
+                  </el-tag>
+                  <div>
+                    <strong>{{ entry.action }}</strong>
+                    <span>{{ entry.timestamp }} / {{ entry.actor || '-' }}</span>
+                    <code>{{ entry.command || '-' }}</code>
+                  </div>
+                  <small v-if="entry.durationMs">{{ entry.durationMs }}ms</small>
+                </div>
+                <div v-if="filteredAuditEntries.length === 0" class="empty-state">
+                  尚無操作紀錄。可先執行 `npm run agent:report` 或啟動 runner 後執行任務。
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </section>
+        </el-tab-pane>
 
-        <div class="section-main-card card-fullsize">
-          <div class="card-info agent-panel">
-            <div class="panel-head">
-              <h3>安全邊界</h3>
-              <p>目前版本只允許讀取與產生報告。</p>
+        <el-tab-pane name="settings">
+          <template #label>
+            <span class="agent-tab-label">設定與決策</span>
+          </template>
+
+          <section class="agent-grid">
+            <div class="section-main-card card-fullsize">
+              <div class="card-info agent-panel">
+                <div class="panel-head">
+                  <h3>安全邊界</h3>
+                  <p>目前版本允許與禁止的動作清單。</p>
+                </div>
+
+                <div class="safety-grid">
+                  <div>
+                    <span>允許</span>
+                    <el-tag
+                      v-for="action in report?.safety.allowedActions || []"
+                      :key="action"
+                      type="success"
+                    >
+                      {{ action }}
+                    </el-tag>
+                  </div>
+                  <div>
+                    <span>禁止</span>
+                    <el-tag
+                      v-for="action in report?.safety.blockedActions || []"
+                      :key="action"
+                      type="danger"
+                    >
+                      {{ action }}
+                    </el-tag>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div class="safety-grid">
-              <div>
-                <span>允許</span>
-                <el-tag
-                  v-for="action in report?.safety.allowedActions || []"
-                  :key="action"
-                  type="success"
-                >
-                  {{ action }}
-                </el-tag>
-              </div>
-              <div>
-                <span>禁止</span>
-                <el-tag
-                  v-for="action in report?.safety.blockedActions || []"
-                  :key="action"
-                  type="danger"
-                >
-                  {{ action }}
-                </el-tag>
+            <div class="section-main-card card-fullsize">
+              <div class="card-info agent-panel">
+                <div class="panel-head">
+                  <h3>待決問題</h3>
+                  <p>這些問題決定是否能進入下一階段。</p>
+                </div>
+
+                <ol class="decision-list">
+                  <li v-for="item in report?.decisionsNeeded || fallbackDecisions" :key="item">
+                    {{ item }}
+                  </li>
+                </ol>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section-main-card card-fullsize">
-        <div class="card-info agent-panel">
-          <div class="panel-head">
-            <h3>待決問題</h3>
-            <p>這些問題決定是否能進入第二階段：寫回 Excel 與自動巡檢。</p>
-          </div>
-
-          <ol class="decision-list">
-            <li v-for="item in report?.decisionsNeeded || fallbackDecisions" :key="item">
-              {{ item }}
-            </li>
-          </ol>
-        </div>
-      </section>
+          </section>
+        </el-tab-pane>
+      </el-tabs>
     </div>
   </el-scrollbar>
 </template>
@@ -458,6 +479,8 @@ import {
   ElSwitch,
   ElSelect,
   ElOption,
+  ElTabs,
+  ElTabPane,
   ElTag,
 } from 'element-plus';
 import { CopyDocument, Refresh, VideoPlay } from '@element-plus/icons-vue';
@@ -557,6 +580,7 @@ const auditSearch = ref('');
 const auditStatusFilter = ref<'all' | 'success' | 'failed' | 'running'>('all');
 const agentRequest = ref('');
 const auditEntries = ref<AuditEntry[]>([]);
+const activeTab = ref<'status' | 'operations' | 'audit' | 'settings'>('status');
 const tasks = ref<AgentTask[]>([]);
 const taskCounts = ref<TaskCounts | null>(null);
 const isLoadingTasks = ref(false);
@@ -1491,10 +1515,48 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
+.intent-actions--compact {
+  margin-top: 12px;
+}
+
 .intent-hint {
   margin: 8px 0 0;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.agent-tabs {
+  margin-top: 4px;
+
+  :deep(.el-tabs__header) {
+    margin-bottom: 14px;
+  }
+
+  :deep(.el-tabs__item) {
+    font-size: 14px;
+    height: 44px;
+    line-height: 44px;
+  }
+
+  :deep(.el-tabs__content) {
+    overflow: visible;
+  }
+}
+
+.agent-tab-label {
+  padding: 0 6px;
+}
+
+.agent-tabs .agent-metrics,
+.agent-tabs .agent-grid,
+.agent-tabs .section-main-card.card-fullsize {
+  margin-bottom: 14px;
+}
+
+.agent-tabs .agent-metrics:last-child,
+.agent-tabs .agent-grid:last-child,
+.agent-tabs .section-main-card.card-fullsize:last-child {
+  margin-bottom: 0;
 }
 
 .command-grid {

@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-05-26 17:27:02",
+  "generatedAt": "2026-05-26 17:48:09",
   "counts": {
     "new": 0,
     "triaged": 0,
-    "pending_review": 0,
+    "pending_review": 5,
     "approved": 0,
     "running": 0,
     "done": 0,
@@ -11,6 +11,166 @@
     "blocked": 0
   },
   "entries": [
+    {
+      "id": "TASK-2026-05-26-006",
+      "title": "audit log 出現 failed 紀錄時應自動發送通知（LINE Not…",
+      "source": "intake-text",
+      "category": "meta",
+      "priority": "medium",
+      "status": "pending_review",
+      "requestText": "audit log 出現 failed 紀錄時應自動發送通知（LINE Notify 或 email），避免週末跑出來的失敗任務沒人發現，造成處理積壓",
+      "summary": "分類為「雜項維護」、優先級「中」，建議動作：查詢執行紀錄。",
+      "nextAction": "status",
+      "needsApproval": false,
+      "syncToExcel": true,
+      "excelRowRef": {
+        "sheet": "tasks",
+        "rowIndex": 6
+      },
+      "auditIds": [
+        "1779788889822-ee47a2"
+      ],
+      "actor": "emma",
+      "createdAt": "2026-05-26 17:48:09",
+      "updatedAt": "2026-05-26 17:48:09",
+      "history": [
+        {
+          "at": "2026-05-26 17:48:09",
+          "from": null,
+          "to": "pending_review",
+          "actor": "emma",
+          "note": "由 intake 建立"
+        }
+      ]
+    },
+    {
+      "id": "TASK-2026-05-26-004",
+      "title": "runner 連線到舊版本端點時前端只顯示「not found」",
+      "source": "intake-text",
+      "category": "meta",
+      "priority": "medium",
+      "status": "pending_review",
+      "requestText": "runner 連線到舊版本端點時前端只顯示「not found」，應改成提示「runner 可能版本太舊，請在專案根目錄重啟 npm run agent:runner」",
+      "summary": "分類為「雜項維護」、優先級「中」，建議動作：需人工處理。",
+      "nextAction": "manual",
+      "needsApproval": true,
+      "syncToExcel": true,
+      "excelRowRef": {
+        "sheet": "tasks",
+        "rowIndex": 4
+      },
+      "auditIds": [
+        "1779788889793-4b90fc"
+      ],
+      "actor": "emma",
+      "createdAt": "2026-05-26 17:48:09",
+      "updatedAt": "2026-05-26 17:48:09",
+      "history": [
+        {
+          "at": "2026-05-26 17:48:09",
+          "from": null,
+          "to": "pending_review",
+          "actor": "emma",
+          "note": "由 intake 建立"
+        }
+      ]
+    },
+    {
+      "id": "TASK-2026-05-26-002",
+      "title": "後台 AI 維護中心 nextAction 是「需人工處理」的任務",
+      "source": "intake-text",
+      "category": "backend-optimization",
+      "priority": "medium",
+      "status": "pending_review",
+      "requestText": "後台 AI 維護中心 nextAction 是「需人工處理」的任務，UI 上的「執行」按鈕應該 disable 並顯示提示，避免使用者點下去後任務直接變 failed",
+      "summary": "分類為「後台優化」、優先級「中」，建議動作：需人工處理。",
+      "nextAction": "manual",
+      "needsApproval": true,
+      "syncToExcel": true,
+      "excelRowRef": {
+        "sheet": "tasks",
+        "rowIndex": 2
+      },
+      "auditIds": [
+        "1779788889752-b78956"
+      ],
+      "actor": "emma",
+      "createdAt": "2026-05-26 17:48:09",
+      "updatedAt": "2026-05-26 17:48:09",
+      "history": [
+        {
+          "at": "2026-05-26 17:48:09",
+          "from": null,
+          "to": "pending_review",
+          "actor": "emma",
+          "note": "由 intake 建立"
+        }
+      ]
+    },
+    {
+      "id": "TASK-2026-05-26-003",
+      "title": "收件匣的 pending_review 任務若超過 3 天沒人處理",
+      "source": "intake-text",
+      "category": "meta",
+      "priority": "medium",
+      "status": "pending_review",
+      "requestText": "收件匣的 pending_review 任務若超過 3 天沒人處理，卡片應該標紅色「超時」警示，避免任務積壓被遺忘",
+      "summary": "分類為「雜項維護」、優先級「中」，建議動作：需人工處理。",
+      "nextAction": "manual",
+      "needsApproval": true,
+      "syncToExcel": true,
+      "excelRowRef": {
+        "sheet": "tasks",
+        "rowIndex": 3
+      },
+      "auditIds": [
+        "1779788889777-c5a956"
+      ],
+      "actor": "emma",
+      "createdAt": "2026-05-26 17:48:09",
+      "updatedAt": "2026-05-26 17:48:09",
+      "history": [
+        {
+          "at": "2026-05-26 17:48:09",
+          "from": null,
+          "to": "pending_review",
+          "actor": "emma",
+          "note": "由 intake 建立"
+        }
+      ]
+    },
+    {
+      "id": "TASK-2026-05-26-005",
+      "title": "AI 維護報告的高優先待辦清單",
+      "source": "intake-text",
+      "category": "report-ops",
+      "priority": "high",
+      "status": "pending_review",
+      "requestText": "AI 維護報告的高優先待辦清單，後台應提供「批次匯入到任務收件匣」按鈕，把報告的 20 筆後臺優化高優先項目一鍵變成 pending_review 任務卡",
+      "summary": "分類為「報告產出」、優先級「高」，建議動作：需人工處理。",
+      "nextAction": "manual",
+      "needsApproval": true,
+      "syncToExcel": true,
+      "excelRowRef": {
+        "sheet": "tasks",
+        "rowIndex": 5
+      },
+      "auditIds": [
+        "1779788889806-bb8a00"
+      ],
+      "actor": "emma",
+      "createdAt": "2026-05-26 17:48:09",
+      "updatedAt": "2026-05-26 17:48:09",
+      "history": [
+        {
+          "at": "2026-05-26 17:48:09",
+          "from": null,
+          "to": "pending_review",
+          "actor": "emma",
+          "note": "由 intake 建立"
+        }
+      ]
+    },
     {
       "id": "TASK-2026-05-26-001",
       "title": "幫我後台AI維護中心調整畫面呈現",

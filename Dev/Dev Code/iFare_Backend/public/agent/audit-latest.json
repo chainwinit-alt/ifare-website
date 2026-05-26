@@ -1,6 +1,61 @@
 {
-  "generatedAt": "2026-05-26 17:27:02",
+  "generatedAt": "2026-05-26 17:48:09",
   "entries": [
+    {
+      "id": "1779788889822-ee47a2",
+      "timestamp": "2026-05-26 17:48:09",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.created",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-006",
+      "request": "audit log 出現 failed 紀錄時應自動發送通知（LINE Notify 或 email），避免週末跑出來的失敗任務沒人發現，造成處理積壓",
+      "stdoutTail": "meta / medium / next=status"
+    },
+    {
+      "id": "1779788889806-bb8a00",
+      "timestamp": "2026-05-26 17:48:09",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.created",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-005",
+      "request": "AI 維護報告的高優先待辦清單，後台應提供「批次匯入到任務收件匣」按鈕，把報告的 20 筆後臺優化高優先項目一鍵變成 pending_review 任務卡",
+      "stdoutTail": "report-ops / high / next=manual"
+    },
+    {
+      "id": "1779788889793-4b90fc",
+      "timestamp": "2026-05-26 17:48:09",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.created",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-004",
+      "request": "runner 連線到舊版本端點時前端只顯示「not found」，應改成提示「runner 可能版本太舊，請在專案根目錄重啟 npm run agent:runner」",
+      "stdoutTail": "meta / medium / next=manual"
+    },
+    {
+      "id": "1779788889777-c5a956",
+      "timestamp": "2026-05-26 17:48:09",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.created",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-003",
+      "request": "收件匣的 pending_review 任務若超過 3 天沒人處理，卡片應該標紅色「超時」警示，避免任務積壓被遺忘",
+      "stdoutTail": "meta / medium / next=manual"
+    },
+    {
+      "id": "1779788889752-b78956",
+      "timestamp": "2026-05-26 17:48:09",
+      "actor": "emma",
+      "source": "agent-runner",
+      "action": "task.created",
+      "status": "success",
+      "taskId": "TASK-2026-05-26-002",
+      "request": "後台 AI 維護中心 nextAction 是「需人工處理」的任務，UI 上的「執行」按鈕應該 disable 並顯示提示，避免使用者點下去後任務直接變 failed",
+      "stdoutTail": "backend-optimization / medium / next=manual"
+    },
     {
       "id": "1779787622435-25164a",
       "timestamp": "2026-05-26 17:27:02",
@@ -277,82 +332,6 @@
       "taskId": "TASK-2026-05-26-002",
       "request": "幫我重新產生今日的維護報告",
       "stdoutTail": "report-ops / medium / next=report"
-    },
-    {
-      "id": "1779785962682-72b706",
-      "timestamp": "2026-05-26 16:59:22",
-      "actor": "emma",
-      "source": "agent-runner",
-      "action": "task.created",
-      "status": "success",
-      "taskId": "TASK-2026-05-26-001",
-      "request": "緊急：後台登入有時候會卡住，要看一下",
-      "stdoutTail": "backend-optimization / critical / next=manual"
-    },
-    {
-      "id": "1779785594139-f1970c",
-      "timestamp": "2026-05-26 16:53:14",
-      "actor": "test",
-      "source": "agent-runner",
-      "action": "task.excel.failed",
-      "status": "failed",
-      "taskId": "TASK-2026-05-26-003",
-      "stderrTail": "Cannot find module 'C:\\Users\\emma.chung\\ifare-website\\scripts\\agent\\excel-sync.mjs' imported from C:\\Users\\emma.chung\\ifare-website\\scripts\\ai-maintenance-runner.mjs"
-    },
-    {
-      "id": "1779785594136-45685c",
-      "timestamp": "2026-05-26 16:53:14",
-      "actor": "test",
-      "source": "agent-runner",
-      "action": "task.done",
-      "status": "success",
-      "taskId": "TASK-2026-05-26-003",
-      "command": "node scripts/ai-maintenance-report.mjs",
-      "durationMs": 619,
-      "exitCode": 0,
-      "outputFiles": [
-        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.docx",
-        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.md",
-        "Dev/Dev Code/iFare_Backend/public/agent/latest-report.json",
-        "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json"
-      ],
-      "stdoutTail": "[ai-maintenance-report] start (write, since=7 days)\n[ai-maintenance-report] collected in 400ms\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.md\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.docx\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\ifare-website\\Dev\\Dev Code\\iFare_Backend\\public\\agent\\latest-report.json\n[ai-maintenance-report] done in 408ms total\n",
-      "stderrTail": ""
-    },
-    {
-      "id": "1779785594134-dbc8a1",
-      "timestamp": "2026-05-26 16:53:14",
-      "actor": "backend-admin",
-      "source": "agent-runner",
-      "action": "report.run.finish",
-      "command": "node scripts/ai-maintenance-report.mjs",
-      "status": "success",
-      "durationMs": 619,
-      "exitCode": 0,
-      "stdoutTail": "[ai-maintenance-report] start (write, since=7 days)\n[ai-maintenance-report] collected in 400ms\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.md\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\Desktop\\iFare-AI-Maintenance-Reports\\2026-05-26.docx\n[ai-maintenance-report] wrote C:\\Users\\emma.chung\\ifare-website\\Dev\\Dev Code\\iFare_Backend\\public\\agent\\latest-report.json\n[ai-maintenance-report] done in 408ms total\n",
-      "stderrTail": "",
-      "outputFiles": [
-        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.docx",
-        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.md",
-        "Dev/Dev Code/iFare_Backend/public/agent/latest-report.json",
-        "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json"
-      ]
-    },
-    {
-      "id": "1779785594110-c1f6c1",
-      "timestamp": "2026-05-26 16:53:14",
-      "actor": "emma.chung",
-      "source": "agent-cli",
-      "action": "report.write",
-      "command": "node scripts/ai-maintenance-report.mjs",
-      "status": "success",
-      "durationMs": 406,
-      "outputFiles": [
-        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.docx",
-        "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.md",
-        "Dev/Dev Code/iFare_Backend/public/agent/latest-report.json",
-        "Dev/Dev Code/iFare_Backend/public/agent/audit-latest.json"
-      ]
     }
   ]
 }
