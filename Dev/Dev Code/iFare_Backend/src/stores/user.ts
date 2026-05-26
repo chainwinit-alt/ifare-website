@@ -61,8 +61,6 @@ export const useUserStore = defineStore('user', {
         login (_act:string, _token: string, _userName: string, _email: string, _userID: number, _permission: string, _state: string, _expiredTimeSec?: number) {
             if (!_act || !_token) return false
 
-            console.log(_userName)
-
             let expiredTime: Date | null = null
             if (_expiredTimeSec) {
                 // 以目前時間為基準推算 token 到期時刻

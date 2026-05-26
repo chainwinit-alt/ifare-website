@@ -1,4 +1,4 @@
-// Updates docs/iFare_UI_UX_問題追蹤清單.xlsx for the 2026-04-28 改版 (cumulative, idempotent):
+// Updates docs/iFare_問題追蹤與AI維運規劃.xlsx for the 2026-04-28 改版 (cumulative, idempotent):
 //  Round 1 (8-file frontend revision):
 //    - marks 7 existing UIUX issues as 已修正 / 部分修正
 //    - appends 3 new issues (#88 / #89 / #90)
@@ -31,7 +31,7 @@ function paintRow(ws, row, fill, font) {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
-const FILE = path.join(REPO_ROOT, 'docs', 'iFare_UI_UX_問題追蹤清單.xlsx');
+const FILE = path.join(REPO_ROOT, 'docs', 'iFare_問題追蹤與AI維運規劃.xlsx');
 const TODAY = '2026-04-28';
 
 const wb = XLSX.readFile(FILE, { cellStyles: true });

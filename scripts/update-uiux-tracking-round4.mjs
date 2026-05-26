@@ -1,4 +1,4 @@
-// Updates docs/iFare_UI_UX_問題追蹤清單.xlsx for Round 4 (2026-05-04 切回 master 開新分支 session):
+// Updates docs/iFare_問題追蹤與AI維運規劃.xlsx for Round 4 (2026-05-04 切回 master 開新分支 session):
 //  UIUX 工作表 — 新增 8 個 issue (#98-#105)
 //  後臺優化 工作表 — 新增 4 個 issue (#13-#16)
 //  統計摘要 — 重算 UIUX 數量
@@ -41,7 +41,7 @@ function expandRange(ws, lastRow) {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
-const FILE = path.join(REPO_ROOT, 'docs', 'iFare_UI_UX_問題追蹤清單.xlsx');
+const FILE = path.join(REPO_ROOT, 'docs', 'iFare_問題追蹤與AI維運規劃.xlsx');
 const TODAY = '2026-05-04';
 
 const wb = XLSX.readFile(FILE, { cellStyles: true });

@@ -232,7 +232,12 @@
 
                 <div class="item-group" data-focus="cover">
                   <label class="input-title">封面圖片</label>
-                  <ImagePicker v-model="form.coverImage" :show-preview="true" placeholder="從媒體庫挑、上傳或貼網址" />
+                  <ImagePicker
+                    :model-value="form.coverImage || ''"
+                    :show-preview="true"
+                    placeholder="從媒體庫挑、上傳或貼網址"
+                    @update:model-value="form.coverImage = $event"
+                  />
                 </div>
 
                 <div v-if="form.coverImage" class="item-group">
@@ -242,7 +247,12 @@
 
                 <div class="item-group">
                   <label class="input-title">社群分享圖</label>
-                  <ImagePicker v-model="form.ogImage" :show-preview="true" placeholder="FB / LINE 分享時顯示的圖片" />
+                  <ImagePicker
+                    :model-value="form.ogImage || ''"
+                    :show-preview="true"
+                    placeholder="FB / LINE 分享時顯示的圖片"
+                    @update:model-value="form.ogImage = $event"
+                  />
                   <span class="input-hint">建議尺寸 1200 x 630。</span>
                 </div>
               </div>
@@ -338,6 +348,7 @@ import {
   type DynamicPage,
   type Section,
 } from '@/composables/useDynamicPages';
+import { FRONTEND_BASE_URL } from '@/config/adminEnv';
 
 type PagePresetKey = 'blank' | 'story' | 'service' | 'campaign' | 'event' | 'news' | 'contact';
 
@@ -371,8 +382,7 @@ const router = useRouter();
 
 const { getById, insert, isSlugConflict, update } = useDynamicPages();
 const { success, error: showError, errorWithNextStep, info, warning, successWithLink } = useFeedback();
-const FRONTEND_PREVIEW_BASE =
-  (import.meta.env.VITE_FRONTEND_BASE as string | undefined) || 'http://localhost:3000';
+const FRONTEND_PREVIEW_BASE = FRONTEND_BASE_URL;
 
 const routeNameType = route?.name?.toString().toLocaleLowerCase() || '';
 const isAdd = ref(routeNameType.includes('add'));

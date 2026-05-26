@@ -202,13 +202,8 @@ function syncCapsLockState(event: KeyboardEvent) {
 const sendActPwd = (formEl: FormInstance | undefined) => {
   if (!formEl) return
 
-  console.log('send')
-  console.log(formEl)
-
   isLoading.value = true
   $WebAPI.Auth(ruleForm.account, ruleForm.password, (res:any) => {
-    console.log(res)
-
     // 處理 HTTP 500 伺服器錯誤（含帳密錯誤情況）
     if (res.response && res.response.status == 500) {
       isLoading.value = false
@@ -234,7 +229,6 @@ const sendActPwd = (formEl: FormInstance | undefined) => {
     // 取得 AccessToken 及過期秒數
     const token = res.data.result.accessToken
     const expiredTimeSec = res.data.result.expireInSeconds
-    console.log(token)
     if (token) {
       // 使用 Token 呼叫 Login API 取得使用者詳細資訊
       $WebAPI.Login(token, ruleForm.account, ruleForm.password, (resLogin:any) => {

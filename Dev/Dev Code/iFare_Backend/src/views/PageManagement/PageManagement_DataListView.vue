@@ -1,18 +1,20 @@
 <template>
   <main-header>
     <template #btnsRight>
-      <!-- 2026-05-25 #95v5 — 4 按鈕加 min-width 等寬,視覺更平均 -->
-      <el-button class="pm-header-btn" :icon="Download" plain @click="onExport">匯出 JSON</el-button>
-      <el-button class="pm-header-btn" :icon="Upload" plain @click="triggerImport">匯入 JSON</el-button>
-      <input
-        ref="fileInput"
-        type="file"
-        accept="application/json,.json"
-        style="display: none"
-        @change="onImport"
-      />
-      <el-button class="pm-header-btn" :icon="MagicStick" plain @click="openQuickCreate">用問答精靈建立</el-button>
-      <el-button class="pm-header-btn" :icon="Plus" type="primary" @click="openQuickCreate">快速新增頁面</el-button>
+      <div class="pm-header-actions">
+        <!-- 2026-05-26 — 統一頁面管理 header actions 的尺寸與間距 -->
+        <el-button class="pm-header-btn pm-header-btn--compact" :icon="Download" plain @click="onExport">匯出 JSON</el-button>
+        <el-button class="pm-header-btn pm-header-btn--compact" :icon="Upload" plain @click="triggerImport">匯入 JSON</el-button>
+        <input
+          ref="fileInput"
+          type="file"
+          accept="application/json,.json"
+          style="display: none"
+          @change="onImport"
+        />
+        <el-button class="pm-header-btn" :icon="MagicStick" plain @click="openQuickCreate">用問答精靈建立</el-button>
+        <el-button class="pm-header-btn" :icon="Plus" type="primary" @click="openBlankCreate">快速新增頁面</el-button>
+      </div>
     </template>
   </main-header>
 
@@ -30,7 +32,7 @@
       <ol class="guide-steps">
         <li>
           <span class="step-dot">1</span>
-          <div><strong>選版型</strong><span>按右上「快速新增頁面」回答 5 題，系統會幫你組好骨架</span></div>
+          <div><strong>選版型</strong><span>按右上「用問答精靈建立」回答 5 題，系統會幫你組好骨架</span></div>
         </li>
         <li>
           <span class="step-dot">2</span>
@@ -53,7 +55,7 @@
             <span class="list-head-count" v-if="total > 0">共 {{ total }} 筆</span>
           </div>
           <p class="list-subtitle">
-            既有頁面點「編輯」可調整內容；新建請按右上「快速新增頁面」答 5 題即可建好。
+            既有頁面點「編輯」可調整內容；新建可用「用問答精靈建立」答 5 題，或按「快速新增頁面」直接進入空白編輯。
           </p>
         </div>
         <div class="list-head-actions">
@@ -399,6 +401,7 @@ import {
   type SectionType,
 } from '@/composables/useDynamicPages';
 import { useFeedback } from '@/composables/useFeedback';
+import { FRONTEND_BASE_URL } from '@/config/adminEnv';
 
 type PagePresetKey = 'blank' | 'story' | 'event' | 'news' | 'contact';
 
@@ -473,8 +476,7 @@ const {
   update,
 } = useDynamicPages();
 const { success, error: showError, successWithAction, successWithUndo, errorWithNextStep } = useFeedback();
-const FRONTEND_PREVIEW_BASE =
-  (import.meta.env.VITE_FRONTEND_BASE as string | undefined) || 'http://localhost:3000';
+const FRONTEND_PREVIEW_BASE = FRONTEND_BASE_URL;
 const fileInput = ref<HTMLInputElement | null>(null);
 
 // 2026-05-25 #95v2 — 使用指引 banner：第一次來會顯示，dismiss 後記憶於 localStorage
@@ -658,6 +660,10 @@ function openQuickCreate() {
   quickCreateForm.ctaUrl = '';
   quickCreateForm.publishNow = false;
   quickCreateOpen.value = true;
+}
+
+function openBlankCreate() {
+  router.push({ name: 'PageManagement_Add' });
 }
 
 // 2026-05-25 #91 — 切換用途時，blocks 同步換預設組合；CTA 只在使用者沒填時補預設
@@ -920,11 +926,31 @@ async function onImport(event: Event) {
 </script>
 
 <style lang="scss" scoped>
-// 2026-05-25 #95v5 — main-header 4 按鈕等寬,讓視覺更平均
-// 用 :deep 穿透 main-header 子 component
-:deep(.pm-header-btn) {
-  min-width: 140px;
+// 2026-05-26 — main-header actions 統一高度、寬度與間距
+.pm-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+
+  :deep(.el-button) {
+    margin-left: 0;
+  }
+}
+
+.pm-header-btn {
+  width: 152px;
+  height: 36px;
   justify-content: center;
+  flex: 0 0 152px;
+  padding: 0 14px;
+  box-sizing: border-box;
+}
+
+.pm-header-btn--compact {
+  width: 112px;
+  flex-basis: 112px;
 }
 
 // 2026-05-25 #95v2 — 使用指引 banner:薄條,可關閉

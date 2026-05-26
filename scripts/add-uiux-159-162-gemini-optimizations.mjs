@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const file = path.resolve(__dirname, '..', 'docs', 'iFare_UI_UX_問題追蹤清單.xlsx');
+const file = path.resolve(__dirname, '..', 'docs', 'iFare_問題追蹤與AI維運規劃.xlsx');
 const sheetName = 'UIUX問題追蹤清單';
 const summarySheetName = '統計摘要';
 
@@ -82,7 +82,7 @@ const issues = [
     '目前 Gemini 主要依 system prompt 回答，尚未有 i-Fare 常見問題、福利查詢、公益夥伴、聯絡資訊等固定知識內容作為依據。',
     '整理站內常見問題與固定資訊，作為後端 prompt 或知識片段注入；明確限制不自行編造補助金額、資格條件或不存在的申請方式。',
     'server/api/chatbot.post.ts docs',
-    'Dev/Dev Code/iFare_Frontend/server/api/chatbot.post.ts\r\ndocs/iFare_UI_UX_問題追蹤清單.xlsx',
+    'Dev/Dev Code/iFare_Frontend/server/api/chatbot.post.ts\r\ndocs/iFare_問題追蹤與AI維運規劃.xlsx',
     '此項偏內容治理與回答品質；可與基金會確認標準問答後再實作。',
     '未修正',
     '',

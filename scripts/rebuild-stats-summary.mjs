@@ -63,7 +63,7 @@ function setRow(ws, row, vals, styles) {
 
 // ===== 讀取現況 =====
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FILE = path.resolve(__dirname, '..', 'docs', 'iFare_UI_UX_問題追蹤清單.xlsx');
+const FILE = path.resolve(__dirname, '..', 'docs', 'iFare_問題追蹤與AI維運規劃.xlsx');
 const wb = XLSX.readFile(FILE, { cellStyles: true });
 const wsUiux = wb.Sheets['UIUX問題追蹤清單'];
 const wsBackend = wb.Sheets['後臺優化'];

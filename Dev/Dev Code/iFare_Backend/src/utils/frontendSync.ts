@@ -13,18 +13,18 @@
  */
 
 import type { DynamicPage } from '@/composables/useDynamicPages';
+import { FRONTEND_DYNAMIC_API_TOKEN, FRONTEND_SYNC_URL } from '@/config/adminEnv';
 
 export interface SyncResult {
   ok: boolean;
   error?: string;
 }
 
-const FRONTEND_SYNC_URL =
-  (import.meta.env.VITE_FRONTEND_SYNC_URL as string | undefined) ||
-  'http://localhost:3000/api/dynamic-pages';
-const FRONTEND_DYNAMIC_API_TOKEN = (import.meta.env.VITE_FRONTEND_DYNAMIC_API_TOKEN as string | undefined) || '';
-
 export async function syncPagesToFrontend(pages: DynamicPage[]): Promise<SyncResult> {
+  if (!FRONTEND_SYNC_URL) {
+    return { ok: false, error: 'VITE_FRONTEND_SYNC_URL or VITE_FRONTEND_BASE is not configured' };
+  }
+
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
   if (FRONTEND_DYNAMIC_API_TOKEN) {

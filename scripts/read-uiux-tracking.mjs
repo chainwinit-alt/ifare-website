@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FILES = [
-  { tag: 'docs', file: path.resolve(__dirname, '..', 'docs', 'iFare_UI_UX_問題追蹤清單.xlsx') },
+  { tag: 'docs', file: path.resolve(__dirname, '..', 'docs', 'iFare_問題追蹤與AI維運規劃.xlsx') },
   { tag: 'desktop', file: 'C:/Users/emma.chung/Desktop/work/iFare_UI_UX_問題追蹤清單_已更新.xlsx' },
 ];
 

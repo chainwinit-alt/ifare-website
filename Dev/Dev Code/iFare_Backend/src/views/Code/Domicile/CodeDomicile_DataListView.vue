@@ -115,9 +115,7 @@ function WebAPI_GetDataList(
     searchName,
     false,  // false = 不限制只取啟用資料
     null,   // null = 不指定特定 id
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;

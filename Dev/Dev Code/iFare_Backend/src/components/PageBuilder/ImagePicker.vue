@@ -128,6 +128,11 @@ import {
   ElTag,
 } from 'element-plus';
 import { Picture } from '@element-plus/icons-vue';
+import {
+  FRONTEND_ASSET_LIST_URL,
+  FRONTEND_ASSET_UPLOAD_URL,
+  FRONTEND_DYNAMIC_API_TOKEN,
+} from '@/config/adminEnv';
 
 interface Asset {
   filename: string;
@@ -152,14 +157,6 @@ const localValue = computed({
   set: (v) => emit('update:modelValue', v),
 });
 
-const FRONTEND_ASSET_LIST_URL =
-  (import.meta.env.VITE_FRONTEND_ASSET_LIST_URL as string | undefined) ||
-  'http://localhost:3000/api/dynamic-assets';
-const FRONTEND_ASSET_UPLOAD_URL =
-  (import.meta.env.VITE_FRONTEND_ASSET_UPLOAD_URL as string | undefined) ||
-  'http://localhost:3000/api/dynamic-assets';
-const FRONTEND_DYNAMIC_API_TOKEN =
-  (import.meta.env.VITE_FRONTEND_DYNAMIC_API_TOKEN as string | undefined) || '';
 const MAX_IMAGE_UPLOAD_SIZE = 8 * 1024 * 1024;
 
 const dialogOpen = ref(false);
@@ -194,6 +191,11 @@ function onDialogOpen() {
 }
 
 async function loadAssets() {
+  if (!FRONTEND_ASSET_LIST_URL) {
+    loadError.value = 'VITE_FRONTEND_ASSET_LIST_URL or VITE_FRONTEND_BASE is not configured';
+    return;
+  }
+
   loading.value = true;
   loadError.value = '';
   try {
@@ -260,6 +262,11 @@ function onDrop(event: DragEvent) {
 
 async function uploadFile(file: File) {
   uploadError.value = '';
+
+  if (!FRONTEND_ASSET_UPLOAD_URL) {
+    uploadError.value = 'VITE_FRONTEND_ASSET_UPLOAD_URL or VITE_FRONTEND_BASE is not configured';
+    return;
+  }
 
   if (!file.type.startsWith('image/')) {
     uploadError.value = '請選擇圖片檔案';

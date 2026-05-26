@@ -484,9 +484,7 @@ function GetCodePoliceList(callback:any){
     null,
     null,
     false,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -520,9 +518,7 @@ function GetCodeDomicileList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -556,9 +552,7 @@ function GetCodeRecipientList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -592,9 +586,7 @@ function GetCodeIncomeList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -628,9 +620,7 @@ function GetCodeIdentityList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -663,9 +653,7 @@ function GetCodeKeywordList(callback:any){
     null,
     null,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -699,9 +687,7 @@ function GetFareOfficeUnitList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -743,9 +729,7 @@ function GetIFarePolicyData(){
     null,
     ids,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;
@@ -825,9 +809,7 @@ const promise_fareOfficeUnit = new Promise((resolve, reject) => {
 })
 
 Promise.all([promise_codePolicy, promise_codeDomicile, promise_codeRecipient, promise_codeIncome, promise_codeIdentity, promise_codeKeyword, promise_fareOfficeUnit])
-        .then(res => {
-          console.log(res)
-          if (res.includes('error')) return false;
+        .then(res => {          if (res.includes('error')) return false;
 
           if (routeNameType.indexOf("edit") >= 0) {
             GetIFarePolicyData()

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import JSZip from 'jszip';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const file = path.resolve(__dirname, '..', 'docs', 'iFare_UI_UX_問題追蹤清單.xlsx');
+const file = path.resolve(__dirname, '..', 'docs', 'iFare_問題追蹤與AI維運規劃.xlsx');
 
 const DEFAULT_THEME = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme">

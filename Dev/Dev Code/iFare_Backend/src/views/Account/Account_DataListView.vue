@@ -74,9 +74,7 @@ function WebAPI_GetDataList(
     _state,
     _account,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;

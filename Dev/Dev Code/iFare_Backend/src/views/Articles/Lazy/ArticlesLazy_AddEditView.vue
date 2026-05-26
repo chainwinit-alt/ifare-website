@@ -338,7 +338,6 @@ function GetCodePoliceList(callback: any) {
     null,
     false,
     (res: any) => {
-      console.log(res);
       let _resData = res.data || "error";
       if (_resData == "error") {
         callback("error");
@@ -378,7 +377,6 @@ function GetCodeKeywordList(callback: any) {
     null,
     null,
     (res: any) => {
-      console.log(res);
       let _resData = res.data || "error";
       if (_resData == "error") {
         callback("error");
@@ -419,7 +417,6 @@ function GetArticlesLazyData() {
     null,
     ids,
     (res: any) => {
-      console.log(res);
       let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
@@ -465,7 +462,6 @@ const promise_codeKeyword = new Promise((resolve, reject) => {
 });
 
 Promise.all([promise_codePolicy, promise_codeKeyword]).then((res) => {
-  console.log(res);
   if (res.includes("error")) return false;
 
   if (routeNameType.indexOf("edit") >= 0) {

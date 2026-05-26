@@ -288,7 +288,6 @@ if (routeNameType.indexOf("edit") >= 0) {
     null,
     ids,
     (res: any) => {
-      console.log(res);
       let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 

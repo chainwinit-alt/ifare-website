@@ -206,9 +206,7 @@ function GetCodePoliceList(callback:any){
     null,
     null,
     false,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -242,9 +240,7 @@ function GetCodeKeywordList(callback:any){
     null,
     null,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -284,9 +280,7 @@ function GetArticlesWelfareData(){
     null,
     null,
     ids,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;
@@ -325,9 +319,7 @@ const promise_codeKeyword = new Promise((resolve, reject) => {
 })
 
 Promise.all([promise_codePolicy, promise_codeKeyword])
-        .then(res => {
-          console.log(res)
-          if (res.includes('error')) return false;
+        .then(res => {          if (res.includes('error')) return false;
 
           if (routeNameType.indexOf("edit") >= 0) {
             GetArticlesWelfareData()

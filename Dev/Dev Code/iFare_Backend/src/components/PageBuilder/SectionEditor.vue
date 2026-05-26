@@ -222,7 +222,11 @@
           </div>
           <div>
             <label class="item-label">按鈕連結</label>
-            <LinkPicker v-model="section.ctaUrl" placeholder="/page 或 https://..." />
+            <LinkPicker
+              :model-value="section.ctaUrl || ''"
+              placeholder="/page 或 https://..."
+              @update:model-value="section.ctaUrl = $event"
+            />
           </div>
         </div>
       </template>
@@ -285,6 +289,7 @@ import {
   isSectionEmpty,
   type Section,
 } from '@/composables/useDynamicPages';
+import { FRONTEND_ASSET_UPLOAD_URL, FRONTEND_DYNAMIC_API_TOKEN } from '@/config/adminEnv';
 import LinkPicker from './LinkPicker.vue';
 import ImagePicker from './ImagePicker.vue';
 
@@ -333,10 +338,6 @@ function onDragEndReset(ev: DragEvent) {
   emit('dragend', ev);
   isDraggable.value = false;
 }
-const FRONTEND_ASSET_UPLOAD_URL =
-  (import.meta.env.VITE_FRONTEND_ASSET_UPLOAD_URL as string | undefined) ||
-  'http://localhost:3000/api/dynamic-assets';
-const FRONTEND_DYNAMIC_API_TOKEN = (import.meta.env.VITE_FRONTEND_DYNAMIC_API_TOKEN as string | undefined) || '';
 const MAX_IMAGE_UPLOAD_SIZE = 8 * 1024 * 1024;
 const isEmbeddedImage = computed(() => section.value.type === 'image-text' && section.value.imageSrc.startsWith('data:image/'));
 const isLocalImagePath = computed(() => (
@@ -442,6 +443,10 @@ function clearSelectedImage() {
 }
 
 async function uploadImageFile(file: File) {
+  if (!FRONTEND_ASSET_UPLOAD_URL) {
+    throw new Error('VITE_FRONTEND_ASSET_UPLOAD_URL or VITE_FRONTEND_BASE is not configured');
+  }
+
   const formData = new FormData();
   const headers: Record<string, string> = {};
   formData.append('file', file);

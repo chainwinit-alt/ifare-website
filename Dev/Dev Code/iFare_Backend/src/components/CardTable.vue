@@ -105,7 +105,7 @@
             <!-- 2026-05-25 #35 — 「資料狀態」改 el-tag + icon,視覺上跟未來的「上架狀態」明顯區分 -->
             <template #default="scope" v-if="column.opts.type == 'state_data'">
               <el-tag
-                :type="scope.row.state_data == '停用' ? 'info' : 'primary'"
+                :type="scope.row.state_data == '停用' ? 'info' : 'success'"
                 :effect="scope.row.state_data == '停用' ? 'plain' : 'light'"
                 size="small"
                 class="state-data-tag"

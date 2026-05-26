@@ -60,12 +60,12 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ElButton } from 'element-plus';
 import type { DynamicPage } from '@/composables/useDynamicPages';
+import { FRONTEND_BASE_URL } from '@/config/adminEnv';
 
 const props = defineProps<{ page: DynamicPage }>();
 
-const FRONTEND_URL =
-  (import.meta.env.VITE_FRONTEND_BASE as string | undefined) || 'http://localhost:3000';
-const previewUrl = `${FRONTEND_URL}/preview`;
+const FRONTEND_URL = FRONTEND_BASE_URL;
+const previewUrl = FRONTEND_URL ? `${FRONTEND_URL}/preview` : 'about:blank';
 const ALLOWED_ORIGIN = FRONTEND_URL;
 
 type Status = 'loading' | 'ready' | 'error';
@@ -98,8 +98,10 @@ const statusTitle = computed(() => {
 });
 
 const statusMessage = computed(() => {
+  if (!FRONTEND_URL) return 'VITE_FRONTEND_BASE is not configured.';
+
   if (status.value === 'loading') {
-    return '正在連線到 localhost:3000/preview。';
+    return `Loading preview from ${FRONTEND_URL}/preview.`;
   }
 
   if (status.value === 'error') {
@@ -125,6 +127,8 @@ function clearReadyTimeout() {
 }
 
 function pushPageToIframe() {
+  if (!ALLOWED_ORIGIN) return;
+
   const win = iframeRef.value?.contentWindow;
   if (!win) return;
 
@@ -142,6 +146,7 @@ function onIframeLoad() {
 }
 
 function handleMessage(event: MessageEvent) {
+  if (!ALLOWED_ORIGIN) return;
   if (event.origin !== ALLOWED_ORIGIN) return;
   if (!event.data || typeof event.data !== 'object') return;
 
