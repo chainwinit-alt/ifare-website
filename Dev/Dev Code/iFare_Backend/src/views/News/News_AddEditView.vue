@@ -168,7 +168,6 @@ if (routeNameType.indexOf("edit") >= 0) {
 }
 
 function SaveAction() {
-  console.log(datepicker_release.value)
   const _title = input_title.value
   const _detail = encodeURIComponent(editorValue.value.replaceAll("https://drive.google.com/uc?export=download&", "https://drive.google.com/thumbnail?sz=w800&"))
   const _releaseTime = datepicker_release.value.toLocaleString('sv')
@@ -180,7 +179,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
     $WebAPI.InsertNews(userStore.token, _title, _detail, _releaseTime, _discontinuedTime, _state, (res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {
@@ -203,7 +201,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
     $WebAPI.UpdateNews(userStore.token, _id, _title, _detail, _releaseTime, _discontinuedTime, _state, (res: any) => {

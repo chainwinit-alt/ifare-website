@@ -115,7 +115,6 @@
                        _route.query.word?.toString())
 
     watch(searchParams, (newVal, oldVal) => {
-        console.log(newVal);
 
         let uploadDate = newVal.datepicker.upload || [];
         let searchWord = newVal.searchInput.word || "";

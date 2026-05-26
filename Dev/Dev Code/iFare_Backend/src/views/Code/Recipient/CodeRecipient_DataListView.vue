@@ -107,7 +107,6 @@ WebAPI_GetDataList(_route.query.create?.toString().split("TO")[0],
                     _route.query.word?.toString());
 
 watch(searchParams, (newVal, oldVal) => {
-  console.log(newVal);
 
   let createDate = newVal.datepicker.create || [];
   let updateDate = newVal.datepicker.update || [];

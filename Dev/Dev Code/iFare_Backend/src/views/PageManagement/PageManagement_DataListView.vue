@@ -402,6 +402,7 @@ import {
 } from '@/composables/useDynamicPages';
 import { useFeedback } from '@/composables/useFeedback';
 import { FRONTEND_BASE_URL } from '@/config/adminEnv';
+import { escapeHtml } from '@/utils/sanitizeHtml';
 
 type PagePresetKey = 'blank' | 'story' | 'event' | 'news' | 'contact';
 
@@ -877,17 +878,18 @@ async function onImport(event: Event) {
     if ((analysis.overwritten ?? 0) > 0) {
       const titles = (analysis.overwrittenTitles ?? []).slice(0, 8);
       const more = (analysis.overwrittenTitles?.length ?? 0) - titles.length;
+      // version / titles 來自匯入檔，屬 user 可控字串，必須 escape 後才能放進 HTML 模板
       const html = `
         <div style="text-align: left;">
           <p style="margin: 0 0 8px;">
-            檔案版本 <strong>${analysis.version}</strong>，共 ${analysis.pages?.length ?? 0} 筆頁面。
+            檔案版本 <strong>${escapeHtml(analysis.version)}</strong>，共 ${analysis.pages?.length ?? 0} 筆頁面。
           </p>
           <p style="margin: 0 0 8px;">
             其中 <strong style="color: #67c23a;">${analysis.added} 筆是新增</strong>，
             <strong style="color: #e6a23c;">${analysis.overwritten} 筆會覆蓋既有頁面</strong>：
           </p>
           <ul style="padding-left: 1.2em; margin: 0 0 8px; max-height: 200px; overflow-y: auto;">
-            ${titles.map((t) => `<li>${t}</li>`).join('')}
+            ${titles.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}
             ${more > 0 ? `<li style="color: #909399;">…還有 ${more} 筆</li>` : ''}
           </ul>
           <p style="margin: 0; color: #909399; font-size: 12px;">

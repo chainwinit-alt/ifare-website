@@ -28,6 +28,7 @@
         <!-- 一般功能頁面：包裹在 part-main 容器中，留出頁首高度的上方空白 -->
         <template v-if="$route.name != 'Login'">
           <div class="part-main">
+            <PageTip />
             <RouterView />
           </div>
         </template>
@@ -97,6 +98,8 @@ import { ElContainer, ElMain, ElScrollbar } from "element-plus";
 import AppAside from "./components/AppAside.vue";
 // 頁首導航列元件
 import AppHeader from "./components/AppHeader.vue";
+// 頁面操作提示（從 route.meta.tip 讀取，可關閉並記憶）
+import PageTip from "@/components/PageTip.vue";
 // 品牌 Logo SVG 元件（用作背景裝飾）
 import logo from "@/components/icons/IconLogo.vue";
 

@@ -84,7 +84,6 @@ const app = getCurrentInstance();
 const $commonLib = app?.appContext.config.globalProperties.$CommonLib;
 const userStore = useUserStore()
 
-console.log($commonLib.CopyArrayObj(props));
 
 // 深複製路由物件，避免直接操作 reactive 原始資料
 const route = $commonLib.CopyArrayObj(props.route);
@@ -97,7 +96,6 @@ const initPageRoute = {
 
 // 麵包屑路徑陣列，初始為首頁
 const pageRouters = reactive<Array<PageRoute>>([{ ...initPageRoute }]);
-console.log($commonLib.CopyArrayObj(pageRouters));
 
 // 顯示於右側的登入使用者名稱
 const actName = ref(userStore.userName);
@@ -171,8 +169,6 @@ onMounted(async () => {
 
 // 監聽 route prop 變化，當路由切換時重新建構麵包屑
 watch(props, async (newProps, oldProps) => {
-  console.log("new:", newProps);
-  console.log("old:", oldProps);
 
   refreshRouteInfo(newProps.route);
 });

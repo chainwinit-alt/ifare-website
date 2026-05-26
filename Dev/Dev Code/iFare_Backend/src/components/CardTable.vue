@@ -250,14 +250,10 @@ watch(pageSize, () => {
 });
 
 const currentPageChange = (page: any) => {
-  console.log("page: ", page);
   currentPage.value = page;
 };
 
 const handleClick = (_data: any, _btnType: string) => {
-  console.log("table link clicked.");
-  console.log(_data);
-  console.log(_btnType);
   switch (props.tbName) {
     case "Account":
       handleClick_Account(_data);
@@ -298,7 +294,6 @@ const handleClick = (_data: any, _btnType: string) => {
 };
 
 const handleClick_Account = (_data: any) => {
-  console.log("-----> handleClick_Account");
   // const permission = _data.row.permission
   const _id = _data.row.id;
   _global?.$router.push({ name: "Account_Detail", query: { id: _id } });
@@ -307,9 +302,7 @@ const handleClick_Account = (_data: any) => {
 const handleClick_Code = (_data: any) => {
   const editPageName =
     _global?.$route.path.replace("/", "").replace("-", "_") + "_Edit";
-  console.log(editPageName);
   const _id = _data.row.id;
-  console.log(_id);
   _global?.$router.push({ name: editPageName, query: { id: _id } });
 };
 
@@ -572,7 +565,6 @@ const deleteConfirm = (callApiName:string, _param:any) => {
       });
       break;
     case "DeleteImgManager":
-      console.log(_id)
       $WebAPI.DeleteImg(userStore.token, _id, (res: any) => {
           let _resData = res.data || "error";
           if (_resData == "error") {

@@ -41,7 +41,6 @@ const $commonLib = app?.appContext.config.globalProperties.$CommonLib;
 const $WebAPI = app?.appContext.config.globalProperties.$WebAPI;
 const userStore = useUserStore();
 const _route = useRoute();
-console.log(_route.query)
 
 const defaultParams = ref(_route.query)
 const searchParams = ref();
@@ -108,7 +107,6 @@ WebAPI_GetDataList(_route.query.permission?.toString(),
                   _route.query.account?.toString());
 
 watch(searchParams, (newVal, oldVal) => {
-  console.log(newVal);
 
   let permission = newVal.radioSelect.permission || "";
   let state = newVal.radioSelect.dataState || "";

@@ -20,6 +20,28 @@ import Analysis_DashboardViewVue from '@/views/Analysis/Analysis_DashboardView.v
 import NoPermission from '@/views/NoPermission.vue'
 //#endregion
 
+// 2026-05-26 #6 — 擴展 RouteMeta，把權限與提示 tip 變成型別安全的欄位
+declare module 'vue-router' {
+  interface RouteMeta {
+    requiresAuth?: boolean
+    /** 路由標題（顯示於 main-header） */
+    title?: string
+    /** 麵包屑用：父層標題 / route name */
+    title_parent?: string
+    urlName_parent?: string
+    /** 詳細頁可隱藏 main-header title */
+    isTitleHide?: boolean
+    /** AsideMenu 高亮對應的鍵 */
+    indexKey?: string
+    /** PageTip 顯示的一句話操作提示 */
+    tip?: string
+    /** 「檢視者」是否允許進入此路由（不設預設不允許） */
+    viewerCanAccess?: boolean
+    /** 是否限「管理者」才能進入（不設預設編輯者 + 管理者皆可） */
+    requiresAdmin?: boolean
+  }
+}
+
 //#region [View.vue] 最新消息
 import News_IndexViewVue from '@/views/News/News_IndexView.vue'
 import News_DataListViewVue from '@/views/News/News_DataListView.vue'
@@ -129,8 +151,15 @@ import PageManagement_DataListViewVue from '@/views/PageManagement/PageManagemen
 import PageManagement_AddEditViewVue from '@/views/PageManagement/PageManagement_AddEditView.vue'
 //#endregion
 
+//#region [View.vue] 部署健康檢查 — 後臺優化 #87
+import HealthCheckView from '@/views/Health/HealthCheckView.vue'
+//#endregion
+
+//#region [View.vue] 部署 Smoke Test 清單 — 後臺優化 #88
+import SmokeTestView from '@/views/Health/SmokeTestView.vue'
+//#endregion
+
 // 輸出基礎路徑（開發除錯用）
-console.log(import.meta.env.BASE_URL)
 
 // 建立路由實例，使用 HTML5 History 模式（無 # 號的 URL）
 const router = createRouter({
@@ -144,7 +173,9 @@ const router = createRouter({
       meta: {
         indexKey: 'Home',
         requiresAuth: true,
-        title: '首頁'
+        title: '首頁',
+        tip: '左側選單或下方快速入口可進入各模組。常用模組會自動記在「最近使用」。',
+        viewerCanAccess: true
       }
       //#endregion
     },
@@ -178,7 +209,8 @@ const router = createRouter({
           component: News_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '最新消息維護'
+            title: '最新消息維護',
+            tip: '先用搜尋條件縮小範圍再點列表。資料狀態設為「停用」前台會立即隱藏。'
           }
         },
         {
@@ -187,7 +219,8 @@ const router = createRouter({
           component: News_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增最新消息'
+            title: '新增最新消息',
+            tip: '填完必填欄位按右上「儲存」即建立。上下架日期到期會自動切換。'
           }
         },
         {
@@ -196,7 +229,8 @@ const router = createRouter({
           component: News_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯最新消息'
+            title: '編輯最新消息',
+            tip: '修改後按「儲存」才會更新前台顯示。建立日期不會改變。'
           }
         },
         {
@@ -230,7 +264,9 @@ const router = createRouter({
           component: ArticlesWelfare_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '福利文章維護'
+            title: '福利文章維護',
+            tip: '可依政策類別、關鍵字篩選。文章「啟用」且在上下架期間才會出現在前台。',
+            viewerCanAccess: true
           }
         },
         {
@@ -239,7 +275,8 @@ const router = createRouter({
           component: ArticlesWelfare_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增福利文章'
+            title: '新增福利文章',
+            tip: '先選政策類別與關鍵字會影響前台分類。建議封面圖比例 16:9。'
           }
         },
         {
@@ -248,7 +285,8 @@ const router = createRouter({
           component: ArticlesWelfare_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯福利文章'
+            title: '編輯福利文章',
+            tip: '修改後按「儲存」。若要先預覽，可把上架日期暫設今天再觀察前台。'
           }
         },
         {
@@ -258,6 +296,7 @@ const router = createRouter({
           meta: {
             requiresAuth: true,
             title: '福利文章瀏覽',
+            viewerCanAccess: true,
             isTitleHide: true
           }
         }
@@ -282,7 +321,9 @@ const router = createRouter({
           component: ArticlesLazy_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '懶人包維護'
+            title: '懶人包維護',
+            tip: '懶人包以多張圖片組成，可依政策類別與關鍵字篩選。',
+            viewerCanAccess: true
           }
         },
         {
@@ -291,7 +332,8 @@ const router = createRouter({
           component: ArticlesLazy_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增懶人包'
+            title: '新增懶人包',
+            tip: '圖片依上傳順序在前台呈現。建議單張寬 1200px 以上、檔案 < 500KB。'
           }
         },
         {
@@ -300,7 +342,8 @@ const router = createRouter({
           component: ArticlesLazy_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯懶人包'
+            title: '編輯懶人包',
+            tip: '修改後按「儲存」才會更新。可重排圖片順序。'
           }
         },
         {
@@ -310,6 +353,7 @@ const router = createRouter({
           meta: {
             requiresAuth: true,
             title: '懶人包瀏覽',
+            viewerCanAccess: true,
             isTitleHide: true
           }
         }
@@ -334,7 +378,9 @@ const router = createRouter({
           component: IFarePolicy_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '福利政策維護'
+            title: '福利政策維護',
+            tip: '政策筆數較多，建議用條件先縮小範圍。下架日期過期會自動從前台隱藏。',
+            viewerCanAccess: true
           }
         },
         {
@@ -343,7 +389,8 @@ const router = createRouter({
           component: IFarePolicy_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增福利政策'
+            title: '新增福利政策',
+            tip: '欄位較多，建議依序填基本資料、適用條件、福利內容、洽辦資訊。'
           }
         },
         {
@@ -352,7 +399,8 @@ const router = createRouter({
           component: IFarePolicy_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯福利政策'
+            title: '編輯福利政策',
+            tip: '修改後按「儲存」。請特別檢查上架/下架日期與洽辦單位是否正確。'
           }
         },
         {
@@ -362,6 +410,7 @@ const router = createRouter({
           meta: {
             requiresAuth: true,
             title: '福利政策瀏覽',
+            viewerCanAccess: true,
             isTitleHide: true
           }
         }
@@ -386,7 +435,8 @@ const router = createRouter({
           component: IFareQA_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '常見問題維護'
+            title: '常見問題維護',
+            tip: 'QA 會顯示在 i-Fare 首頁與政策詳情。問題與答案建議使用白話。'
           }
         },
         {
@@ -395,7 +445,8 @@ const router = createRouter({
           component: IFareQA_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增常見問題'
+            title: '新增常見問題',
+            tip: '答案內容會直接顯示給民眾，請避免使用內部術語。'
           }
         },
         {
@@ -404,7 +455,8 @@ const router = createRouter({
           component: IFareQA_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯常見問題'
+            title: '編輯常見問題',
+            tip: '修改後按「儲存」即更新前台。'
           }
         },
         {
@@ -438,7 +490,8 @@ const router = createRouter({
           component: IFareOfficeUnit_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '洽辦單位維護'
+            title: '洽辦單位維護',
+            tip: '洽辦單位會被多筆政策引用，編輯前請確認影響範圍。'
           }
         },
         {
@@ -447,7 +500,8 @@ const router = createRouter({
           component: IFareOfficeUnit_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增洽辦單位'
+            title: '新增洽辦單位',
+            tip: '一個單位可有多個分支地址與電話，依需求新增。'
           }
         },
         {
@@ -456,7 +510,8 @@ const router = createRouter({
           component: IFareOfficeUnit_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯洽辦單位'
+            title: '編輯洽辦單位',
+            tip: '修改地址或電話後，所有引用此單位的政策都會同步更新。'
           }
         },
         {
@@ -490,7 +545,8 @@ const router = createRouter({
           component: Collaborator_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '公益夥伴維護'
+            title: '公益夥伴維護',
+            tip: '夥伴顯示順序依「啟用」狀態與建立時間排序。'
           }
         },
         {
@@ -499,7 +555,8 @@ const router = createRouter({
           component: Collaborator_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增公益夥伴'
+            title: '新增公益夥伴',
+            tip: 'Logo 建議 PNG 透明背景、檔案 < 500KB。連結填夥伴官網。'
           }
         },
         {
@@ -508,7 +565,8 @@ const router = createRouter({
           component: Collaborator_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯公益夥伴'
+            title: '編輯公益夥伴',
+            tip: '修改後按「儲存」。Logo 替換後前台立即更新。'
           }
         },
         {
@@ -542,7 +600,8 @@ const router = createRouter({
           component: CodePolicy_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '政策類別維護'
+            title: '政策類別維護',
+            tip: '政策類別會出現在前台政策篩選選單，停用後民眾搜尋時看不到。'
           }
         },
         {
@@ -551,7 +610,8 @@ const router = createRouter({
           component: CodePolicy_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增政策類別'
+            title: '新增政策類別',
+            tip: '新增類別後，記得通知內容人員把舊政策歸類到此類別。'
           }
         },
         {
@@ -560,7 +620,8 @@ const router = createRouter({
           component: CodePolicy_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯政策類別'
+            title: '編輯政策類別',
+            tip: '修改名稱會即時影響前台篩選顯示文字。'
           }
         }
       ]
@@ -584,7 +645,8 @@ const router = createRouter({
           component: CodeRecipient_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '受助者維護'
+            title: '受助者維護',
+            tip: '受助者類別用於福利政策的適用對象篩選。'
           }
         },
         {
@@ -593,7 +655,8 @@ const router = createRouter({
           component: CodeRecipient_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增受助者'
+            title: '新增受助者',
+            tip: '建議使用民眾易懂的稱呼，例如「低收入戶」「身心障礙者」。'
           }
         },
         {
@@ -602,7 +665,8 @@ const router = createRouter({
           component: CodeRecipient_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯受助者'
+            title: '編輯受助者',
+            tip: '修改名稱會立即同步到所有引用此代碼的政策。'
           }
         }
       ]
@@ -626,7 +690,8 @@ const router = createRouter({
           component: CodeKeyword_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '關鍵字維護'
+            title: '關鍵字維護',
+            tip: '關鍵字用於文章與政策的標籤，提升前台搜尋命中率。'
           }
         },
         {
@@ -635,7 +700,8 @@ const router = createRouter({
           component: CodeKeyword_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增關鍵字'
+            title: '新增關鍵字',
+            tip: '建議使用名詞、避免標點符號。'
           }
         },
         {
@@ -644,7 +710,8 @@ const router = createRouter({
           component: CodeKeyword_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯關鍵字'
+            title: '編輯關鍵字',
+            tip: '修改後所有掛此關鍵字的文章/政策標籤都會更新。'
           }
         }
       ]
@@ -668,7 +735,8 @@ const router = createRouter({
           component: CodeIncome_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '經濟條件維護'
+            title: '經濟條件維護',
+            tip: '經濟條件用於福利政策的收入門檻篩選。'
           }
         },
         {
@@ -677,7 +745,8 @@ const router = createRouter({
           component: CodeIncome_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增經濟條件'
+            title: '新增經濟條件',
+            tip: '請使用具體門檻描述，例如「家庭月收入 < 4 萬」。'
           }
         },
         {
@@ -686,7 +755,8 @@ const router = createRouter({
           component: CodeIncome_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯經濟條件'
+            title: '編輯經濟條件',
+            tip: '修改後民眾依此條件查到的政策結果可能改變。'
           }
         }
       ]
@@ -710,7 +780,8 @@ const router = createRouter({
           component: CodeIdentity_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '特殊身分維護'
+            title: '特殊身分維護',
+            tip: '特殊身分用於福利政策的對象篩選（原住民、新住民等）。'
           }
         },
         {
@@ -719,7 +790,8 @@ const router = createRouter({
           component: CodeIdentity_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增特殊身分'
+            title: '新增特殊身分',
+            tip: '請使用法規或政府公告慣用名稱。'
           }
         },
         {
@@ -728,7 +800,8 @@ const router = createRouter({
           component: CodeIdentity_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯特殊身分'
+            title: '編輯特殊身分',
+            tip: '修改後所有引用此身分的政策即時同步。'
           }
         }
       ]
@@ -752,7 +825,8 @@ const router = createRouter({
           component: CodeDomicile_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '戶籍地維護'
+            title: '戶籍地維護',
+            tip: '戶籍地用於洽辦單位的服務範圍劃分。'
           }
         },
         {
@@ -761,7 +835,8 @@ const router = createRouter({
           component: CodeDomicile_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增戶籍地'
+            title: '新增戶籍地',
+            tip: '依縣市行政區命名，例如「臺北市」「新北市」。'
           }
         },
         {
@@ -770,7 +845,8 @@ const router = createRouter({
           component: CodeDomicile_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯戶籍地'
+            title: '編輯戶籍地',
+            tip: '修改後所有引用此戶籍地的單位顯示文字會更新。'
           }
         }
       ]
@@ -784,7 +860,8 @@ const router = createRouter({
       meta: {
         indexKey: 'Analysis',
         requiresAuth: true,
-        title: '資料分析'
+        title: '資料分析',
+        tip: '目前資料來自網站訪客紀錄；GA4 整合預計另外規劃。'
       }
       //#endregion
     },
@@ -806,7 +883,8 @@ const router = createRouter({
           component: Account_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '帳戶維護'
+            title: '帳戶維護',
+            tip: '帳號權限分檢視者/編輯者/管理者三層，建立後不可變更。'
           }
         },
         {
@@ -815,7 +893,8 @@ const router = createRouter({
           component: Account_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增帳戶'
+            title: '新增帳戶',
+            tip: '預設密碼至少 6 字、含英文大小寫與數字。使用者首次登入後可自行修改。'
           }
         },
         {
@@ -824,7 +903,8 @@ const router = createRouter({
           component: Account_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯帳戶'
+            title: '編輯帳戶',
+            tip: '帳號、權限、資料狀態建立後不可修改；需變更請新增新帳號並停用舊帳號。'
           }
         },
         {
@@ -834,7 +914,8 @@ const router = createRouter({
           component: Account_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '管理者編輯帳戶'
+            title: '管理者編輯帳戶',
+            requiresAdmin: true
           }
         },
         {
@@ -868,7 +949,8 @@ const router = createRouter({
           component: Personal_DetailViewVue,
           meta: {
             requiresAuth: true,
-            title: '個人資料'
+            title: '個人資料',
+            tip: '這裡只顯示目前的帳戶資料，需修改請按「編輯個人資料」。'
           }
         },
         {
@@ -877,7 +959,8 @@ const router = createRouter({
           component: Personal_EditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯個人資料'
+            title: '編輯個人資料',
+            tip: '修改姓名/E-mail 後按「儲存」。要改密碼請按上方「變更密碼」。'
           }
         },
         {
@@ -886,7 +969,8 @@ const router = createRouter({
           component: Personal_ChangePwdViewVue,
           meta: {
             requiresAuth: true,
-            title: '變更密碼'
+            title: '變更密碼',
+            tip: '新密碼需含英文大小寫與數字、至少 6 字。儲存後下次登入需用新密碼。'
           }
         }
       ]
@@ -910,7 +994,8 @@ const router = createRouter({
           component: PageManagement_DataListViewVue,
           meta: {
             requiresAuth: true,
-            title: '頁面管理'
+            title: '頁面管理',
+            tip: '動態頁面變更需「發布」才會推到前台，僅儲存只是暫存草稿。'
           }
         },
         {
@@ -919,7 +1004,8 @@ const router = createRouter({
           component: PageManagement_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '新增頁面'
+            title: '新增頁面',
+            tip: '先設定 slug 與 SEO，再放入區塊。儲存只是暫存，按「發布」才會生效。'
           }
         },
         {
@@ -928,7 +1014,8 @@ const router = createRouter({
           component: PageManagement_AddEditViewVue,
           meta: {
             requiresAuth: true,
-            title: '編輯頁面'
+            title: '編輯頁面',
+            tip: '修改後可先儲存草稿預覽，確認沒問題再點「發布」推到前台。'
           }
         }
       ]
@@ -942,8 +1029,37 @@ const router = createRouter({
       meta: {
         indexKey: 'NoPermission',
         requiresAuth: true,
-        title: '無此權限'
+        title: '無此權限',
+        viewerCanAccess: true
       }
+    },
+    {
+      //#region 部署健康檢查 — 後臺優化 #87
+      path: '/Health',
+      name: 'Health',
+      component: HealthCheckView,
+      meta: {
+        indexKey: 'Health',
+        requiresAuth: true,
+        title: '部署健康檢查',
+        tip: 'read-only：列出目前部署的 API/環境變數/連線狀態，協助確認設定有沒有正確套用。',
+        requiresAdmin: true
+      }
+      //#endregion
+    },
+    {
+      //#region 部署 Smoke Test 清單 — 後臺優化 #88
+      path: '/Health/Smoke',
+      name: 'SmokeTest',
+      component: SmokeTestView,
+      meta: {
+        indexKey: 'Health',
+        requiresAuth: true,
+        title: '部署 Smoke Test',
+        tip: '依清單逐項驗收部署狀態；「通過/失敗/備註」會存在本機 localStorage，重新整理後仍在。',
+        requiresAdmin: true
+      }
+      //#endregion
     },
     {
       // 圖片管理頁
@@ -953,7 +1069,8 @@ const router = createRouter({
       meta: {
         indexKey: 'ImgManager',
         requiresAuth: true,
-        title: '圖片管理'
+        title: '圖片管理',
+        tip: '上傳的圖片可供文章、懶人包、夥伴等共用。刪除前請確認沒有頁面正在引用。'
       }
     }
   ]
@@ -968,46 +1085,38 @@ export default {
 
     /**
      * 全域前置守衛（beforeEach）
-     * 執行時機：每次路由跳轉前
-     * 功能：
-     *   1. 未登入時重導至登入頁
-     *   2. 「檢視者」角色僅能瀏覽特定頁面，其餘頁面導向無權限頁
-     *   3. Account_Edit_Manager 路由僅「管理者」可存取
+     *
+     * 2026-05-26 #6 — 改為讀 route.meta 驅動的權限模型，不再用 to.name 字串硬比。
+     * 新增 route 只要設 meta.viewerCanAccess / meta.requiresAdmin，不必再來這裡改字串清單。
+     *
+     * 規則：
+     *   1. meta.requiresAuth 為 true 且未登入 → /Login
+     *   2. meta.requiresAdmin 為 true 但非「管理者」 → /NoPermission
+     *   3. 使用者為「檢視者」但目標路由未標 meta.viewerCanAccess → /NoPermission
+     *   4. 其餘放行（編輯者 + 管理者 可進除 requiresAdmin 之外的所有路由）
      */
-    router.beforeEach((to, from) => {
+    router.beforeEach((to, _from) => {
       const userStore = useUserStore()
 
-      // 規則一：需要登入但尚未登入 → 重導至登入頁
+      // 規則 1：需登入但尚未登入
       if (to.meta.requiresAuth && !userStore.isLogin) {
-        return {
-          path: '/Login'
-        }
+        return { path: '/Login' }
       }
 
-      // 規則二：「檢視者」角色的存取限制
-      // 以下頁面「檢視者」可正常存取，其餘均導向無權限頁
-      if (to.name != null &&
-          to.name.toString().indexOf('Login') < 0 &&
-          to.name.toString().indexOf('Home') < 0 &&
-          to.name.toString().indexOf('Articles_Welfare_DataList') < 0 &&
-          to.name.toString().indexOf('Articles_Lazy_DataList') < 0 &&
-          to.name.toString().indexOf('IFare_Policy_DataList') < 0 &&
-          to.name.toString().indexOf('Articles_Welfare_Detail') < 0 &&
-          to.name.toString().indexOf('Articles_Lazy_Detail') < 0 &&
-          to.name.toString().indexOf('IFare_Policy_Detail') < 0 &&
-          // to.name.toString().indexOf('Personal_Detail') < 0 &&
-          to.name.toString().indexOf('NoPermission') < 0 &&
-          userStore.permission == "檢視者") {
-        return {
-          path: '/NoPermission'
-        }
+      // Login / NoPermission 本身不需做進一步權限檢查（NoPermission 預設 viewerCanAccess: true）
+      const isAuthPage = to.name === 'Login' || to.name === 'NoPermission'
+      if (isAuthPage) return
+
+      const permission = userStore.permission
+
+      // 規則 2：管理者限定路由
+      if (to.meta.requiresAdmin && permission !== '管理者') {
+        return { path: '/NoPermission' }
       }
 
-      // 規則三：Account_Edit_Manager 僅「管理者」可存取
-      if (to.name != null && to.name.toString().indexOf('Account_Edit_Manager') >= 0 && userStore.permission != "管理者") {
-        return {
-          path: '/NoPermission'
-        }
+      // 規則 3：檢視者只能進有標 viewerCanAccess 的路由
+      if (permission === '檢視者' && !to.meta.viewerCanAccess) {
+        return { path: '/NoPermission' }
       }
     })
 

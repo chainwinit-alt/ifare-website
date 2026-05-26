@@ -157,7 +157,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
     $WebAPI.InsertFareQA(userStore.token, _qa, _answer, _state,(res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {
@@ -180,7 +179,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
     $WebAPI.UpdateFareQA(userStore.token, _id, _qa, _answer, _state,(res: any) => {

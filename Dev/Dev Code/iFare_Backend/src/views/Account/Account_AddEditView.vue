@@ -36,7 +36,11 @@
           <div class="item-group">
               <label class="input-title required">帳號</label>
               <el-input class="c-input-format" v-model="input_account" type="text" size="large" placeholder="請輸入帳號" v-if="$route.name != 'Account_Edit'" />
-              <span class="input-value" v-else>{{ input_account }}</span>
+              <div class="input-readonly" v-else>
+                <el-icon class="readonly-icon"><Lock /></el-icon>
+                <span class="readonly-value">{{ input_account }}</span>
+                <span class="readonly-tag">建立後不可修改</span>
+              </div>
           </div>
           <!-- E-mail 輸入 -->
           <div class="item-group">
@@ -49,7 +53,11 @@
             <el-radio-group v-model="userState" v-if="$route.name != 'Account_Edit'">
                 <el-radio v-for="(radio) in permissionList" :label="radio.value">{{ radio.title }}</el-radio>
             </el-radio-group>
-            <span class="input-value" v-else>{{ userState }}</span>
+            <div class="input-readonly" v-else>
+              <el-icon class="readonly-icon"><Lock /></el-icon>
+              <span class="readonly-value">{{ userState }}</span>
+              <span class="readonly-tag">建立後不可修改</span>
+            </div>
           </div>
       </div>
     </div>
@@ -66,7 +74,11 @@
                     inactive-text="停用"
                     v-if="$route.name != 'Account_Edit'"
                     />
-                <span class="input-value" v-else>{{ swtich_state_val }}</span>
+                <div class="input-readonly" v-else>
+                  <el-icon class="readonly-icon"><Lock /></el-icon>
+                  <span class="readonly-value">{{ swtich_state_val }}</span>
+                  <span class="readonly-tag">建立後不可修改</span>
+                </div>
             </div>
         </div>
     </div>
@@ -101,8 +113,8 @@
  *    編輯模式 → 呼叫 UpdateAccount API → 成功後返回上一頁
  */
 import { ref, reactive, watch, getCurrentInstance } from "vue";
-import { ElButton, ElRadioGroup, ElRadio, ElSwitch, ElInput, ElScrollbar } from "element-plus";
-import { Check, Close } from "@element-plus/icons-vue";
+import { ElButton, ElRadioGroup, ElRadio, ElSwitch, ElInput, ElScrollbar, ElIcon } from "element-plus";
+import { Check, Close, Lock } from "@element-plus/icons-vue";
 import MainHeader from "@/components/MainHeader.vue";
 import type { RadioObj } from "@/interface/Component";
 import { useUserStore } from "@/stores/user";
@@ -210,7 +222,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
     $WebAPI.InsertAccount(userStore.token, _userName, _account, _email, _permission, _isEnabled, _pwd, _pwdConfirm,(res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {
@@ -233,7 +244,6 @@ function SaveAction() {
 
   // 編輯模式：呼叫 UpdateAccount API（帳號不可修改，故不傳 account）
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
     $WebAPI.UpdateAccount(userStore.token, _id, _userName, _account, _email, _permission, _isEnabled,(res: any) => {
@@ -257,3 +267,41 @@ function SaveAction() {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.input-readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 8px;
+  background-color: #f5f7fa;
+  color: #606266;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.readonly-icon {
+  color: #909399;
+  font-size: 14px;
+}
+
+.readonly-value {
+  color: #303133;
+  font-weight: 500;
+}
+
+.readonly-tag {
+  margin-left: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background-color: #ffffff;
+  border: 1px solid #e4e7ed;
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.4;
+}
+</style>

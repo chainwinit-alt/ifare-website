@@ -328,7 +328,6 @@ Promise.all([promise_codePolicy, promise_codeKeyword])
 
 
 function SaveAction() {
-  console.log(datepicker_release.value)
   const _title = input_title.value
   const _state = switch_state.value
 
@@ -350,10 +349,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
-    console.log(datepicker_release)
-    console.log(datepicker_release.value)
-    console.log(_releaseTime)
     $WebAPI.InsertArticlesWelfare(userStore.token, _title, _detail, _codePolicyID, _codeKeywordIDs, _releaseTime, _discontinued, _state,(res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {
@@ -376,7 +371,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
     $WebAPI.UpdateArticlesWelfare(userStore.token, _id, _title, _detail, _codePolicyID, _codeKeywordIDs, _releaseTime, _discontinued, _state,(res: any) => {

@@ -349,6 +349,7 @@ import {
   type Section,
 } from '@/composables/useDynamicPages';
 import { FRONTEND_BASE_URL } from '@/config/adminEnv';
+import { escapeHtml } from '@/utils/sanitizeHtml';
 
 type PagePresetKey = 'blank' | 'story' | 'service' | 'campaign' | 'event' | 'news' | 'contact';
 
@@ -1357,6 +1358,7 @@ async function onSave() {
   // 2026-05-25 #97 發布前 checklist — 只在「狀態為已發布 + 有建議項未完成」才攔，草稿或全綠都直接放行
   if (form.status === 'published' && completenessWarnCount.value > 0) {
     const warnItems = completenessChecks.value.filter((c) => c.state === 'warn');
+    // c.label 為固定字串、c.hint 可能含 form.title / form.slug 等 user 輸入，需 escape 後插入
     const html = `
       <div style="text-align: left;">
         <p style="margin: 0 0 12px; color: #606266;">下列項目尚未完成，建議補上後再發布到前台：</p>
@@ -1364,7 +1366,7 @@ async function onSave() {
           ${warnItems
             .map(
               (c) =>
-                `<li style="margin-bottom: 4px;"><strong>${c.label}</strong>：<span style="color: #909399;">${c.hint}</span></li>`,
+                `<li style="margin-bottom: 4px;"><strong>${escapeHtml(c.label)}</strong>：<span style="color: #909399;">${escapeHtml(c.hint)}</span></li>`,
             )
             .join('')}
         </ul>

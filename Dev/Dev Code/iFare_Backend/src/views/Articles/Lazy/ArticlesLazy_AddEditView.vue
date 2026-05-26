@@ -319,7 +319,6 @@ function buildImagePayload(img: any) {
 
 function getImage(file: any, fileList: any) {
   console.error("【getImage】");
-  console.log(file);
 
   if (!validateImageFile(file)) {
     upload.value?.handleRemove(file);
@@ -470,7 +469,6 @@ Promise.all([promise_codePolicy, promise_codeKeyword]).then((res) => {
 });
 
 function SaveAction() {
-  console.log(imgList.value);
 
   if (saving.value) return;
   if (!validateForm()) return;
@@ -492,7 +490,6 @@ function SaveAction() {
     const _discontinued = formatDateTimeForApi(datepicker_discontinued.value);
 
     if (routeNameType.indexOf("add") >= 0) {
-      console.log("[Add] Save action");
       $WebAPI.InsertArticlesLazy(userStore.token, _title, _imgList, _codePolicyID, _codeKeywordIDs, _releaseTime, _discontinued, _state,(res: any) => {
           let _resData = res.data || "error";
           if (_resData == "error") {
@@ -518,7 +515,6 @@ function SaveAction() {
     }
 
     if (routeNameType.indexOf("edit") >= 0) {
-      console.log("[Edit] Save action");
       const _id = ids? ids[0] : 0
       if (_id == 0) return false
       $WebAPI.UpdateArticlesLazy(userStore.token, _id, _title, _imgList, _codePolicyID, _codeKeywordIDs, _releaseTime, _discontinued, _state,(res: any) => {

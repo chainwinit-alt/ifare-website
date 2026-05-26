@@ -43,7 +43,6 @@ export default {
              * 可能會讓既有綁定失效；使用 Object.assign / splice 可以保留參考。
              */
             ResetObjRef(obj:any, initObj: any) {
-                console.log('【ResetObjRef】')
                 if (typeof obj != 'object' || obj == null) return false;
                 const isObjArray = obj.constructor === [].constructor
                 const isObjJSON = obj.constructor === ({}).constructor

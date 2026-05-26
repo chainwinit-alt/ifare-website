@@ -102,7 +102,6 @@ async function SaveAction() {
   const _isEnabled = switch_state.value;
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
     // 2026-05-25 #34 — 新增前先檢查名稱重複,避免送到後端才發現
     const dupAdd = await checkDuplicate($WebAPI.GetCodePolicy, _labelName, null);
     if (!dupAdd.ok) {
@@ -137,7 +136,6 @@ async function SaveAction() {
   }
 
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids ? ids[0] : 0;
     if (_id == 0) return false;
     // 2026-05-25 #34 — 編輯前也檢查名稱重複(忽略自己這筆)

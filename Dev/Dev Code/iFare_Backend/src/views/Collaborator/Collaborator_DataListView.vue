@@ -132,7 +132,6 @@ WebAPI_GetDataList(_route.query.dataState?.toString(),
 
 // 監聽搜尋條件變更，自動重新查詢
 watch(searchParams, (newVal, oldVal) => {
-  console.log(newVal);
 
   let state = newVal.radioSelect.dataState || ""
   let updateDate = newVal.datepicker.update || [];

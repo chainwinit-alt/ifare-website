@@ -142,8 +142,6 @@ if (props.selectType == "keyword") {
       })
       modelValue.value.splice(0)
       _selectIndex.forEach((_i:any) => {
-        console.log(_i)
-        console.log(selectList)
         modelValue.value.push(selectList[_i])
       })
     }
@@ -174,7 +172,6 @@ const modelValue = computed({
     return props.selectValue;
   },
   set(value) {
-    console.log(value);
     emits("update:selectValue", value);
   },
 });

@@ -255,7 +255,6 @@ function validateForm() {
  */
 function getImage(file:any, fileList:any){
   console.error('【getImage】')
-  console.log(file)
 
   if (!validateImageFile(file)) {
     upload.value?.handleRemove(file);
@@ -271,7 +270,6 @@ function getImage(file:any, fileList:any){
  */
 function uploadNewImg(rawfile:any){
   console.error('【uploadNewImg】')
-  console.log(rawfile)
   upload.value!.clearFiles()
   const file = rawfile[0] as UploadRawFile
   file.uid = genFileId()
@@ -316,7 +314,6 @@ if (routeNameType.indexOf("edit") >= 0) {
  *    - 編輯：UpdateCollaborator → 成功後返回上一頁
  */
 function SaveAction() {
-  console.log(imgList.value)
   if (saving.value) return;
   if (!validateForm()) return;
 
@@ -337,7 +334,6 @@ function SaveAction() {
 
     // 新增模式
     if (routeNameType.indexOf("add") >= 0) {
-      console.log("[Add] Save action");
       $WebAPI.InsertCollaborator(userStore.token, _title, _serviceItem, _tel, _url, _imageFile, _imageName, _imageExtension, _state,(res: any) => {
           let _resData = res.data || "error";
           if (_resData == "error") {
@@ -364,7 +360,6 @@ function SaveAction() {
 
     // 編輯模式
     if (routeNameType.indexOf("edit") >= 0) {
-      console.log("[Edit] Save action");
       const _id = ids? ids[0] : 0
       if (_id == 0) return false  // ID 無效時不執行
       $WebAPI.UpdateCollaborator(userStore.token, _id, _title, _serviceItem, _tel, _url, _imageFile, _imageName, _imageExtension, _state,(res: any) => {

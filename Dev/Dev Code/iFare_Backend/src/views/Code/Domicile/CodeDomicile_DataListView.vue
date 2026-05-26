@@ -151,7 +151,6 @@ WebAPI_GetDataList(_route.query.create?.toString().split("TO")[0],  // 建立日
 
 // 監聽搜尋條件變更，重新呼叫 API 更新列表
 watch(searchParams, (newVal, oldVal) => {
-  console.log(newVal);
 
   let createDate = newVal.datepicker.create || []  // 建立日期範圍陣列 [start, end]
   let updateDate = newVal.datepicker.update || []  // 異動日期範圍陣列 [start, end]

@@ -146,7 +146,6 @@ WebAPI_GetDataList( _route.query.create?.toString().split("TO")[0],
                     _route.query.num ? [parseInt(_route.query.num?.toString())]: undefined,);
 
 watch(searchParams, (newVal, oldVal) => {
-  console.log(newVal);
 
   let state = newVal.radioSelect.dataState || "";
   let createDate = newVal.datepicker.create || [];

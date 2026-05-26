@@ -8,15 +8,62 @@
           <strong class="search-toolbar__count">{{ activeFilterCount }}</strong>
           <span class="search-toolbar__label">個條件</span>
         </div>
-        <button
-          type="button"
-          class="search-toolbar__reset"
-          :disabled="!hasActiveFilters"
-          aria-label="清除所有搜尋條件"
-          @click="resetSearchParams"
-        >
-          清除全部
-        </button>
+        <div class="search-toolbar__actions">
+          <!-- 我的搜尋下拉：點選快速套用 / 刪除 -->
+          <el-dropdown
+            v-if="savedSearches.length > 0"
+            trigger="click"
+            class="search-toolbar__saved"
+            :max-height="280"
+          >
+            <button type="button" class="search-toolbar__chip">
+              <el-icon><Star /></el-icon>
+              <span>我的搜尋（{{ savedSearches.length }}）</span>
+              <el-icon class="search-toolbar__chip-arrow"><ArrowDown /></el-icon>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item
+                  v-for="item in savedSearches"
+                  :key="item.name"
+                  @click="applySavedSearch(item)"
+                >
+                  <div class="saved-search-row">
+                    <span class="saved-search-row__name">{{ item.name }}</span>
+                    <button
+                      type="button"
+                      class="saved-search-row__delete"
+                      aria-label="刪除此搜尋"
+                      @click.stop="deleteSavedSearch(item.name, $event)"
+                    >
+                      <el-icon><Delete /></el-icon>
+                    </button>
+                  </div>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <!-- 儲存目前條件：必須有 active filter 才可按 -->
+          <button
+            type="button"
+            class="search-toolbar__chip search-toolbar__chip--primary"
+            :disabled="!hasActiveFilters"
+            aria-label="儲存此搜尋條件"
+            @click="saveCurrentSearch"
+          >
+            <el-icon><Star /></el-icon>
+            <span>儲存此搜尋</span>
+          </button>
+          <button
+            type="button"
+            class="search-toolbar__reset"
+            :disabled="!hasActiveFilters"
+            aria-label="清除所有搜尋條件"
+            @click="resetSearchParams"
+          >
+            清除全部
+          </button>
+        </div>
       </div>
       <!-- 權限篩選（radioSelect_permission）：顯示條件視 searchMode 而定 -->
       <comp-radio-select
@@ -171,19 +218,30 @@
  * Emits：
  * - update:searchParams：傳出包含所有搜尋條件的物件給父元件
  */
-import { computed, reactive, ref } from "vue";
-import { RefreshLeft, Search } from "@element-plus/icons-vue";
-import { ElButton } from "element-plus";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { ArrowDown, Delete, RefreshLeft, Search, Star } from "@element-plus/icons-vue";
+import {
+  ElButton,
+  ElDropdown,
+  ElDropdownItem,
+  ElDropdownMenu,
+  ElIcon,
+  ElMessageBox,
+} from "element-plus";
 import CompDateRangePicker from "@/components/CompDateRangePicker.vue";
 import CompRadioSelect from "./CompRadioSelect.vue";
 import CompItemSelect from "./CompItemSelect.vue";
 import CompTextInput from "./CompTextInput.vue";
+import { useFeedback } from "@/composables/useFeedback";
 import { useRouter } from "vue-router";
 
 const _router = useRouter()
+const { success: showSuccess } = useFeedback();
 const props = defineProps(["searchMode", "defaultParams"]);
 const emits = defineEmits(["update:searchParams"]);
 const ALL_OPTION_LABEL = "不限";
+const SAVED_SEARCH_STORAGE_PREFIX = "ifare-backend:saved-search:";
+const SAVED_SEARCH_MAX = 10;
 
 /* ========== 型別定義 ========== */
 
@@ -253,6 +311,183 @@ const selectValue_imgManagerType = ref(props.defaultParams && props.defaultParam
 const inputValue_num = ref(props.defaultParams && props.defaultParams.num ? props.defaultParams.num : "")
 const inputValue_searchWord = ref(props.defaultParams && props.defaultParams.word ? props.defaultParams.word : "");
 const inputValue_searchAccount = ref(props.defaultParams && props.defaultParams.account ? props.defaultParams.account : "");
+
+/* ========== 儲存搜尋條件（localStorage，依 searchMode 分區） ========== */
+
+interface SavedSearchParams {
+  datepicker: {
+    create: any[];
+    update: any[];
+    upload: any[];
+    release: any[];
+    discontinued: any[];
+  };
+  radioSelect: {
+    dataState: string;
+    permission: string;
+    releaseState: string;
+  };
+  itemSelect: {
+    domicile: any;
+    policy: any;
+    keyword: any[] | null;
+    imgManagerType: any;
+  };
+  searchInput: {
+    num: string;
+    word: string;
+    account: string;
+  };
+}
+
+interface SavedSearch {
+  name: string;
+  savedAt: number;
+  params: SavedSearchParams;
+}
+
+const savedSearchKey = computed(() => `${SAVED_SEARCH_STORAGE_PREFIX}${props.searchMode}`);
+const savedSearches = ref<SavedSearch[]>([]);
+
+function loadSavedSearches() {
+  try {
+    const raw = window.localStorage.getItem(savedSearchKey.value);
+    if (!raw) {
+      savedSearches.value = [];
+      return;
+    }
+    const parsed = JSON.parse(raw);
+    savedSearches.value = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    savedSearches.value = [];
+  }
+}
+
+function persistSavedSearches() {
+  try {
+    window.localStorage.setItem(savedSearchKey.value, JSON.stringify(savedSearches.value));
+  } catch {
+    // localStorage 不可用時忽略（無痕模式 / quota 用盡）
+  }
+}
+
+function snapshotCurrentParams(): SavedSearchParams {
+  return {
+    datepicker: {
+      create: Array.isArray(datepicker_create.value) ? [...datepicker_create.value] : [],
+      update: Array.isArray(datepicker_update.value) ? [...datepicker_update.value] : [],
+      upload: Array.isArray(datepicker_upload.value) ? [...datepicker_upload.value] : [],
+      release: Array.isArray(datepicker_release.value) ? [...datepicker_release.value] : [],
+      discontinued: Array.isArray(datepicker_discontinued.value) ? [...datepicker_discontinued.value] : [],
+    },
+    radioSelect: {
+      dataState: radioValue_dataState.value,
+      permission: radioValue_permission.value,
+      releaseState: radioValue_releaseState.value,
+    },
+    itemSelect: {
+      domicile: selectValue_domicile.value,
+      policy: selectValue_policy.value,
+      keyword: Array.isArray(selectValue_keyword.value) ? [...selectValue_keyword.value] : null,
+      imgManagerType: selectValue_imgManagerType.value,
+    },
+    searchInput: {
+      num: inputValue_num.value,
+      word: inputValue_searchWord.value,
+      account: inputValue_searchAccount.value,
+    },
+  };
+}
+
+function applyParamsSnapshot(s: SavedSearchParams) {
+  datepicker_create.value = s.datepicker?.create || [];
+  datepicker_update.value = s.datepicker?.update || [];
+  datepicker_upload.value = s.datepicker?.upload || [];
+  datepicker_release.value = s.datepicker?.release || [];
+  datepicker_discontinued.value = s.datepicker?.discontinued || [];
+
+  radioValue_dataState.value = s.radioSelect?.dataState ?? ALL_OPTION_LABEL;
+  radioValue_permission.value = s.radioSelect?.permission ?? ALL_OPTION_LABEL;
+  radioValue_releaseState.value = s.radioSelect?.releaseState ?? ALL_OPTION_LABEL;
+
+  selectValue_domicile.value = s.itemSelect?.domicile ?? null;
+  selectValue_policy.value = s.itemSelect?.policy ?? null;
+  selectValue_keyword.value = Array.isArray(s.itemSelect?.keyword) ? s.itemSelect!.keyword : null;
+  selectValue_imgManagerType.value = s.itemSelect?.imgManagerType ?? null;
+
+  inputValue_num.value = s.searchInput?.num ?? "";
+  inputValue_searchWord.value = s.searchInput?.word ?? "";
+  inputValue_searchAccount.value = s.searchInput?.account ?? "";
+}
+
+async function saveCurrentSearch() {
+  if (!hasActiveFilters.value) return;
+  try {
+    const { value } = await ElMessageBox.prompt("為這組搜尋條件命名，下次可從「我的搜尋」直接套用。", "儲存搜尋條件", {
+      confirmButtonText: "儲存",
+      cancelButtonText: "取消",
+      inputPattern: /\S+/,
+      inputErrorMessage: "名稱不可空白",
+      inputPlaceholder: "例如：本週新增的政策",
+    });
+    const name = String(value || "").trim();
+    if (!name) return;
+
+    const existingIndex = savedSearches.value.findIndex((s) => s.name === name);
+    if (existingIndex >= 0) {
+      try {
+        await ElMessageBox.confirm(`已有名為「${name}」的搜尋，要覆蓋嗎？`, "名稱重複", {
+          confirmButtonText: "覆蓋",
+          cancelButtonText: "取消",
+          type: "warning",
+        });
+      } catch {
+        return;
+      }
+      savedSearches.value.splice(existingIndex, 1);
+    }
+
+    const next: SavedSearch = {
+      name,
+      savedAt: Date.now(),
+      params: snapshotCurrentParams(),
+    };
+    savedSearches.value = [next, ...savedSearches.value].slice(0, SAVED_SEARCH_MAX);
+    persistSavedSearches();
+    showSuccess(`已儲存搜尋「${name}」`);
+  } catch {
+    // 使用者取消 prompt，不需處理
+  }
+}
+
+function applySavedSearch(search: SavedSearch) {
+  applyParamsSnapshot(search.params);
+  SetSearchParams();
+}
+
+async function deleteSavedSearch(name: string, event?: Event) {
+  event?.stopPropagation();
+  try {
+    await ElMessageBox.confirm(`要刪除「${name}」這組搜尋嗎？`, "刪除搜尋", {
+      confirmButtonText: "刪除",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
+  savedSearches.value = savedSearches.value.filter((s) => s.name !== name);
+  persistSavedSearches();
+  showSuccess(`已刪除「${name}」`);
+}
+
+onMounted(() => {
+  loadSavedSearches();
+});
+
+watch(savedSearchKey, () => {
+  loadSavedSearches();
+});
 
 const activeFilterCount = computed(() => {
   let count = 0;
@@ -537,6 +772,7 @@ function SetSearchParams() {
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .search-toolbar__summary {
@@ -544,6 +780,13 @@ function SetSearchParams() {
   align-items: baseline;
   gap: 6px;
   color: #606266;
+}
+
+.search-toolbar__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .search-toolbar__label {
@@ -556,6 +799,48 @@ function SetSearchParams() {
   color: #303133;
 }
 
+.search-toolbar__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid rgba(48, 49, 51, 0.12);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #606266;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: rgba(234, 85, 4, 0.32);
+    color: #ea5504;
+  }
+
+  &:disabled {
+    border-color: #ebeef5;
+    background: #f5f7fa;
+    color: #c0c4cc;
+    cursor: not-allowed;
+  }
+
+  &.search-toolbar__chip--primary {
+    border-color: rgba(234, 85, 4, 0.4);
+    background: linear-gradient(135deg, #fff7f1, #ffffff);
+    color: #ea5504;
+
+    &:hover:not(:disabled) {
+      background: linear-gradient(135deg, #ea5504, #f39a48);
+      color: #ffffff;
+    }
+  }
+}
+
+.search-toolbar__chip-arrow {
+  font-size: 12px;
+}
+
 .search-toolbar__reset {
   border: 0;
   background: transparent;
@@ -563,11 +848,46 @@ function SetSearchParams() {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  padding: 0;
+  padding: 4px 8px;
 
   &:disabled {
     color: #c0c4cc;
     cursor: not-allowed;
+  }
+}
+
+.saved-search-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.saved-search-row__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-search-row__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #909399;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+
+  &:hover {
+    background: rgba(245, 108, 108, 0.12);
+    color: #f56c6c;
   }
 }
 

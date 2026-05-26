@@ -818,7 +818,6 @@ Promise.all([promise_codePolicy, promise_codeDomicile, promise_codeRecipient, pr
 
 
 function SaveAction() {
-  console.log(datepicker_release.value)
   const _title = input_title.value
   const _state = switch_state.value
   const _competentAuthority = input_competentAuthority.value
@@ -876,7 +875,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
     $WebAPI.InsertFarePolicy(userStore.token, _title, _qualification, _welfareInfo, _evidence, _ifareOfficeUnitID, _officeInfo, _officeTel,
       _codePolicyID, _codeDomicileID, _codeIdentityIDs, _codeIncomeIDs, _codeRecipientIDs, _codeKeywordIDs, _competentAuthority,
       _releaseTime, _discontinued, _remark, _state,(res: any) => {
@@ -901,7 +899,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
     $WebAPI.UpdateFarePolicy(userStore.token, _id, _title, _qualification, _welfareInfo, _evidence, _ifareOfficeUnitID, _officeInfo, _officeTel,

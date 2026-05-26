@@ -80,3 +80,14 @@ export function sanitizeHtml(html: string | null | undefined): string {
 
   return template.innerHTML;
 }
+
+// HTML 文字插值用 escape：把 user 可控字串放進 HTML 模板時必須先過這個，避免 XSS
+export function escapeHtml(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
