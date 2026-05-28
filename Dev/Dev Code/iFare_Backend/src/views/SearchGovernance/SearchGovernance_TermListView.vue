@@ -4,17 +4,18 @@
       <el-button plain @click="startCreateTerm">新增搜尋詞</el-button>
     </template>
   </main-header>
+
   <el-scrollbar class="main-scrollbar">
     <section class="section-main-card card-fullsize">
       <div class="card-info section-head">
         <div>
           <h3>搜尋詞管理</h3>
-          <p>管理分組後的搜尋詞詞庫、權重、啟用狀態與治理備註。</p>
+          <p>以前台顯示詞為單位管理搜尋熱度，不再拆成來源下拉清單。</p>
         </div>
         <div class="summary-inline">
-          <span>{{ filteredGroupedTerms.length }} 組</span>
-          <span>{{ activeTerms }} 啟用中</span>
-          <span>{{ inactiveTerms }} 停用中</span>
+          <span>{{ filteredGroupedTerms.length }} 個顯示詞</span>
+          <span>{{ activeTerms }} 筆啟用中</span>
+          <span>{{ inactiveTerms }} 筆停用中</span>
           <span>{{ totalAliases }} 個別名</span>
         </div>
       </div>
@@ -25,63 +26,42 @@
         <div class="card-info">
           <div class="term-toolbar">
             <div class="group-hint">
-              <strong>依顯示詞分組</strong>
-              <p>展開群組後，可比較相同名稱但不同類型與來源的搜尋詞。</p>
+              <strong>聚合視圖</strong>
+              <p>同一個顯示詞直接顯示 7 日熱度與 30 日搜尋數，來源資訊只保留摘要。</p>
             </div>
             <el-input
               v-model="searchKeyword"
               class="term-search-input"
               clearable
-              placeholder="搜尋顯示詞、正規詞、類型或來源"
+              placeholder="搜尋顯示詞、類型、來源或狀態"
             />
           </div>
+
+          <div class="formula-note">
+            <h4>熱度計算說明</h4>
+            <p>`7日熱度` 來自近 7 天每日熱度分數加總，分數會綜合搜尋次數、結果頁觸發次數、非零結果表現、內容支撐度、人工加權與基礎權重。表格中顯示的是依目前清單最高熱度標準化後的 0-100 分數。</p>
+            <p>`30日搜尋數` 為近 30 天同一顯示詞群組下所有搜尋詞的搜尋次數加總。單次搜尋事件應只計入一次，不因同名來源重複累加。</p>
+          </div>
+
           <el-table :data="filteredGroupedTerms" stripe style="width: 100%">
-            <el-table-column type="expand" width="54">
+            <el-table-column prop="displayTerm" label="搜尋詞" min-width="200" />
+            <el-table-column label="7日熱度" width="150">
               <template #default="{ row }">
-                <div class="child-table-wrap">
-                  <el-table :data="row.items" stripe style="width: 100%">
-                    <el-table-column label="類型" width="100">
-                      <template #default="{ row: childRow }">
-                        {{ getTermTypeLabel(childRow.termType) }}
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="來源" min-width="150">
-                      <template #default="{ row: childRow }">
-                        {{ getSourceKindLabel(childRow.sourceKind) }}
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="狀態" width="100">
-                      <template #default="{ row: childRow }">
-                        <el-tag :type="childRow.status === 'active' ? 'success' : 'info'" size="small">
-                          {{ getStatusLabel(childRow.status) }}
-                        </el-tag>
-                      </template>
-                    </el-table-column>
-                    <el-table-column prop="manualBoost" label="手動加權" width="90" />
-                    <el-table-column prop="hotScore7d" label="7日熱度" width="90" />
-                    <el-table-column prop="searchCount30d" label="30日搜尋數" width="120" />
-                    <el-table-column prop="aliasCount" label="別名數" width="80" />
-                    <el-table-column prop="lastUpdated" label="更新時間" width="160" />
-                    <el-table-column label="操作" width="100" align="center">
-                      <template #default="{ row: childRow }">
-                        <el-button text type="primary" @click="selectTerm(childRow)">編輯</el-button>
-                      </template>
-                    </el-table-column>
-                  </el-table>
+                <div class="heat-score-cell">
+                  <strong>{{ row.aggregateHotScore7dPercent }}</strong>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="displayTerm" label="顯示詞" min-width="180" />
-            <el-table-column prop="aggregateSearchCount30d" label="30日搜尋數" width="120" />
-            <el-table-column prop="itemCount" label="筆數" width="90" />
+            <el-table-column prop="aggregateSearchCount30d" label="30日搜尋數" width="130" />
+            <el-table-column prop="aggregateAliasCount" label="別名數" width="100" />
             <el-table-column label="啟用" width="90">
               <template #default="{ row }">
                 <span>{{ row.activeCount }}/{{ row.itemCount }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="typeSummary" label="類型" min-width="140" />
-            <el-table-column prop="sourceSummary" label="來源" min-width="180" />
-            <el-table-column prop="latestUpdated" label="最近更新" width="160" />
+            <el-table-column prop="typeSummary" label="類型" min-width="150" />
+            <el-table-column prop="sourceSummary" label="來源" min-width="200" />
+            <el-table-column prop="latestUpdated" label="最近更新" width="170" />
             <el-table-column label="操作" width="120" align="center">
               <template #default="{ row }">
                 <el-button text type="primary" @click="openGroupEditor(row)">編輯</el-button>
@@ -115,51 +95,73 @@
 
       <div class="kv-grid">
         <div class="kv-item">
-          <span>正規詞</span>
-          <strong>{{ isCreatingTerm ? "儲存後產生" : selectedTerm.normalizedTerm }}</strong>
+          <span>正規化詞</span>
+          <strong>{{ isCreatingTerm ? "建立後產生" : selectedTerm.normalizedTerm }}</strong>
         </div>
         <div class="kv-item">
-          <span>最後更新</span>
-          <strong>{{ isCreatingTerm ? "待建立" : selectedTerm.lastUpdated }}</strong>
+          <span>最近更新</span>
+          <strong>{{ isCreatingTerm ? "尚未建立" : selectedTerm.lastUpdated }}</strong>
         </div>
       </div>
 
       <div class="editor-grid">
         <div class="editor-item">
           <label>顯示詞</label>
-          <el-input v-model="termForm.displayTerm" placeholder="標準顯示詞" />
+          <div class="display-term-input-wrap">
+            <input
+              v-model="termForm.displayTerm"
+              class="display-term-native-input"
+              placeholder="輸入或選擇既有顯示詞"
+              @focus="showDisplayTermSuggestions = true"
+              @blur="hideDisplayTermSuggestions"
+            />
+            <div
+              v-if="showDisplayTermSuggestions && filteredDisplayTermOptions.length"
+              class="display-term-suggestions"
+            >
+              <button
+                v-for="option in filteredDisplayTermOptions"
+                :key="option"
+                type="button"
+                class="display-term-suggestion-item"
+                @mousedown.prevent="selectDisplayTermOption(option)"
+              >
+                {{ option }}
+              </button>
+            </div>
+          </div>
         </div>
         <div class="editor-item">
           <label>類型</label>
-          <el-select v-model="termForm.termType" placeholder="選擇類型">
-            <el-option label="關鍵字" value="keyword" />
-            <el-option label="政策" value="policy" />
-            <el-option label="政策標題" value="policy_title" />
-            <el-option label="趨勢" value="trend" />
-            <el-option label="對象" value="recipient" />
-            <el-option label="身分別" value="identity" />
-            <el-option label="所得別" value="income" />
-          </el-select>
+          <select v-model="termForm.termType" class="editor-native-select">
+            <option value="keyword">關鍵字</option>
+            <option value="policy">政策分類</option>
+            <option value="policy_title">政策標題</option>
+            <option value="trend">趨勢詞</option>
+            <option value="recipient">受助者</option>
+            <option value="identity">特殊身分</option>
+            <option value="income">所得別</option>
+          </select>
         </div>
         <div class="editor-item">
           <label>來源</label>
-          <el-select v-model="termForm.sourceKind" placeholder="選擇來源">
-            <el-option label="程式關鍵字" value="code_keyword" />
-            <el-option label="政策擷取" value="policy_extract" />
-            <el-option label="iFare 政策" value="ifare_policy" />
-            <el-option label="人工建立" value="manual" />
-            <el-option label="Google 趨勢關聯字" value="google_trends_related_query" />
-          </el-select>
+          <select v-model="termForm.sourceKind" class="editor-native-select">
+            <option value="code_keyword">程式關鍵字</option>
+            <option value="policy_extract">政策抽取</option>
+            <option value="ifare_policy">iFare 政策</option>
+            <option value="manual">手動建立</option>
+            <option value="google_trends_related_query">Google Trends</option>
+          </select>
         </div>
         <div class="editor-item">
           <label>狀態</label>
-          <el-select v-model="termForm.status" placeholder="選擇狀態">
-            <el-option label="啟用" value="active" />
-            <el-option label="停用" value="inactive" />
-          </el-select>
+          <select v-model="termForm.status" class="editor-native-select">
+            <option value="active">啟用</option>
+            <option value="inactive">停用</option>
+          </select>
         </div>
         <div class="editor-item">
-          <label>手動加權</label>
+          <label>人工加權</label>
           <el-input-number v-model="termForm.manualBoost" :min="0" :max="10" :step="0.1" :precision="2" />
         </div>
         <div class="editor-item">
@@ -174,11 +176,11 @@
             <span>7日熱度</span>
             <strong>{{ isCreatingTerm ? 0 : selectedTerm.hotScore7d }}</strong>
           </div>
-          <el-progress :percentage="isCreatingTerm ? 0 : selectedTerm.hotScore7d" :stroke-width="10" />
+          <el-progress :percentage="Math.min(100, isCreatingTerm ? 0 : selectedTerm.hotScore7d)" :stroke-width="10" />
         </div>
         <div>
           <div class="metric-row">
-            <span>別名覆蓋數</span>
+            <span>別名數</span>
             <strong>{{ isCreatingTerm ? 0 : selectedTerm.aliasCount }}</strong>
           </div>
           <el-progress :percentage="Math.min(100, (isCreatingTerm ? 0 : selectedTerm.aliasCount) * 20)" status="success" :stroke-width="10" />
@@ -192,10 +194,11 @@
           type="textarea"
           :rows="4"
           resize="none"
-          placeholder="說明這個搜尋詞的治理原因。"
+          placeholder="記錄這個搜尋詞的治理原因或後續處理方向。"
         />
       </div>
     </div>
+
     <template #footer>
       <div class="dialog-actions">
         <el-button plain @click="resetTermForm" :disabled="isSavingTerm">重設</el-button>
@@ -206,7 +209,7 @@
           plain
           @click="router.push({ name: 'SearchGovernance_Aliases', query: { term: selectedTerm.displayTerm } })"
         >
-          查看別名
+          管理別名
         </el-button>
         <el-button type="primary" @click="saveTerm" :loading="isSavingTerm">
           {{ isCreatingTerm ? "建立搜尋詞" : "儲存變更" }}
@@ -218,7 +221,19 @@
 
 <script setup lang="ts">
 import { computed, getCurrentInstance, onMounted, ref, watch } from "vue";
-import { ElButton, ElDialog, ElInput, ElInputNumber, ElOption, ElProgress, ElScrollbar, ElSelect, ElTable, ElTableColumn, ElTag } from "element-plus";
+import {
+  ElButton,
+  ElDialog,
+  ElInput,
+  ElInputNumber,
+  ElOption,
+  ElProgress,
+  ElScrollbar,
+  ElSelect,
+  ElTable,
+  ElTableColumn,
+  ElTag,
+} from "element-plus";
 import { useRoute, useRouter } from "vue-router";
 import MainHeader from "@/components/MainHeader.vue";
 import type { SearchTermItem } from "@/data/SearchGovernance";
@@ -229,10 +244,14 @@ interface SearchTermGroup {
   displayTerm: string;
   itemCount: number;
   activeCount: number;
+  aggregateHotScore7d: number;
+  aggregateHotScore7dPercent: number;
   aggregateSearchCount30d: number;
+  aggregateAliasCount: number;
   typeSummary: string;
   sourceSummary: string;
   latestUpdated: string;
+  primaryItem: SearchTermItem | null;
   items: SearchTermItem[];
 }
 
@@ -242,18 +261,38 @@ const userStore = useUserStore();
 const app = getCurrentInstance();
 const $WebAPI = app?.appContext.config.globalProperties.$WebAPI;
 const $Message = app?.appContext.config.globalProperties.$message;
+
 const searchTerms = ref<SearchTermItem[]>([]);
 const searchKeyword = ref("");
 const selectedTerm = ref<SearchTermItem | null>(null);
 const isTermDialogOpen = ref(false);
 const isCreatingTerm = ref(false);
 const isSavingTerm = ref(false);
+const showDisplayTermSuggestions = ref(false);
 const termForm = ref(createTermForm(selectedTerm.value));
 
 const activeTerms = computed(() => searchTerms.value.filter((item) => item.status === "active").length);
 const inactiveTerms = computed(() => searchTerms.value.length - activeTerms.value);
 const totalAliases = computed(() => searchTerms.value.reduce((sum, item) => sum + item.aliasCount, 0));
-const groupedTerms = computed<SearchTermGroup[]>(() => {
+const displayTermOptions = computed(() => {
+  return Array.from(
+    new Set(
+      baseGroupedTerms.value
+        .map((item) => item.displayTerm.trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "zh-Hant"));
+});
+
+const filteredDisplayTermOptions = computed(() => {
+  const keyword = termForm.value.displayTerm.trim().toLowerCase();
+
+  return displayTermOptions.value
+    .filter((option) => !keyword || option.toLowerCase().includes(keyword))
+    .slice(0, 8);
+});
+
+const baseGroupedTerms = computed<SearchTermGroup[]>(() => {
   const groupMap = new Map<string, SearchTermItem[]>();
 
   searchTerms.value.forEach((item) => {
@@ -269,35 +308,58 @@ const groupedTerms = computed<SearchTermGroup[]>(() => {
         if (a.status !== b.status) {
           return a.status === "active" ? -1 : 1;
         }
-        return b.searchCount30d - a.searchCount30d;
+        if (b.hotScore7d !== a.hotScore7d) {
+          return b.hotScore7d - a.hotScore7d;
+        }
+        if (b.searchCount30d !== a.searchCount30d) {
+          return b.searchCount30d - a.searchCount30d;
+        }
+        return a.id - b.id;
       });
-      const typeSummary = Array.from(new Set(sortedItems.map((item) => getTermTypeLabel(item.termType)))).join("、");
-      const sourceSummary = Array.from(new Set(sortedItems.map((item) => getSourceKindLabel(item.sourceKind)))).join("、");
-      const aggregateSearchCount30d = sortedItems.reduce((sum, item) => sum + item.searchCount30d, 0);
 
       return {
         key,
         displayTerm: sortedItems[0]?.displayTerm || "",
         itemCount: sortedItems.length,
         activeCount: sortedItems.filter((item) => item.status === "active").length,
-        aggregateSearchCount30d,
-        typeSummary,
-        sourceSummary,
+        aggregateHotScore7d: sortedItems.reduce((sum, item) => sum + Number(item.hotScore7d || 0), 0),
+        aggregateHotScore7dPercent: 0,
+        aggregateSearchCount30d: sortedItems.reduce((sum, item) => sum + Number(item.searchCount30d || 0), 0),
+        aggregateAliasCount: sortedItems.reduce((sum, item) => sum + Number(item.aliasCount || 0), 0),
+        typeSummary: Array.from(new Set(sortedItems.map((item) => getTermTypeLabel(item.termType)))).join(" / "),
+        sourceSummary: Array.from(new Set(sortedItems.map((item) => getSourceKindLabel(item.sourceKind)))).join(" / "),
         latestUpdated: sortedItems.find((item) => item.lastUpdated)?.lastUpdated || "",
+        primaryItem: sortedItems[0] || null,
         items: sortedItems,
       };
     })
     .sort((a, b) => {
+      if (b.aggregateHotScore7d !== a.aggregateHotScore7d) {
+        return b.aggregateHotScore7d - a.aggregateHotScore7d;
+      }
       if (b.aggregateSearchCount30d !== a.aggregateSearchCount30d) {
         return b.aggregateSearchCount30d - a.aggregateSearchCount30d;
       }
-
-      if (a.displayTerm.length !== b.displayTerm.length) {
-        return a.displayTerm.length - b.displayTerm.length;
-      }
-
-      return a.displayTerm.localeCompare(b.displayTerm);
+      return a.displayTerm.localeCompare(b.displayTerm, "zh-Hant");
     });
+});
+
+const maxAggregateHotScore7d = computed(() => {
+  return baseGroupedTerms.value.reduce((max, group) => Math.max(max, Number(group.aggregateHotScore7d || 0)), 0);
+});
+
+const groupedTerms = computed<SearchTermGroup[]>(() => {
+  if (maxAggregateHotScore7d.value <= 0) {
+    return baseGroupedTerms.value.map((group) => ({
+      ...group,
+      aggregateHotScore7dPercent: 0,
+    }));
+  }
+
+  return baseGroupedTerms.value.map((group) => ({
+    ...group,
+    aggregateHotScore7dPercent: Math.round((Number(group.aggregateHotScore7d || 0) / maxAggregateHotScore7d.value) * 100),
+  }));
 });
 
 const normalizedSearchKeyword = computed(() => searchKeyword.value.trim().toLowerCase());
@@ -308,39 +370,17 @@ const filteredGroupedTerms = computed<SearchTermGroup[]>(() => {
     return groupedTerms.value;
   }
 
-  return groupedTerms.value
-    .map((group) => {
-      const filteredItems = group.items.filter((item) => {
-        const haystacks = [
-          item.displayTerm,
-          item.normalizedTerm,
-          item.termType,
-          item.sourceKind,
-          item.status,
-        ];
+  return groupedTerms.value.filter((group) => {
+    const haystacks = [
+      group.displayTerm,
+      group.typeSummary,
+      group.sourceSummary,
+      group.latestUpdated,
+      ...group.items.flatMap((item) => [item.normalizedTerm, item.termType, item.sourceKind, item.status]),
+    ];
 
-        return haystacks.some((value) => String(value || "").toLowerCase().includes(keyword));
-      });
-
-      if (!filteredItems.length) {
-        return null;
-      }
-
-      const typeSummary = Array.from(new Set(filteredItems.map((item) => getTermTypeLabel(item.termType)))).join("、");
-      const sourceSummary = Array.from(new Set(filteredItems.map((item) => getSourceKindLabel(item.sourceKind)))).join("、");
-
-      return {
-        ...group,
-        itemCount: filteredItems.length,
-        activeCount: filteredItems.filter((item) => item.status === "active").length,
-        aggregateSearchCount30d: filteredItems.reduce((sum, item) => sum + item.searchCount30d, 0),
-        typeSummary,
-        sourceSummary,
-        latestUpdated: filteredItems.find((item) => item.lastUpdated)?.lastUpdated || "",
-        items: filteredItems,
-      };
-    })
-    .filter((group): group is SearchTermGroup => Boolean(group));
+    return haystacks.some((value) => String(value || "").toLowerCase().includes(keyword));
+  });
 });
 
 function getStatusLabel(status: string) {
@@ -350,11 +390,11 @@ function getStatusLabel(status: string) {
 function getTermTypeLabel(termType: string) {
   const labels: Record<string, string> = {
     keyword: "關鍵字",
-    policy: "政策",
+    policy: "政策分類",
     policy_title: "政策標題",
-    trend: "趨勢",
-    recipient: "對象",
-    identity: "身分別",
+    trend: "趨勢詞",
+    recipient: "受助者",
+    identity: "特殊身分",
     income: "所得別",
   };
   return labels[termType] || termType;
@@ -363,10 +403,10 @@ function getTermTypeLabel(termType: string) {
 function getSourceKindLabel(sourceKind: string) {
   const labels: Record<string, string> = {
     code_keyword: "程式關鍵字",
-    policy_extract: "政策擷取",
+    policy_extract: "政策抽取",
     ifare_policy: "iFare 政策",
-    manual: "人工建立",
-    google_trends_related_query: "Google 趨勢關聯字",
+    manual: "手動建立",
+    google_trends_related_query: "Google Trends",
   };
   return labels[sourceKind] || sourceKind;
 }
@@ -378,9 +418,20 @@ function createTermForm(term: SearchTermItem | null) {
     sourceKind: term?.sourceKind || "manual",
     status: (term?.status || "active") as SearchTermItem["status"],
     manualBoost: Number(term?.manualBoost || 0),
-    baseWeight: Number(term?.baseWeight || 0),
+    baseWeight: Number(term?.baseWeight || 1),
     note: term?.note || "",
   };
+}
+
+function selectDisplayTermOption(option: string) {
+  termForm.value.displayTerm = option;
+  showDisplayTermSuggestions.value = false;
+}
+
+function hideDisplayTermSuggestions() {
+  window.setTimeout(() => {
+    showDisplayTermSuggestions.value = false;
+  }, 120);
 }
 
 function selectTerm(term: SearchTermItem) {
@@ -390,8 +441,8 @@ function selectTerm(term: SearchTermItem) {
 }
 
 function openGroupEditor(group: SearchTermGroup) {
-  if (group.items[0]) {
-    selectTerm(group.items[0]);
+  if (group.primaryItem) {
+    selectTerm(group.primaryItem);
   }
 }
 
@@ -417,6 +468,7 @@ function startCreateTerm() {
 
 function closeTermDialog() {
   isTermDialogOpen.value = false;
+  showDisplayTermSuggestions.value = false;
   if (isCreatingTerm.value) {
     isCreatingTerm.value = false;
     selectedTerm.value = searchTerms.value[0] || null;
@@ -458,7 +510,7 @@ function loadTerms() {
 function saveTerm() {
   if (!selectedTerm.value) return;
   if (!$WebAPI || !userStore.token) {
-    $Message?.({ type: "error", message: "搜尋治理 API 目前不可用。" });
+    $Message?.({ type: "error", message: "搜尋詞 API 尚未就緒。" });
     return;
   }
 
@@ -499,6 +551,7 @@ function saveTerm() {
     } else {
       searchTerms.value.unshift(updatedTerm);
     }
+
     isCreatingTerm.value = false;
     selectedTerm.value = updatedTerm;
     isTermDialogOpen.value = false;
@@ -556,6 +609,11 @@ onMounted(() => {
   color: #6b7280;
 }
 
+.heat-score-cell {
+  display: grid;
+  justify-items: start;
+}
+
 .group-hint {
   padding: 14px 16px;
   border-radius: 14px;
@@ -587,8 +645,24 @@ onMounted(() => {
   color: #6b7280;
 }
 
-.child-table-wrap {
-  padding: 4px 12px 12px;
+.formula-note {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #fffaf0;
+  border: 1px solid #f5d7a1;
+}
+
+.formula-note h4,
+.formula-note p {
+  margin: 0;
+}
+
+.formula-note p {
+  color: #6b7280;
+  line-height: 1.6;
 }
 
 .governance-layout {
@@ -633,7 +707,82 @@ onMounted(() => {
   gap: 8px;
 }
 
-.editor-item :deep(.el-select) {
+.display-term-input-wrap {
+  width: 100%;
+  position: relative;
+}
+
+.display-term-native-input {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  color: #303133;
+  background: #fff;
+  font-size: 14px;
+  line-height: 32px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.display-term-native-input:focus {
+  border-color: #409eff;
+  outline: none;
+}
+
+.editor-native-select {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  color: #303133;
+  background: #fff;
+  font-size: 14px;
+  line-height: 32px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.editor-native-select:focus {
+  border-color: #409eff;
+  outline: none;
+}
+
+.display-term-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px 0;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+.display-term-suggestion-item {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  background: transparent;
+  color: #303133;
+  text-align: left;
+  cursor: pointer;
+}
+
+.display-term-suggestion-item:hover {
+  background: #f5f7fa;
+}
+
+.editor-item :deep(.el-select),
+.editor-item :deep(.el-autocomplete),
+.editor-item :deep(.el-autocomplete .el-input) {
   width: 100%;
 }
 
@@ -658,7 +807,6 @@ onMounted(() => {
 }
 
 @media (max-width: 1100px) {
-  .term-toolbar,
   .editor-grid,
   .kv-grid,
   .metric-stack {

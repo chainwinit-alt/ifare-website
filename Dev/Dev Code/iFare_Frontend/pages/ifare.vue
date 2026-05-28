@@ -376,6 +376,9 @@ function Search() {
   if (codeSelectRecipient.value) query.recipient = codeSelectRecipient.value;
   if (codeSelect_area.value) query.area = codeSelect_area.value;
   if (searchQuery.value.trim()) query.query = searchQuery.value.trim();
+  if (process.client) {
+    sessionStorage.setItem("ifare:scroll-to-summary", "1");
+  }
   $router.push({ path: "/ifare/result", query: query });
   // Init value.
   codeSelect_policy.value = ""

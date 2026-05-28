@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="app-body-child" :name="$route.name">
     <div class="section-list">
-      <section class="section-filter">
+      <section ref="filterSectionRef" class="section-filter">
         <div class="card-filter">
           <div class="part-top">
             <div class="filter-group">
@@ -166,17 +166,22 @@
         </div>
       </section>
       <section class="section-result">
-        <div class="part-list">
+        <div ref="resultContentRef" class="part-list">
           <ClientOnly>
-            <IfareSummaryCard
-              :query="appliedSearchQuery"
-              :cases="storageiFarePolicyList"
-              :provider="llmProvider"
-              :search-context="appliedSummarySearchContext"
-              :summary-trigger-key="summaryTriggerKey"
-              :summary-cache-key="routeSearchSignature"
-              :summary-reset-key="summaryResetKey"
-            />
+            <div ref="summaryScrollAnchorRef" class="summary-scroll-anchor" aria-hidden="true"></div>
+            <div ref="summarySectionRef">
+              <IfareSummaryCard
+                :query="appliedSearchQuery"
+                :cases="storageiFarePolicyList"
+                :provider="llmProvider"
+                :results-loading="isLoading"
+                :search-context="appliedSummarySearchContext"
+                :summary-trigger-key="summaryTriggerKey"
+                :summary-cache-key="routeSearchSignature"
+                :summary-reset-key="summaryResetKey"
+                @summary-complete="handleSummaryComplete"
+              />
+            </div>
             <span class="result-total">{{ storageiFarePolicyList.length }}</span>
             <div class="result-loading" v-if="isLoading">載入中...</div>
             <div class="result-loading result-error" v-else-if="hasError">
@@ -297,11 +302,18 @@ const errorMessage = ref('載入福利政策時發生錯誤');
 const showResetFeedback = ref(false);
 const RESET_FEEDBACK_MS = 1800;
 let resetFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
+let summaryScrollLockTimer: ReturnType<typeof setInterval> | null = null;
+let summaryResizeObserver: ResizeObserver | null = null;
 let lastQuery: any = {};
 const isClientReady = ref(false);
 const $route = useRoute();
 const $router = useRouter();
 const appliedSearchParams = ref<Record<string, any>>({});
+const filterSectionRef = ref<HTMLElement | null>(null);
+const resultContentRef = ref<HTMLElement | null>(null);
+const summaryScrollAnchorRef = ref<HTMLElement | null>(null);
+const summarySectionRef = ref<HTMLElement | null>(null);
+const pendingScrollToSummary = ref(false);
 const routeSearchParams = computed(() => buildQueryFromRoute($route.query as Record<string, any>));
 const routeSearchSignature = computed(() => {
   return Object.keys(routeSearchParams.value || {})
@@ -350,6 +362,25 @@ const appliedSummarySearchContext = computed(() => ({
     : "",
   query: String(effectiveAppliedSearchParams.value.Query || ""),
 }));
+
+function markPendingSummaryScroll() {
+  pendingScrollToSummary.value = true;
+  if (process.client) {
+    sessionStorage.setItem("ifare:scroll-to-summary", "1");
+  }
+}
+
+function clearPendingSummaryScroll() {
+  pendingScrollToSummary.value = false;
+  if (process.client) {
+    sessionStorage.removeItem("ifare:scroll-to-summary");
+  }
+}
+
+function syncPendingSummaryScrollFromSession() {
+  if (!process.client) return;
+  pendingScrollToSummary.value = sessionStorage.getItem("ifare:scroll-to-summary") === "1";
+}
 
 function isAllPolicyValue(value: any) {
   return value == ALL_POLICY_VALUE || value == "全部";
@@ -627,6 +658,7 @@ function SwitchIdentity(codeVal: any) {
 function Search() {
   if (!canSearch.value) return false;
   summaryResetKey.value += 1;
+  markPendingSummaryScroll();
   const nextQuery = buildFarePolicyApiQuery();
   lastQuery = { ...nextQuery };
   const currentQuery = buildQueryFromRoute($route.query as Record<string, any>);
@@ -889,6 +921,7 @@ function ResetParam() {
   SwitchIncome("reset")
   SwitchIdentity("reset")
   summaryResetKey.value += 1;
+  clearPendingSummaryScroll();
   lastQuery = {};
   syncRouteQueryFromSearch({});
   triggerResetFeedback()
@@ -896,6 +929,7 @@ function ResetParam() {
 
 function RetryLoad() {
   summaryResetKey.value += 1;
+  markPendingSummaryScroll();
   SetDataInit(lastQuery);
 }
 
@@ -905,6 +939,29 @@ function ScrollToFilter() {
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+function handleSummaryComplete() {
+  if (typeof window === "undefined" || !pendingScrollToSummary.value) return;
+
+  nextTick(() => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        scrollToSummaryAnchor("smooth");
+        clearSummaryScrollLock();
+        let ticks = 0;
+        summaryScrollLockTimer = setInterval(() => {
+          scrollToSummaryAnchor("auto");
+          ticks += 1;
+
+          if (ticks >= 10) {
+            clearSummaryScrollLock();
+            clearPendingSummaryScroll();
+          }
+        }, 120);
+      });
+    });
+  });
+}
+
 function clearResetFeedbackTimer() {
   if (!resetFeedbackTimer) {
     return;
@@ -912,6 +969,52 @@ function clearResetFeedbackTimer() {
 
   clearTimeout(resetFeedbackTimer);
   resetFeedbackTimer = null;
+}
+
+function clearSummaryScrollLock() {
+  if (!summaryScrollLockTimer) {
+    return;
+  }
+
+  clearInterval(summaryScrollLockTimer);
+  summaryScrollLockTimer = null;
+}
+
+function scrollToSummaryAnchor(behavior: ScrollBehavior = "auto") {
+  if (typeof window === "undefined") return;
+
+  const anchor = summaryScrollAnchorRef.value || summarySectionRef.value;
+  if (!anchor) return;
+
+  anchor.scrollIntoView({
+    behavior,
+    block: "start",
+  });
+}
+
+function setupSummaryResizeObserver() {
+  if (typeof window === "undefined" || summaryResizeObserver || typeof ResizeObserver === "undefined") {
+    return;
+  }
+
+  const observedElement = resultContentRef.value || summarySectionRef.value;
+  if (!observedElement) return;
+
+  summaryResizeObserver = new ResizeObserver(() => {
+    if (!pendingScrollToSummary.value) return;
+    scrollToSummaryAnchor("auto");
+  });
+
+  summaryResizeObserver.observe(observedElement);
+}
+
+function clearSummaryResizeObserver() {
+  if (!summaryResizeObserver) {
+    return;
+  }
+
+  summaryResizeObserver.disconnect();
+  summaryResizeObserver = null;
 }
 
 function triggerResetFeedback() {
@@ -928,6 +1031,7 @@ function triggerResetFeedback() {
 watch(
   () => $route.fullPath,
   () => {
+    syncPendingSummaryScrollFromSession();
     hydrateFromRoute($route.query as Record<string, any>);
   },
   { immediate: true }
@@ -935,14 +1039,27 @@ watch(
 
 onMounted(() => {
   isClientReady.value = true;
+  syncPendingSummaryScrollFromSession();
+  nextTick(() => {
+    setupSummaryResizeObserver();
+  });
 });
 
 onBeforeUnmount(() => {
   clearResetFeedbackTimer()
+  clearSummaryScrollLock()
+  clearSummaryResizeObserver()
 })
 </script>
 
 <style scoped>
+.summary-scroll-anchor {
+  display: block;
+  width: 100%;
+  height: 1px;
+  scroll-margin-top: 88px;
+}
+
 .query-action-row {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1039,6 +1156,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
+  .summary-scroll-anchor {
+    scroll-margin-top: 72px;
+  }
+
   .query-field-mobile {
     width: 100%;
   }

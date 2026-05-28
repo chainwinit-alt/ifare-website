@@ -111,11 +111,16 @@ type SummarySearchContext = {
   query?: string;
 };
 
+const emit = defineEmits<{
+  summaryComplete: [payload: { summary: string; provider: ProviderName }];
+}>();
+
 const props = withDefaults(
   defineProps<{
     query?: string;
     cases: SummaryCaseItem[];
     provider?: ProviderName;
+    resultsLoading?: boolean;
     searchContext?: SummarySearchContext;
     summaryTriggerKey?: number;
     summaryCacheKey?: string;
@@ -124,6 +129,7 @@ const props = withDefaults(
   {
     query: "",
     provider: "gemini",
+    resultsLoading: false,
     searchContext: () => ({}),
     summaryTriggerKey: 0,
     summaryCacheKey: "",
@@ -494,9 +500,17 @@ function restoreCachedSummary() {
   return true;
 }
 
+function emitSummaryComplete() {
+  emit("summaryComplete", {
+    summary: summaryText.value,
+    provider: selectedProvider.value,
+  });
+}
+
 async function loadSummary(forceRefresh = false) {
   if (!forceRefresh) {
     if (restoreCachedSummary()) {
+      emitSummaryComplete();
       return;
     }
   }
@@ -508,6 +522,7 @@ async function loadSummary(forceRefresh = false) {
   isLoading.value = true;
   streamError.value = "";
   summaryText.value = "";
+  let completedByStream = false;
 
   try {
     await $llm.streamSummarizeCases({
@@ -525,6 +540,7 @@ async function loadSummary(forceRefresh = false) {
         console.log("[IFareSummaryCard][meta]", meta);
       },
     });
+    completedByStream = true;
   } catch (error: any) {
     if (currentRequestId !== requestId) return;
     console.error("[IFareSummaryCard]", error);
@@ -540,6 +556,9 @@ async function loadSummary(forceRefresh = false) {
       summaryText.value = fallbackText.value;
     }
     writeSummaryCache(summaryText.value);
+    if (completedByStream) {
+      emitSummaryComplete();
+    }
   }
 }
 
@@ -558,6 +577,11 @@ watch(
         summaryText.value = "";
         streamError.value = "";
         isLoading.value = false;
+      }
+      if (!props.resultsLoading) {
+        nextTick(() => {
+          emitSummaryComplete();
+        });
       }
       return;
     }

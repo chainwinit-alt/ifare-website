@@ -662,6 +662,14 @@ BEGIN
     ;WITH filtered_query AS
     (
         SELECT
+            ROW_NUMBER() OVER (
+                ORDER BY
+                    q.created_at,
+                    q.normalized_query,
+                    q.source_page,
+                    ISNULL(q.result_count, 0),
+                    ISNULL(q.query_text, N'')
+            ) AS query_row_id,
             q.normalized_query,
             q.result_count,
             q.source_page,
@@ -673,23 +681,110 @@ BEGIN
             AND q.normalized_query IS NOT NULL
             AND q.normalized_query <> N''
     ),
+    query_term_candidate AS
+    (
+        SELECT
+            q.query_row_id,
+            alias_term.id AS term_id,
+            q.stat_date,
+            q.result_count,
+            q.source_page,
+            CAST(0 AS INT) AS alias_priority,
+            CASE alias_term.term_type
+                WHEN N'keyword' THEN 1
+                WHEN N'recipient' THEN 2
+                WHEN N'identity' THEN 3
+                WHEN N'income' THEN 4
+                WHEN N'policy' THEN 5
+                WHEN N'manual' THEN 6
+                WHEN N'trend' THEN 7
+                WHEN N'policy_title' THEN 20
+                ELSE 10
+            END AS term_type_priority,
+            CASE alias_term.source_kind
+                WHEN N'code_keyword' THEN 1
+                WHEN N'code_policy' THEN 2
+                WHEN N'code_recipient' THEN 3
+                WHEN N'code_identity' THEN 4
+                WHEN N'code_income' THEN 5
+                WHEN N'ifare_policy' THEN 6
+                WHEN N'policy_extract' THEN 7
+                WHEN N'google_trends_related_query' THEN 8
+                ELSE 99
+            END AS source_priority,
+            ISNULL(alias_term.manual_boost, 0) AS manual_boost,
+            ISNULL(alias_term.base_weight, 1.0) AS base_weight
+        FROM filtered_query q
+        INNER JOIN [dbo].[search_term_alias] alias
+            ON alias.normalized_alias = q.normalized_query
+           AND alias.status = N'active'
+        INNER JOIN [dbo].[search_term] alias_term
+            ON alias_term.id = alias.term_id
+           AND alias_term.status = N'active'
+        
+        UNION ALL
+
+        SELECT
+            q.query_row_id,
+            term.id AS term_id,
+            q.stat_date,
+            q.result_count,
+            q.source_page,
+            CAST(1 AS INT) AS alias_priority,
+            CASE term.term_type
+                WHEN N'keyword' THEN 1
+                WHEN N'recipient' THEN 2
+                WHEN N'identity' THEN 3
+                WHEN N'income' THEN 4
+                WHEN N'policy' THEN 5
+                WHEN N'manual' THEN 6
+                WHEN N'trend' THEN 7
+                WHEN N'policy_title' THEN 20
+                ELSE 10
+            END AS term_type_priority,
+            CASE term.source_kind
+                WHEN N'code_keyword' THEN 1
+                WHEN N'code_policy' THEN 2
+                WHEN N'code_recipient' THEN 3
+                WHEN N'code_identity' THEN 4
+                WHEN N'code_income' THEN 5
+                WHEN N'ifare_policy' THEN 6
+                WHEN N'policy_extract' THEN 7
+                WHEN N'google_trends_related_query' THEN 8
+                ELSE 99
+            END AS source_priority,
+            ISNULL(term.manual_boost, 0) AS manual_boost,
+            ISNULL(term.base_weight, 1.0) AS base_weight
+        FROM filtered_query q
+        INNER JOIN [dbo].[search_term] term
+            ON term.normalized_term = q.normalized_query
+           AND term.status = N'active'
+    ),
     mapped_query AS
     (
         SELECT
-            COALESCE(term.id, alias_term.id) AS term_id,
-            q.stat_date,
-            q.result_count,
-            q.source_page
-        FROM filtered_query q
-        LEFT JOIN [dbo].[search_term] term
-            ON term.normalized_term = q.normalized_query
-           AND term.status = N'active'
-        LEFT JOIN [dbo].[search_term_alias] alias
-            ON alias.normalized_alias = q.normalized_query
-           AND alias.status = N'active'
-        LEFT JOIN [dbo].[search_term] alias_term
-            ON alias_term.id = alias.term_id
-           AND alias_term.status = N'active'
+            ranked.term_id,
+            ranked.stat_date,
+            ranked.result_count,
+            ranked.source_page
+        FROM
+        (
+            SELECT
+                candidate.*,
+                ROW_NUMBER() OVER (
+                    PARTITION BY candidate.query_row_id
+                    ORDER BY
+                        candidate.alias_priority ASC,
+                        candidate.term_type_priority ASC,
+                        candidate.source_priority ASC,
+                        candidate.manual_boost DESC,
+                        candidate.base_weight DESC,
+                        candidate.term_id ASC
+                ) AS rn
+            FROM query_term_candidate candidate
+            WHERE candidate.term_id IS NOT NULL
+        ) ranked
+        WHERE ranked.rn = 1
     ),
     daily_behavior AS
     (
