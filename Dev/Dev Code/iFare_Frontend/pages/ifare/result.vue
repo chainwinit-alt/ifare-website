@@ -268,12 +268,13 @@
 
 <script setup lang="ts">
 const _isSelect = ref(false)
+const bodyClass = computed(() => ({
+  "overflow-disabled": _isSelect.value,
+  "select-mode": _isSelect.value,
+}));
 useHead({
     bodyAttrs: {
-        class: {
-          "overflow-disabled": _isSelect,
-          "select-mode": _isSelect
-        }
+        class: bodyClass
     }
 })
 definePageMeta({

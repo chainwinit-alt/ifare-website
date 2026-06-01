@@ -19,6 +19,15 @@ const readEnv = (...keys: string[]) => {
   return "";
 };
 
+const remoteStableMode =
+  (readEnv("NUXT_REMOTE_STABLE", "IFARE_REMOTE_STABLE") || "").toLowerCase() === "1" ||
+  (readEnv("NUXT_REMOTE_STABLE", "IFARE_REMOTE_STABLE") || "").toLowerCase() === "true";
+
+const shouldDisableHmrByDefault =
+  process.env.NODE_ENV === "development" &&
+  !readEnv("NUXT_HMR_HOST", "NUXT_HMR_CLIENT_PORT") &&
+  !readEnv("NUXT_REMOTE_STABLE", "IFARE_REMOTE_STABLE");
+
 export default defineNuxtConfig({
   devtools: { enabled: false },
 
@@ -60,7 +69,7 @@ export default defineNuxtConfig({
   nitro: {
     devProxy: {
       "/api/services/app": {
-        target: "http://localhost/ifare_api/api/services/app",
+        target: "http://localhost:5002/api/services/app",
         changeOrigin: true,
         secure: false,
       },
@@ -71,10 +80,16 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: ["nuxt-gtag", "nuxt-simple-sitemap"],
-  css: ["normalize.css/normalize.css", "~/assets/style/styleIFare.scss"],
-
   vite: {
+    server: {
+      hmr: remoteStableMode || shouldDisableHmrByDefault
+        ? false
+        : {
+            protocol: "ws",
+            host: process.env.NUXT_HMR_HOST || "10.201.7.11",
+            clientPort: Number(process.env.NUXT_HMR_CLIENT_PORT || 8080),
+          },
+    },
     css: {
       preprocessorOptions: {
         scss: {
@@ -83,6 +98,9 @@ export default defineNuxtConfig({
       },
     },
   },
+
+  modules: ["nuxt-gtag", "nuxt-simple-sitemap"],
+  css: ["normalize.css/normalize.css", "~/assets/style/styleIFare.scss"],
 
   app: {
     head: {

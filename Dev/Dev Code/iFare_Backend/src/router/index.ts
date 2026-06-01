@@ -1039,7 +1039,7 @@ const router = createRouter({
       meta: {
         indexKey: 'SearchGovernance',
         requiresAuth: true,
-        title_parent: '搜尋治理',
+        title_parent: 'Search Management',
         urlName_parent: 'SearchGovernance_Dashboard'
       },
       children: [
@@ -1049,7 +1049,7 @@ const router = createRouter({
           component: SearchGovernance_DashboardViewVue,
           meta: {
             requiresAuth: true,
-            title: '搜尋治理'
+            title: 'Search Management'
           }
         },
         {
@@ -1058,7 +1058,7 @@ const router = createRouter({
           component: SearchGovernance_TermListViewVue,
           meta: {
             requiresAuth: true,
-            title: '搜尋詞'
+            title: 'Search Terms'
           }
         },
         {
@@ -1067,7 +1067,7 @@ const router = createRouter({
           component: SearchGovernance_AliasListViewVue,
           meta: {
             requiresAuth: true,
-            title: '搜尋別名'
+            title: 'Search Alias'
           }
         }
       ]

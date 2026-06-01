@@ -34,22 +34,20 @@
     ],
     "permission": "Editor"
   },
-
-  { "indexKey": "ImgManager", "title": "圖片管理", "url": {"name": "ImgManager"}, "permission": "Editor" },
-  { "indexKey": "PageManagement", "title": "頁面管理", "url": {"name": "PageManagement_DataList"}, "permission": "Editor" },
-    {
+  { "indexKey": "ImgManager", "title": "Image Manager", "url": { "name": "ImgManager" }, "permission": "Editor" },
+  { "indexKey": "PageManagement", "title": "Page Management", "url": { "name": "PageManagement_DataList" }, "permission": "Editor" },
+  {
     "indexKey": "SearchGovernance",
-    "title": "搜尋治理",
+    "title": "Search Management",
     "subList": [
-      { "indexKey": "SearchGovernance_Dashboard", "title": "總覽", "url": { "name": "SearchGovernance_Dashboard" }, "permission": "Editor" },
-      { "indexKey": "SearchGovernance_Terms", "title": "搜尋詞", "url": { "name": "SearchGovernance_Terms" }, "permission": "Editor" },
-      { "indexKey": "SearchGovernance_Aliases", "title": "別名", "url": { "name": "SearchGovernance_Aliases" }, "permission": "Editor" }
+      { "indexKey": "SearchGovernance_Dashboard", "title": "Dashboard", "url": { "name": "SearchGovernance_Dashboard" }, "permission": "Editor" },
+      { "indexKey": "SearchGovernance_Terms", "title": "Search Terms", "url": { "name": "SearchGovernance_Terms" }, "permission": "Editor" },
+      { "indexKey": "SearchGovernance_Aliases", "title": "Search Aliases", "url": { "name": "SearchGovernance_Aliases" }, "permission": "Editor" }
     ],
     "permission": "Editor"
   },
-  { "indexKey": "Analysis", "title": "資料分析", "url": {"name": "Analysis"}, "permission": "Editor" },
-  { "indexKey": "AdminAgent", "title": "AI 維護中心", "url": {"name": "AdminAgent"}, "permission": "Admin" },
-  { "indexKey": "Account", "title": "帳戶維護", "url": {"name": "Account_DataList"}, "permission": "Editor" },
-  { "indexKey": "Personal", "title": "個人資料", "url": {"name": "Personal_Detail"}, "permission": "Editor" }
-
+  { "indexKey": "Analysis", "title": "Analytics", "url": { "name": "Analysis" }, "permission": "Editor" },
+  { "indexKey": "AdminAgent", "title": "AI Admin Agent", "url": { "name": "AdminAgent" }, "permission": "Admin" },
+  { "indexKey": "Account", "title": "Account Management", "url": { "name": "Account_DataList" }, "permission": "Editor" },
+  { "indexKey": "Personal", "title": "Profile", "url": { "name": "Personal_Detail" }, "permission": "Editor" }
 ]
