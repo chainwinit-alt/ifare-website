@@ -3,18 +3,19 @@
     <template #btnsRight>
       <el-button plain @click="startCreateAlias">新增別名</el-button>
       <el-button type="primary" @click="router.push({ name: 'SearchGovernance_Dashboard' })">
-        返回總覽
+        返回 Dashboard
       </el-button>
     </template>
   </main-header>
+
   <el-scrollbar class="main-scrollbar">
     <section class="section-main-card card-fullsize">
       <div class="card-info section-head">
         <div>
           <h3>別名管理</h3>
-          <p>將使用者語言對應到標準搜尋詞與政策名稱。</p>
+          <p>管理前台搜尋詞的別名對應，將同義詞穩定映射到標準搜尋詞。</p>
         </div>
-        <el-tag type="success" effect="plain">即時 API 流程</el-tag>
+        <el-tag type="success" effect="plain">後台 API 已串接</el-tag>
       </div>
     </section>
 
@@ -23,7 +24,7 @@
         <div class="card-info">
           <div class="queue-banner">
             <div>
-              <strong>建議下一步</strong>
+              <strong>建議操作</strong>
               <p>{{ recommendedAction }}</p>
             </div>
             <el-button plain @click="searchAliases[0] && selectAlias(searchAliases[0])">編輯範例</el-button>
@@ -31,8 +32,8 @@
 
           <el-table :data="searchAliases" stripe style="width: 100%">
             <el-table-column prop="alias" label="別名" min-width="140" />
-            <el-table-column prop="targetTerm" label="目標詞" min-width="140" />
-            <el-table-column label="目標類型" width="100">
+            <el-table-column prop="targetTerm" label="標準搜尋詞" min-width="160" />
+            <el-table-column label="類型" width="110">
               <template #default="{ row }">
                 {{ getTermTypeLabel(row.targetType) }}
               </template>
@@ -49,13 +50,13 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="來源" width="100">
+            <el-table-column label="來源" width="120">
               <template #default="{ row }">
                 {{ getSourceKindLabel(row.source) }}
               </template>
             </el-table-column>
             <el-table-column prop="updatedBy" label="更新者" width="120" />
-            <el-table-column prop="lastUpdated" label="更新時間" width="160" />
+            <el-table-column prop="lastUpdated" label="最近更新" width="160" />
             <el-table-column label="操作" width="100" align="center">
               <template #default="{ row }">
                 <el-button text type="primary" @click="selectAlias(row)">編輯</el-button>
@@ -80,7 +81,9 @@
       <div class="alias-head">
         <div>
           <h3>{{ isCreatingAlias ? "新增別名" : selectedAlias.alias }}</h3>
-          <p class="alias-normalized">{{ isCreatingAlias ? "建立新的別名對應。" : selectedAlias.normalizedAlias }}</p>
+          <p class="alias-normalized">
+            {{ isCreatingAlias ? "建立新的搜尋別名映射。" : selectedAlias.normalizedAlias }}
+          </p>
         </div>
         <el-tag :type="selectedAlias.status === 'active' ? 'success' : 'info'">
           {{ isCreatingAlias ? "草稿" : getStatusLabel(selectedAlias.status) }}
@@ -89,82 +92,100 @@
 
       <div class="detail-list">
         <div class="detail-item">
-          <span>目標類型</span>
-          <strong>{{ isCreatingAlias ? "待選擇目標詞" : getTermTypeLabel(selectedAlias.targetType) }}</strong>
+          <span>標準搜尋詞</span>
+          <strong>{{ isCreatingAlias ? "建立後顯示" : selectedAlias.targetTerm }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>類型</span>
+          <strong>{{ isCreatingAlias ? "選擇後顯示" : getTermTypeLabel(selectedAlias.targetType) }}</strong>
         </div>
         <div class="detail-item">
           <span>來源</span>
-          <strong>{{ isCreatingAlias ? "人工建立" : getSourceKindLabel(selectedAlias.source) }}</strong>
+          <strong>{{ isCreatingAlias ? "手動建立" : getSourceKindLabel(selectedAlias.source) }}</strong>
         </div>
         <div class="detail-item">
-          <span>更新者</span>
-          <strong>{{ isCreatingAlias ? "目前使用者" : selectedAlias.updatedBy }}</strong>
-        </div>
-        <div class="detail-item">
-          <span>最後更新</span>
-          <strong>{{ isCreatingAlias ? "待建立" : selectedAlias.lastUpdated }}</strong>
+          <span>最近更新</span>
+          <strong>{{ isCreatingAlias ? "尚未建立" : selectedAlias.lastUpdated }}</strong>
         </div>
       </div>
 
       <div class="editor-grid">
         <div class="editor-item">
           <label>別名</label>
-          <el-input v-model="aliasForm.alias" placeholder="使用者輸入的別名" />
+          <el-input v-model="aliasForm.alias" placeholder="輸入要新增的別名" />
         </div>
         <div class="editor-item">
-          <label>目標詞</label>
-          <el-select v-model="aliasForm.termId" placeholder="選擇標準搜尋詞" filterable>
-            <el-option
-              v-for="term in searchTerms"
-              :key="term.id"
-              :label="term.displayTerm"
-              :value="term.id"
+          <label>標準搜尋詞</label>
+          <div class="display-term-input-wrap">
+            <input
+              v-model="aliasForm.targetTermDisplay"
+              class="display-term-native-input"
+              placeholder="輸入或選擇標準搜尋詞"
+              @input="syncAliasTargetTerm"
+              @focus="showTermSuggestions = true"
+              @blur="hideTermSuggestions"
             />
-          </el-select>
+            <div v-if="showTermSuggestions && filteredTermOptions.length" class="display-term-suggestions">
+              <button
+                v-for="term in filteredTermOptions"
+                :key="term.id"
+                type="button"
+                class="display-term-suggestion-item"
+                @mousedown.prevent="selectAliasTerm(term)"
+              >
+                {{ term.displayTerm }}
+              </button>
+            </div>
+          </div>
         </div>
         <div class="editor-item">
           <label>匹配模式</label>
-          <el-select v-model="aliasForm.matchMode" placeholder="選擇匹配模式">
-            <el-option label="完全相同" value="exact" />
-            <el-option label="同義詞" value="synonym" />
-            <el-option label="包含" value="contains" />
-            <el-option label="前綴" value="prefix" />
-          </el-select>
+          <select v-model="aliasForm.matchMode" class="editor-native-select">
+            <option value="exact">完全相符</option>
+            <option value="synonym">同義詞</option>
+            <option value="contains">包含</option>
+            <option value="prefix">前綴</option>
+          </select>
         </div>
         <div class="editor-item">
           <label>狀態</label>
-          <el-select v-model="aliasForm.status" placeholder="選擇狀態">
-            <el-option label="啟用" value="active" />
-            <el-option label="停用" value="inactive" />
-          </el-select>
+          <select v-model="aliasForm.status" class="editor-native-select">
+            <option value="active">啟用</option>
+            <option value="inactive">停用</option>
+          </select>
         </div>
       </div>
 
       <div class="mapping-preview">
-        <h4>建立原因</h4>
+        <h4>備註</h4>
         <el-input
           v-model="aliasForm.note"
           type="textarea"
           :rows="4"
           resize="none"
-          placeholder="說明這個別名的意圖對應或上線備註。"
+          placeholder="補充這個別名的用途、來源或調整原因"
         />
       </div>
 
       <div class="mapping-preview">
-        <h4>建議檢查項目</h4>
+        <h4>設定提醒</h4>
         <ul>
-          <li>先檢查這個別名是否來自零結果查詢或高點擊政策名稱。</li>
-          <li>同一個搜尋意圖群組只保留一個主要目標詞。</li>
-          <li>啟用後再確認建議詞與排序是否符合預期。</li>
+          <li>同一個別名應只指向一個標準搜尋詞，避免前台解析不一致。</li>
+          <li>若是常見同義詞，建議使用「同義詞」匹配模式。</li>
+          <li>停用後不會再參與搜尋映射，但資料仍會保留。</li>
         </ul>
       </div>
     </div>
+
     <template #footer>
       <div class="detail-actions">
         <el-button plain @click="resetAliasForm" :disabled="isSavingAlias">重設</el-button>
-        <el-button plain @click="closeAliasDialog" :disabled="isSavingAlias">{{ isCreatingAlias ? "取消" : "關閉" }}</el-button>
-        <el-button type="primary" @click="saveAlias" :loading="isSavingAlias">{{ isCreatingAlias ? "建立別名" : "儲存變更" }}</el-button>
+        <el-button plain @click="closeAliasDialog" :disabled="isSavingAlias">
+          {{ isCreatingAlias ? "取消" : "關閉" }}
+        </el-button>
+        <el-button type="primary" @click="saveAlias" :loading="isSavingAlias">
+          {{ isCreatingAlias ? "建立別名" : "儲存變更" }}
+        </el-button>
       </div>
     </template>
   </el-dialog>
@@ -172,11 +193,20 @@
 
 <script setup lang="ts">
 import { computed, getCurrentInstance, onMounted, ref, watch } from "vue";
-import { ElButton, ElDialog, ElInput, ElOption, ElScrollbar, ElSelect, ElTable, ElTableColumn, ElTag } from "element-plus";
+import { ElButton, ElDialog, ElInput, ElScrollbar, ElTable, ElTableColumn, ElTag } from "element-plus";
 import { useRoute, useRouter } from "vue-router";
 import MainHeader from "@/components/MainHeader.vue";
 import type { SearchAliasItem, SearchTermItem } from "@/data/SearchGovernance";
 import { useUserStore } from "@/stores/user";
+
+type AliasFormState = {
+  alias: string;
+  termId: number;
+  targetTermDisplay: string;
+  matchMode: string;
+  status: SearchAliasItem["status"];
+  note: string;
+};
 
 const route = useRoute();
 const router = useRouter();
@@ -184,20 +214,32 @@ const userStore = useUserStore();
 const app = getCurrentInstance();
 const $WebAPI = app?.appContext.config.globalProperties.$WebAPI;
 const $Message = app?.appContext.config.globalProperties.$message;
+
 const searchAliases = ref<SearchAliasItem[]>([]);
 const searchTerms = ref<SearchTermItem[]>([]);
 const selectedAlias = ref<SearchAliasItem | null>(null);
 const isAliasDialogOpen = ref(false);
 const isCreatingAlias = ref(false);
 const isSavingAlias = ref(false);
-const aliasForm = ref(createAliasForm(selectedAlias.value));
+const showTermSuggestions = ref(false);
+const aliasForm = ref<AliasFormState>(createAliasForm(selectedAlias.value));
 
 const recommendedAction = computed(() => {
-  if (route.query.term) {
-    return `請檢查與「${String(route.query.term)}」相關的別名，判斷是否需要擴充成更完整的意圖對應。`;
+  const focusedTerm = String(route.query.term || "").trim();
+  if (focusedTerm) {
+    return `你是從搜尋詞「${focusedTerm}」進來的，可以直接檢查它目前有哪些別名與映射。`;
   }
 
-  return "建議先從零結果查詢與高頻口語詞開始，逐一對應到單一標準搜尋詞。";
+  return "先確認別名是否映射到正確的標準搜尋詞，再決定匹配模式與啟用狀態。";
+});
+
+const filteredTermOptions = computed(() => {
+  const keyword = aliasForm.value.targetTermDisplay.trim().toLowerCase();
+
+  return searchTerms.value
+    .filter((term) => !keyword || term.displayTerm.toLowerCase().includes(keyword))
+    .sort((a, b) => a.displayTerm.localeCompare(b.displayTerm, "zh-Hant"))
+    .slice(0, 8);
 });
 
 function getStatusLabel(status: string) {
@@ -207,11 +249,11 @@ function getStatusLabel(status: string) {
 function getTermTypeLabel(termType: string) {
   const labels: Record<string, string> = {
     keyword: "關鍵字",
-    policy: "政策",
+    policy: "政策分類",
     policy_title: "政策標題",
-    trend: "趨勢",
-    recipient: "對象",
-    identity: "身分別",
+    trend: "趨勢詞",
+    recipient: "受助者",
+    identity: "特殊身分",
     income: "所得別",
   };
   return labels[termType] || termType;
@@ -220,17 +262,17 @@ function getTermTypeLabel(termType: string) {
 function getSourceKindLabel(sourceKind: string) {
   const labels: Record<string, string> = {
     code_keyword: "程式關鍵字",
-    policy_extract: "政策擷取",
+    policy_extract: "政策抽取",
     ifare_policy: "iFare 政策",
-    manual: "人工建立",
-    google_trends_related_query: "Google 趨勢關聯字",
+    manual: "手動建立",
+    google_trends_related_query: "Google Trends",
   };
   return labels[sourceKind] || sourceKind;
 }
 
 function getMatchModeLabel(matchMode: string) {
   const labels: Record<string, string> = {
-    exact: "完全相同",
+    exact: "完全相符",
     synonym: "同義詞",
     contains: "包含",
     prefix: "前綴",
@@ -238,10 +280,13 @@ function getMatchModeLabel(matchMode: string) {
   return labels[matchMode] || matchMode;
 }
 
-function createAliasForm(alias: SearchAliasItem | null) {
+function createAliasForm(alias: SearchAliasItem | null): AliasFormState {
+  const matchedTerm = searchTerms.value.find((item) => item.id === Number(alias?.termId || 0));
+
   return {
     alias: alias?.alias || "",
     termId: Number(alias?.termId || 0),
+    targetTermDisplay: matchedTerm?.displayTerm || alias?.targetTerm || "",
     matchMode: alias?.matchMode || "exact",
     status: (alias?.status || "active") as SearchAliasItem["status"],
     note: alias?.note || "",
@@ -255,14 +300,16 @@ function selectAlias(alias: SearchAliasItem) {
 }
 
 function startCreateAlias() {
+  const initialTerm = searchTerms.value[0] || null;
+
   isCreatingAlias.value = true;
   selectedAlias.value = {
     id: 0,
-    termId: searchTerms.value[0]?.id || 0,
+    termId: initialTerm?.id || 0,
     alias: "",
     normalizedAlias: "",
-    targetTerm: "",
-    targetType: "",
+    targetTerm: initialTerm?.displayTerm || "",
+    targetType: initialTerm?.termType || "",
     matchMode: "synonym",
     status: "active",
     source: "manual",
@@ -275,6 +322,7 @@ function startCreateAlias() {
 
 function closeAliasDialog() {
   isAliasDialogOpen.value = false;
+  showTermSuggestions.value = false;
   if (isCreatingAlias.value) {
     isCreatingAlias.value = false;
     selectedAlias.value = searchAliases.value[0] || null;
@@ -283,6 +331,24 @@ function closeAliasDialog() {
 
 function resetAliasForm() {
   aliasForm.value = createAliasForm(selectedAlias.value);
+}
+
+function selectAliasTerm(term: SearchTermItem) {
+  aliasForm.value.termId = term.id;
+  aliasForm.value.targetTermDisplay = term.displayTerm;
+  showTermSuggestions.value = false;
+}
+
+function syncAliasTargetTerm() {
+  const normalized = aliasForm.value.targetTermDisplay.trim().toLowerCase();
+  const matchedTerm = searchTerms.value.find((term) => term.displayTerm.trim().toLowerCase() === normalized);
+  aliasForm.value.termId = matchedTerm?.id || 0;
+}
+
+function hideTermSuggestions() {
+  window.setTimeout(() => {
+    showTermSuggestions.value = false;
+  }, 120);
 }
 
 function applyFocusedAlias() {
@@ -308,6 +374,10 @@ function loadTerms() {
     }
 
     searchTerms.value = payload.result;
+
+    if (selectedAlias.value) {
+      aliasForm.value = createAliasForm(selectedAlias.value);
+    }
   });
 }
 
@@ -331,7 +401,7 @@ function loadAliases() {
 function saveAlias() {
   if (!selectedAlias.value) return;
   if (!$WebAPI || !userStore.token) {
-    $Message?.({ type: "error", message: "搜尋治理 API 目前不可用。" });
+    $Message?.({ type: "error", message: "別名 API 尚未準備完成。" });
     return;
   }
 
@@ -341,7 +411,7 @@ function saveAlias() {
     return;
   }
   if (!aliasForm.value.termId) {
-    $Message?.({ type: "warning", message: "請選擇目標搜尋詞。" });
+    $Message?.({ type: "warning", message: "請選擇標準搜尋詞。" });
     return;
   }
 
@@ -359,32 +429,28 @@ function saveAlias() {
     payloadData.id = selectedAlias.value.id;
   }
 
-  action.call(
-    $WebAPI,
-    userStore.token,
-    payloadData,
-    (res: any) => {
-      isSavingAlias.value = false;
-      const payload = res?.data?.result;
-      if (!payload || payload.errCode != 0 || !payload.result) {
-        $Message?.({ type: "error", message: payload?.errMsg || "別名儲存失敗。" });
-        return;
-      }
-
-      const updatedAlias = payload.result as SearchAliasItem;
-      const targetIndex = searchAliases.value.findIndex((item) => item.id === updatedAlias.id);
-      if (targetIndex >= 0) {
-        searchAliases.value[targetIndex] = updatedAlias;
-      } else {
-        searchAliases.value.unshift(updatedAlias);
-      }
-      isCreatingAlias.value = false;
-      selectedAlias.value = updatedAlias;
-      isAliasDialogOpen.value = false;
-      resetAliasForm();
-      $Message?.({ type: "success", message: targetIndex >= 0 ? "別名已更新。" : "別名已建立。" });
+  action.call($WebAPI, userStore.token, payloadData, (res: any) => {
+    isSavingAlias.value = false;
+    const payload = res?.data?.result;
+    if (!payload || payload.errCode != 0 || !payload.result) {
+      $Message?.({ type: "error", message: payload?.errMsg || "別名儲存失敗。" });
+      return;
     }
-  );
+
+    const updatedAlias = payload.result as SearchAliasItem;
+    const targetIndex = searchAliases.value.findIndex((item) => item.id === updatedAlias.id);
+    if (targetIndex >= 0) {
+      searchAliases.value[targetIndex] = updatedAlias;
+    } else {
+      searchAliases.value.unshift(updatedAlias);
+    }
+
+    isCreatingAlias.value = false;
+    selectedAlias.value = updatedAlias;
+    isAliasDialogOpen.value = false;
+    resetAliasForm();
+    $Message?.({ type: "success", message: targetIndex >= 0 ? "別名已更新。" : "別名已建立。" });
+  });
 }
 
 watch(
@@ -479,8 +545,60 @@ onMounted(() => {
   gap: 8px;
 }
 
-.editor-item :deep(.el-select) {
+.display-term-input-wrap {
   width: 100%;
+  position: relative;
+}
+
+.display-term-native-input,
+.editor-native-select {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  color: #303133;
+  background: #fff;
+  font-size: 14px;
+  line-height: 32px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.display-term-native-input:focus,
+.editor-native-select:focus {
+  border-color: #409eff;
+  outline: none;
+}
+
+.display-term-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px 0;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+.display-term-suggestion-item {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  background: transparent;
+  color: #303133;
+  text-align: left;
+  cursor: pointer;
+}
+
+.display-term-suggestion-item:hover {
+  background: #f5f7fa;
 }
 
 .mapping-preview {

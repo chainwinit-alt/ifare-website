@@ -602,6 +602,7 @@ SELECT TOP (@limit)
     CAST(COALESCE(term.base_weight, 1) AS FLOAT) AS base_weight,
     COALESCE(score.hot_score_7d, 0) AS hot_score_7d,
     COALESCE(score.total_search_count_30d, 0) AS total_search_count_30d,
+    CONVERT(NVARCHAR(19), COALESCE(term.updated_at, term.created_at), 120) AS last_updated,
     COALESCE(alias_item.alias_count, 0) AS alias_count
 FROM [dbo].[search_term] term
 LEFT JOIN term_scores score
@@ -635,8 +636,8 @@ ORDER BY
                     BaseWeight = reader.IsDBNull(7) ? 1d : Convert.ToDouble(reader.GetValue(7), CultureInfo.InvariantCulture),
                     HotScore7d = hotScore,
                     SearchCount30d = searchCount,
-                    LastUpdated = string.Empty,
-                    AliasCount = reader.IsDBNull(10) ? 0 : reader.GetInt32(10),
+                    LastUpdated = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+                    AliasCount = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
                     Note = BuildTermNote(sourceKind, status, hotScore, searchCount)
                 });
             }
@@ -658,7 +659,8 @@ SELECT TOP (@limit)
     COALESCE(NULLIF(term.display_term, N''), term.term) AS target_term,
     term.term_type,
     COALESCE(alias.status, N'inactive') AS status,
-    COALESCE(term.source_kind, N'manual') AS source_kind
+    COALESCE(term.source_kind, N'manual') AS source_kind,
+    CONVERT(NVARCHAR(19), COALESCE(alias.updated_at, alias.created_at), 120) AS last_updated
 FROM [dbo].[search_term_alias] alias
 INNER JOIN [dbo].[search_term] term
     ON term.id = alias.term_id
@@ -682,8 +684,8 @@ ORDER BY
                     MatchMode = InferAliasMatchMode(aliasText),
                     Status = reader.IsDBNull(6) ? "inactive" : reader.GetString(6),
                     Source = reader.IsDBNull(7) ? "manual" : reader.GetString(7),
-                    UpdatedBy = string.Empty,
-                    LastUpdated = string.Empty,
+                    UpdatedBy = "System",
+                    LastUpdated = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
                     Note = "別名已對應至標準搜尋詞。"
                 });
             }

@@ -1,10 +1,11 @@
 <template>
   <main-header />
+
   <el-scrollbar class="main-scrollbar">
     <section class="section-main-card card-fullsize">
       <div class="card-info governance-hero">
         <div class="hero-copy-wrap">
-          <p class="eyebrow">搜尋治理工作台</p>
+          <p class="eyebrow">搜尋治理 Dashboard</p>
           <h2>iFare 搜尋治理總覽</h2>
           <p class="hero-copy">
             從近 7 天與近 30 天的搜尋資料，快速找出零結果、高頻低結果與需要優先治理的搜尋詞。
@@ -18,7 +19,7 @@
             前往別名
           </el-button>
           <el-button plain @click="refreshHotStats" :loading="isRefreshingHotStats">
-            更新熱門關鍵字
+            重算熱度統計
           </el-button>
           <el-button plain @click="syncTerms" :loading="isSyncingTerms">
             同步搜尋詞詞庫
@@ -27,29 +28,8 @@
       </div>
     </section>
 
-    <section class="section-main-card card-fullsize">
-      <div class="card-info range-strip">
-        <div class="range-item">
-          <span class="range-label">統計區間</span>
-          <strong>近 30 天</strong>
-        </div>
-        <div class="range-item">
-          <span class="range-label">待處理清單</span>
-          <strong>近 7 天</strong>
-        </div>
-        <div class="range-item">
-          <span class="range-label">趨勢圖</span>
-          <strong>近 7 天</strong>
-        </div>
-      </div>
-    </section>
-
     <section v-if="searchOverviewStats.length" class="stats-grid">
-      <article
-        v-for="item in searchOverviewStats"
-        :key="item.key"
-        class="section-main-card stat-card"
-      >
+      <article v-for="item in searchOverviewStats" :key="item.key" class="section-main-card stat-card">
         <div class="card-info">
           <span class="stat-label">{{ item.label }}</span>
           <strong class="stat-value">{{ item.value }}</strong>
@@ -60,8 +40,8 @@
 
     <section v-else class="section-main-card card-fullsize empty-card">
       <div class="card-info">
-        <h3>目前沒有搜尋統計資料</h3>
-        <p>請確認後端 API 是否已連線，或先執行一次熱門關鍵字更新。</p>
+        <h3>目前沒有搜尋治理統計資料</h3>
+        <p>請確認後台 API 是否正常，或先執行熱度統計重算與搜尋詞同步。</p>
       </div>
     </section>
 
@@ -69,8 +49,8 @@
       <div class="card-info">
         <div class="section-head">
           <div>
-            <h3>近 7 天搜尋量</h3>
-            <p>顯示最近 7 天的搜尋次數變化。</p>
+            <h3>近 7 日搜尋趨勢</h3>
+            <p>觀察近 7 天搜尋量變化。</p>
           </div>
         </div>
         <div class="trend-row">
@@ -90,21 +70,21 @@
         <div class="card-info">
           <div class="section-head">
             <div>
-              <h3>零結果待處理清單</h3>
+              <h3>零結果搜尋待治理</h3>
               <p>近 7 天完全查不到結果的查詢，優先補別名與搜尋詞。</p>
             </div>
             <el-tag type="danger" effect="plain">{{ zeroResultQueue.length }} 筆</el-tag>
           </div>
           <el-table :data="zeroResultQueue" stripe style="width: 100%">
-            <el-table-column prop="query" label="搜尋字詞" min-width="180" />
-            <el-table-column prop="searches7d" label="7 天搜尋量" width="120" />
+            <el-table-column prop="query" label="搜尋詞" min-width="180" />
+            <el-table-column prop="searches7d" label="7日搜尋數" width="120" />
             <el-table-column prop="resultCount" label="結果數" width="90" />
             <el-table-column label="狀態" width="110">
               <template #default="{ row }">
                 <el-tag :type="queueTagType(row.status)" size="small">{{ getQueueStatusLabel(row.status) }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="owner" label="指派對象" width="120" />
+            <el-table-column prop="owner" label="處理者" width="120" />
             <el-table-column prop="suggestion" label="建議動作" min-width="220" />
             <el-table-column label="操作" width="170" fixed="right">
               <template #default="{ row }">
@@ -115,7 +95,7 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-if="!zeroResultQueue.length" description="目前沒有零結果待處理資料。" />
+          <el-empty v-if="!zeroResultQueue.length" description="目前沒有零結果搜尋待治理。" />
         </div>
       </article>
 
@@ -123,14 +103,14 @@
         <div class="card-info">
           <div class="section-head">
             <div>
-              <h3>結果過少待處理清單</h3>
-              <p>查得到但結果過少的查詢，適合檢查排序、別名與詞庫覆蓋。</p>
+              <h3>低結果搜尋待治理</h3>
+              <p>有結果但結果偏少的搜尋，適合補別名與調整治理規則。</p>
             </div>
             <el-tag type="warning" effect="plain">{{ lowResultQueue.length }} 筆</el-tag>
           </div>
           <el-table :data="lowResultQueue" stripe style="width: 100%">
-            <el-table-column prop="query" label="搜尋字詞" min-width="180" />
-            <el-table-column prop="searches7d" label="7 天搜尋量" width="120" />
+            <el-table-column prop="query" label="搜尋詞" min-width="180" />
+            <el-table-column prop="searches7d" label="7日搜尋數" width="120" />
             <el-table-column prop="resultCount" label="結果數" width="90" />
             <el-table-column label="狀態" width="110">
               <template #default="{ row }">
@@ -147,7 +127,7 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-if="!lowResultQueue.length" description="目前沒有結果過少待處理資料。" />
+          <el-empty v-if="!lowResultQueue.length" description="目前沒有低結果搜尋待治理。" />
         </div>
       </article>
 
@@ -156,26 +136,27 @@
           <div class="section-head">
             <div>
               <h3>重點治理搜尋詞</h3>
-              <p>依近 30 天搜尋量挑出目前最值得優先檢查的搜尋詞。</p>
+              <p>先合併同名搜尋詞的熱度與搜尋數，再依 7 日熱度優先排序，避免不同來源重複出現。</p>
             </div>
-            <el-tag type="success" effect="plain">{{ topTerms.length }} 筆</el-tag>
+            <el-tag type="success" effect="plain">{{ rankedTopTerms.length }} 筆</el-tag>
           </div>
-          <div v-if="topTerms.length" class="term-list">
+          <div v-if="rankedTopTerms.length" class="term-list">
             <button
-              v-for="term in topTerms"
-              :key="term.id"
+              v-for="term in rankedTopTerms"
+              :key="term.key"
               type="button"
               class="term-list-item"
-              @click="openTerms(term.id)"
+              @click="openTerms(term.primaryItem?.id)"
             >
               <div>
                 <strong>{{ term.displayTerm }}</strong>
                 <p>{{ term.note }}</p>
               </div>
               <div class="term-meta">
-                <span>{{ term.searchCount30d }} 次搜尋</span>
-                <el-tag size="small" :type="term.status === 'active' ? 'success' : 'info'">
-                  {{ getStatusLabel(term.status) }}
+                <span>{{ term.aggregateHotScore7d }} 7日熱度</span>
+                <span>{{ term.aggregateSearchCount30d }} 次搜尋</span>
+                <el-tag size="small" :type="term.primaryItem?.status === 'active' ? 'success' : 'info'">
+                  {{ getStatusLabel(term.primaryItem?.status || "") }}
                 </el-tag>
               </div>
             </button>
@@ -195,6 +176,16 @@ import MainHeader from "@/components/MainHeader.vue";
 import type { SearchOverviewStat, SearchQueueItem, SearchTermItem, SearchTrendPoint } from "@/data/SearchGovernance";
 import { useUserStore } from "@/stores/user";
 
+interface DashboardTopTermGroup {
+  key: string;
+  displayTerm: string;
+  aggregateHotScore7d: number;
+  aggregateSearchCount30d: number;
+  note: string;
+  primaryItem: SearchTermItem | null;
+  items: SearchTermItem[];
+}
+
 const router = useRouter();
 const userStore = useUserStore();
 const app = getCurrentInstance();
@@ -210,6 +201,55 @@ const isSyncingTerms = ref(false);
 
 const zeroResultQueue = computed(() => searchQueue.value.filter((item) => item.resultCount === 0));
 const lowResultQueue = computed(() => searchQueue.value.filter((item) => item.resultCount > 0));
+
+const rankedTopTerms = computed<DashboardTopTermGroup[]>(() => {
+  const groupMap = new Map<string, SearchTermItem[]>();
+
+  topTerms.value.forEach((item) => {
+    const key = item.displayTerm.trim().toLowerCase() || `(empty-${item.id})`;
+    const current = groupMap.get(key) || [];
+    current.push(item);
+    groupMap.set(key, current);
+  });
+
+  return Array.from(groupMap.entries())
+    .map(([key, items]) => {
+      const sortedItems = [...items].sort((a, b) => {
+        if (a.status !== b.status) {
+          return a.status === "active" ? -1 : 1;
+        }
+        if (Number(b.hotScore7d || 0) !== Number(a.hotScore7d || 0)) {
+          return Number(b.hotScore7d || 0) - Number(a.hotScore7d || 0);
+        }
+        if (Number(b.searchCount30d || 0) !== Number(a.searchCount30d || 0)) {
+          return Number(b.searchCount30d || 0) - Number(a.searchCount30d || 0);
+        }
+        return a.id - b.id;
+      });
+
+      return {
+        key,
+        displayTerm: sortedItems[0]?.displayTerm || "",
+        aggregateHotScore7d: sortedItems.reduce((sum, item) => sum + Number(item.hotScore7d || 0), 0),
+        aggregateSearchCount30d: sortedItems.reduce((sum, item) => sum + Number(item.searchCount30d || 0), 0),
+        note: sortedItems[0]?.note || "",
+        primaryItem: sortedItems[0] || null,
+        items: sortedItems,
+      };
+    })
+    .sort((a, b) => {
+      if ((a.primaryItem?.status || "") !== (b.primaryItem?.status || "")) {
+        return a.primaryItem?.status === "active" ? -1 : 1;
+      }
+      if (Number(b.aggregateHotScore7d || 0) !== Number(a.aggregateHotScore7d || 0)) {
+        return Number(b.aggregateHotScore7d || 0) - Number(a.aggregateHotScore7d || 0);
+      }
+      if (Number(b.aggregateSearchCount30d || 0) !== Number(a.aggregateSearchCount30d || 0)) {
+        return Number(b.aggregateSearchCount30d || 0) - Number(a.aggregateSearchCount30d || 0);
+      }
+      return a.displayTerm.localeCompare(b.displayTerm, "zh-Hant");
+    });
+});
 
 function queueTagType(status: string) {
   if (status === "resolved") return "success";
@@ -252,14 +292,14 @@ function refreshHotStats() {
     isRefreshingHotStats.value = false;
     const payload = res?.data?.result;
     if (!payload || payload.errCode != 0 || !payload.result) {
-      $Message?.({ type: "error", message: payload?.errMsg || "更新熱門關鍵字失敗。" });
+      $Message?.({ type: "error", message: payload?.errMsg || "重算熱度統計失敗。" });
       return;
     }
 
     const result = payload.result;
     $Message?.({
       type: "success",
-      message: `已更新 ${result.startDate} 至 ${result.endDate} 的搜尋統計，共 ${result.rowCount} 筆。`,
+      message: `已完成 ${result.startDate} 到 ${result.endDate} 的熱度重算，共更新 ${result.rowCount} 筆。`,
     });
     loadDashboard();
   });
@@ -311,7 +351,6 @@ onMounted(() => {
 .governance-hero,
 .section-head,
 .hero-actions,
-.range-strip,
 .stats-grid,
 .trend-row,
 .term-meta,
@@ -365,27 +404,6 @@ h2 {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 12px;
-}
-
-.range-strip {
-  gap: 16px;
-  align-items: center;
-}
-
-.range-item {
-  min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  background: #f8fafc;
-}
-
-.range-label {
-  display: block;
-  margin-bottom: 4px;
-  color: #6b7280;
-  font-size: 12px;
-  letter-spacing: 0.06em;
 }
 
 .stats-grid {
@@ -553,7 +571,6 @@ h2 {
 }
 
 @media (max-width: 768px) {
-  .range-strip,
   .trend-row {
     flex-wrap: wrap;
   }
@@ -569,6 +586,7 @@ h2 {
 
   .term-meta {
     white-space: normal;
+    flex-wrap: wrap;
   }
 }
 </style>
