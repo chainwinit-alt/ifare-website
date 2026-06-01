@@ -7,17 +7,40 @@
         'is-empty': isEmpty,
         'is-selected': selected,
         'is-collapsed': collapsed,
+        'is-draggable': isDraggable,
       },
     ]"
-    :draggable="true"
+    :data-section-id="section.id"
+    :draggable="isDraggable"
     @click="emit('select')"
-    @dragstart="emit('dragstart', $event)"
+    @dragstart="onDragStartEmit"
     @dragover.prevent="emit('dragover', $event)"
-    @dragend="emit('dragend', $event)"
+    @dragend="onDragEndReset"
     @drop.prevent="emit('drop', $event)"
   >
-    <div class="section-toolbar">
-      <span class="section-handle" title="拖曳排序" aria-hidden="true">⋮⋮</span>
+    <div
+      class="section-toolbar"
+      :class="{ 'drag-source': collapsed }"
+      @mousedown="collapsed && enableDrag()"
+      @mouseup="disableDrag"
+      @mouseleave="disableDrag"
+    >
+      <span
+        class="section-handle"
+        title="按住拖曳調整順序"
+        aria-label="拖曳排序"
+        @mousedown.stop="enableDrag"
+        @mouseup="disableDrag"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+          <circle cx="9" cy="6" r="1.6" />
+          <circle cx="15" cy="6" r="1.6" />
+          <circle cx="9" cy="12" r="1.6" />
+          <circle cx="15" cy="12" r="1.6" />
+          <circle cx="9" cy="18" r="1.6" />
+          <circle cx="15" cy="18" r="1.6" />
+        </svg>
+      </span>
 
       <div class="section-meta">
         <span class="meta-icon">{{ SECTION_TYPE_META[section.type].icon }}</span>
@@ -151,8 +174,15 @@
           </div>
         </div>
 
-        <el-button :icon="Plus" size="small" plain :disabled="section.cards.length >= 6" @click="addCard">
-          新增卡片
+        <el-button
+          :icon="Plus"
+          size="small"
+          plain
+          :disabled="section.type === 'four-card' && section.cards.length >= 6"
+          :title="section.type === 'four-card' && section.cards.length >= 6 ? '最多 6 張卡片' : ''"
+          @click="addCard"
+        >
+          新增卡片<span v-if="section.type === 'four-card' && section.cards.length >= 6" class="limit-hint">（已達上限 6 張）</span>
         </el-button>
       </template>
 
@@ -166,17 +196,13 @@
         </div>
 
         <div class="item-row">
-          <label class="item-label">圖片網址</label>
-          <el-input v-model="section.imageSrc" placeholder="https://... 或 /img/..." />
+          <label class="item-label">圖片</label>
+          <ImagePicker v-model="section.imageSrc" :show-preview="true" placeholder="從媒體庫挑、上傳新圖、或貼網址" />
         </div>
 
         <div class="item-row">
           <label class="item-label">圖片替代文字</label>
           <el-input v-model="section.imageAlt" placeholder="提供給無障礙與 SEO 的說明文字" />
-        </div>
-
-        <div v-if="section.imageSrc" class="image-preview">
-          <img :src="section.imageSrc" :alt="section.imageAlt" />
         </div>
 
         <div class="item-row">
@@ -196,7 +222,11 @@
           </div>
           <div>
             <label class="item-label">按鈕連結</label>
-            <el-input v-model="section.ctaUrl" placeholder="/page 或 https://..." />
+            <LinkPicker
+              :model-value="section.ctaUrl || ''"
+              placeholder="/page 或 https://..."
+              @update:model-value="section.ctaUrl = $event"
+            />
           </div>
         </div>
       </template>
@@ -220,13 +250,20 @@
             <el-input v-model="card.title" placeholder="卡片標題" size="large" />
             <div class="two-col">
               <el-input v-model="card.ctaText" placeholder="按鈕文字" />
-              <el-input v-model="card.ctaUrl" placeholder="按鈕連結" />
+              <LinkPicker v-model="card.ctaUrl" placeholder="按鈕連結" />
             </div>
           </div>
         </div>
 
-        <el-button :icon="Plus" size="small" plain :disabled="section.cards.length >= 3" @click="addCtaCard">
-          新增行動卡
+        <el-button
+          :icon="Plus"
+          size="small"
+          plain
+          :disabled="section.type === 'cta-card' && section.cards.length >= 3"
+          :title="section.type === 'cta-card' && section.cards.length >= 3 ? '最多 3 張行動卡' : ''"
+          @click="addCtaCard"
+        >
+          新增行動卡<span v-if="section.type === 'cta-card' && section.cards.length >= 3" class="limit-hint">（已達上限 3 張）</span>
         </el-button>
       </template>
     </div>
@@ -234,8 +271,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { ElButton, ElInput, ElRadioButton, ElRadioGroup } from 'element-plus';
+import { computed, ref } from 'vue';
+import { ElButton, ElInput, ElMessage, ElRadioButton, ElRadioGroup } from 'element-plus';
 import {
   ArrowDown,
   ArrowUp,
@@ -244,6 +281,7 @@ import {
   Delete,
   Plus,
   Top,
+  Upload,
 } from '@element-plus/icons-vue';
 import {
   ICON_OPTIONS,
@@ -251,6 +289,9 @@ import {
   isSectionEmpty,
   type Section,
 } from '@/composables/useDynamicPages';
+import { FRONTEND_ASSET_UPLOAD_URL, FRONTEND_DYNAMIC_API_TOKEN } from '@/config/adminEnv';
+import LinkPicker from './LinkPicker.vue';
+import ImagePicker from './ImagePicker.vue';
 
 const props = defineProps<{
   modelValue: Section;
@@ -275,6 +316,34 @@ const emit = defineEmits<{
 
 const section = computed(() => props.modelValue);
 const isEmpty = computed(() => isSectionEmpty(section.value));
+const imageFileInput = ref<HTMLInputElement | null>(null);
+const uploadingImage = ref(false);
+
+// 2026-05-25 拖拽改良：預設不可拖（避免擋表單輸入），按住把手才可拖
+const isDraggable = ref(false);
+
+function enableDrag() {
+  isDraggable.value = true;
+}
+
+function disableDrag() {
+  isDraggable.value = false;
+}
+
+function onDragStartEmit(ev: DragEvent) {
+  emit('dragstart', ev);
+}
+
+function onDragEndReset(ev: DragEvent) {
+  emit('dragend', ev);
+  isDraggable.value = false;
+}
+const MAX_IMAGE_UPLOAD_SIZE = 8 * 1024 * 1024;
+const isEmbeddedImage = computed(() => section.value.type === 'image-text' && section.value.imageSrc.startsWith('data:image/'));
+const isLocalImagePath = computed(() => (
+  section.value.type === 'image-text' &&
+  /^(["']?)([a-zA-Z]:\\|[a-zA-Z]:\/|\\\\|file:\/\/)/.test(section.value.imageSrc.trim())
+));
 
 const summaryText = computed(() => {
   const current = section.value;
@@ -363,6 +432,79 @@ function removeCtaCard(idx: number) {
     section.value.cards.splice(idx, 1);
   }
 }
+
+function triggerImageFileSelect() {
+  imageFileInput.value?.click();
+}
+
+function clearSelectedImage() {
+  if (section.value.type !== 'image-text') return;
+  section.value.imageSrc = '';
+}
+
+async function uploadImageFile(file: File) {
+  if (!FRONTEND_ASSET_UPLOAD_URL) {
+    throw new Error('VITE_FRONTEND_ASSET_UPLOAD_URL or VITE_FRONTEND_BASE is not configured');
+  }
+
+  const formData = new FormData();
+  const headers: Record<string, string> = {};
+  formData.append('file', file);
+
+  if (FRONTEND_DYNAMIC_API_TOKEN) {
+    headers['X-iFare-Sync-Token'] = FRONTEND_DYNAMIC_API_TOKEN;
+  }
+
+  const response = await fetch(FRONTEND_ASSET_UPLOAD_URL, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return response.json() as Promise<{ url?: string; path?: string }>;
+}
+
+async function onImageFileChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('請選擇圖片檔案');
+    input.value = '';
+    return;
+  }
+
+  if (file.size > MAX_IMAGE_UPLOAD_SIZE) {
+    ElMessage.warning('圖片不可超過 8MB，請壓縮後再上傳');
+    input.value = '';
+    return;
+  }
+
+  uploadingImage.value = true;
+
+  try {
+    const result = await uploadImageFile(file);
+    if (section.value.type !== 'image-text') return;
+
+    section.value.imageSrc = result.url || result.path || '';
+    if (!section.value.imageAlt.trim()) {
+      section.value.imageAlt = file.name.replace(/\.[^.]+$/, '');
+    }
+    ElMessage.success('圖片已上傳，儲存頁面時會保留圖片網址');
+  } catch (err) {
+    console.warn('[PageBuilder] image upload failed', err);
+    ElMessage.error('圖片上傳失敗，請確認前台 dev server 已啟動');
+  } finally {
+    uploadingImage.value = false;
+    input.value = '';
+  }
+}
 </script>
 
 <style lang="scss" scoped>
@@ -402,18 +544,61 @@ function removeCtaCard(idx: number) {
   gap: 12px;
 }
 
+// 2026-05-25 加強拖把手 — 從 ⋮⋮ 改成 6 個圓點 grip 圖示，hover 變橘明顯
 .section-handle {
   cursor: grab;
   color: #c0c4cc;
-  font-size: 14px;
   line-height: 1;
-  letter-spacing: -2px;
   user-select: none;
-  padding-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 36px;
+  margin: -4px -4px 0 -8px;
+  border-radius: 8px;
+  transition: background-color 0.18s ease, color 0.18s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    color: #ea5504;
+    background: rgba(234, 85, 4, 0.08);
+  }
+
+  &:active,
+  .is-draggable & {
+    cursor: grabbing;
+    color: #ea5504;
+    background: rgba(234, 85, 4, 0.15);
+  }
+}
+
+// 收合狀態時 toolbar 整條可拖（更好抓）
+.section-toolbar.drag-source {
+  cursor: grab;
 
   &:active {
     cursor: grabbing;
   }
+
+  &:hover .section-handle {
+    color: #ea5504;
+    background: rgba(234, 85, 4, 0.08);
+  }
+}
+
+// 拖拽中視覺反饋
+.section-editor.is-draggable {
+  border-color: #ea5504;
+  box-shadow: 0 12px 28px -14px rgba(234, 85, 4, 0.5);
+}
+
+// 2026-05-25 R — 達上限提示文字（disabled button 內）
+.limit-hint {
+  margin-left: 4px;
+  font-size: 11px;
+  color: inherit;
+  opacity: 0.85;
 }
 
 .section-meta {
@@ -527,6 +712,23 @@ function removeCtaCard(idx: number) {
   font-size: 12px;
   color: #909399;
   line-height: 1.6;
+}
+
+.item-warning {
+  font-size: 12px;
+  color: #c45656;
+  line-height: 1.6;
+}
+
+.image-source-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.image-file-input {
+  display: none;
 }
 
 .paragraphs-list,

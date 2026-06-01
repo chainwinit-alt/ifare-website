@@ -114,7 +114,10 @@
                 @is-opened="isSelectOpen"
                 @update:select-value="getSelectValue"
               />
-            <CompSelectRecipient 
+            <!-- 2026-05-25 UIUX #57 — 原 CompSelectRecipient 改用 CompSelect variant="tags" + allow-deselect -->
+            <CompSelect
+                variant="tags"
+                :allow-deselect="true"
                 placeholder="受助者年齡區間"
                 select-title="受助者年齡區間"
                 select-type="recipient"
@@ -183,17 +186,26 @@
               />
             </div>
             <span class="result-total">{{ storageiFarePolicyList.length }}</span>
+            <div class="compare-toolbar" v-if="compareCount > 0">
+              <span>已收藏 {{ compareCount }} 個福利</span>
+              <NuxtLink class="btn btn-filter compare-toolbar__link" to="/ifare/compare">
+                <span>查看比較</span>
+              </NuxtLink>
+            </div>
             <div class="result-loading" v-if="isLoading">載入中...</div>
             <div class="result-loading result-error" v-else-if="hasError">
               <p>{{ errorMessage }}</p>
               <button class="btn btn-filter" type="button" @click="RetryLoad">重新載入</button>
             </div>
-            <div class="result-loading result-empty" v-else-if="iFarePolicyList.length === 0" role="status">
+            <div class="result-loading result-empty" v-else-if="!isLoading && iFarePolicyList.length === 0" role="status">
               <div class="empty-illustration" aria-hidden="true">
                 <i class="icon ic-search"></i>
               </div>
               <p class="empty-title">沒有找到符合條件的福利</p>
-              <p class="empty-hint">試試放寬篩選條件、調整關鍵字，或看看所有福利政策。</p>
+              <p class="empty-hint">{{ emptyHint }}</p>
+              <ul v-if="emptyDiagnosis.length > 0" class="empty-diagnosis-list">
+                <li v-for="item in emptyDiagnosis" :key="item">{{ item }}</li>
+              </ul>
               <div class="empty-actions">
                 <button class="btn btn-filter" type="button" @click="ScrollToFilter">
                   <span>修改搜尋條件</span>
@@ -209,8 +221,22 @@
                 v-for="_item in iFarePolicyList"
                 :key="_item.id"
               >
+                <button
+                  class="compare-toggle"
+                  :class="{ 'is-saved': isPolicySaved(_item.id) }"
+                  type="button"
+                  :aria-pressed="isPolicySaved(_item.id)"
+                  @click.stop="ToggleCompare(_item)"
+                >
+                  {{ isPolicySaved(_item.id) ? '已收藏' : '收藏比較' }}
+                </button>
                 <NuxtLink :to="{ path: '/ifare/info', query: { id: _item.id } }">
                   <h4 class="result-title">{{ _item.title }}</h4>
+                  <span
+                    v-if="_item.deadlineInfo"
+                    class="deadline-badge"
+                    :class="`deadline-badge--${_item.deadlineInfo.level}`"
+                  >{{ _item.deadlineInfo.label }}</span>
                   <div class="result-item-bottom">
                     <div class="result-filter">
                       <label class="result-filter-area">{{ _item.area }}</label>
@@ -258,8 +284,11 @@ definePageMeta({
 const { $WebApiGet } = useNuxtApp();
 const { getApiResultArray } = useApiResult();
 const { getApiErrorMessage } = useApiErrorMessage();
+const { getDeadlineInfo } = usePolicyDeadline();
+const { loadWelfareProfile, saveWelfareProfile, clearWelfareProfile } = useWelfareProfile();
+const { getLifeEventByKey } = useWelfareLifeEvents();
+const { count: compareCount, isSaved: isPolicySaved, togglePolicy } = useWelfareCompare();
 import CompSelect from "../components/CompSelect.vue";
-import CompSelectRecipient from "../components/CompSelectRecipient.vue";
 import CompSelectElse from "~/components/CompSelectElse.vue";
 import CompPage from "../components/CompPage.vue"
 import IfareSummaryCard from "~/components/IfareSummaryCard.vue";
@@ -308,6 +337,7 @@ let lastQuery: any = {};
 const isClientReady = ref(false);
 const $route = useRoute();
 const $router = useRouter();
+const selectedLifeEvent = ref("");
 const appliedSearchParams = ref<Record<string, any>>({});
 const filterSectionRef = ref<HTMLElement | null>(null);
 const resultContentRef = ref<HTMLElement | null>(null);
@@ -325,6 +355,11 @@ const effectiveAppliedSearchParams = computed(() => {
   return Object.keys(appliedSearchParams.value || {}).length > 0
     ? appliedSearchParams.value
     : routeSearchParams.value;
+});
+const canSearch = computed(() => {
+  const formQuery = buildFarePolicyApiQuery();
+  const routeQuery = buildQueryFromRoute($route.query as Record<string, any>);
+  return Object.keys({ ...routeQuery, ...formQuery }).length > 0;
 });
 
 function getSelectLabel(list: Array<selectItem>, value: string, isAllValue?: (value: any) => boolean) {
@@ -398,13 +433,9 @@ function buildFarePolicyApiQuery() {
   if (codeSelectIncome.value) query.CodeIncome = codeSelectIncome.value;
   if (searchQuery.value.trim()) query.Query = searchQuery.value.trim();
   if (codeSelectIdentity.value.length > 0) query.CodeIdentities = codeSelectIdentity.value;
+  if (selectedLifeEvent.value) query.LifeEvent = selectedLifeEvent.value;
   return query;
 }
-const canSearch = computed(() => {
-  const formQuery = buildFarePolicyApiQuery();
-  const routeQuery = buildQueryFromRoute($route.query as Record<string, any>);
-  return Object.keys({ ...routeQuery, ...formQuery }).length > 0;
-});
 const autocompleteFilters = computed(() => ({
   CodePolicy: codeSelect_policy.value && !isAllPolicyValue(codeSelect_policy.value) ? codeSelect_policy.value : undefined,
   CodeRecipient: codeSelectRecipient.value || undefined,
@@ -460,6 +491,7 @@ function buildQueryFromRoute(routeQuery: Record<string, any>) {
   if (routeQuery.income) nextQuery.CodeIncome = routeQuery.income;
   if (routeQuery.query) nextQuery.Query = routeQuery.query;
   if (routeQuery.identity) nextQuery.CodeIdentities = parseIdentityQuery(routeQuery.identity);
+  if (routeQuery.event) nextQuery.LifeEvent = routeQuery.event;
   return nextQuery;
 }
 
@@ -469,6 +501,7 @@ function syncFilterStateFromRoute(routeQuery: Record<string, any>) {
   codeSelectRecipient.value = typeof routeQuery.recipient == "string" ? routeQuery.recipient : "";
   codeSelectIncome.value = typeof routeQuery.income == "string" ? routeQuery.income : "";
   searchQuery.value = typeof routeQuery.query == "string" ? routeQuery.query : "";
+  selectedLifeEvent.value = typeof routeQuery.event == "string" ? routeQuery.event : "";
 
   const routeIdentities = parseIdentityQuery(routeQuery.identity);
   codeSelectIdentity.value.splice(0);
@@ -661,6 +694,15 @@ function Search() {
   markPendingSummaryScroll();
   const nextQuery = buildFarePolicyApiQuery();
   lastQuery = { ...nextQuery };
+  saveWelfareProfile({
+    policy: codeSelect_policy.value,
+    recipient: codeSelectRecipient.value,
+    area: codeSelect_area.value,
+    income: codeSelectIncome.value,
+    identities: codeSelectIdentity.value.map((item: any) => String(item)),
+    query: searchQuery.value.trim(),
+    lifeEvent: selectedLifeEvent.value,
+  });
   const currentQuery = buildQueryFromRoute($route.query as Record<string, any>);
   const nextSignature = JSON.stringify(nextQuery);
   const currentSignature = JSON.stringify(currentQuery);
@@ -685,6 +727,8 @@ interface iFarePolicyItem {
   hasIndentity: boolean;
   hasIncome: boolean;
   hasRecipient: boolean;
+  discontinuedTime: string;
+  deadlineInfo: any;
 }
 
 interface pageNum {
@@ -698,6 +742,23 @@ const storageiFarePolicyList = reactive<Array<iFarePolicyItem>>([]);
 const pageNums = reactive<Array<pageNum>>([]);
 const summaryTriggerKey = ref(0);
 const summaryResetKey = ref(0);
+const activeLifeEvent = computed(() => getLifeEventByKey(selectedLifeEvent.value));
+const emptyHint = computed(() => {
+  if (activeLifeEvent.value) {
+    return `目前找不到與「${activeLifeEvent.value.name}」完全符合的福利，建議先放寬條件或調整關鍵字。`;
+  }
+
+  return '試試放寬篩選條件、調整關鍵字，或看看所有福利政策。';
+});
+const emptyDiagnosis = computed(() => {
+  const hints: string[] = [];
+  if (lastQuery.CodeDomicile) hints.push('戶籍地可能太精準，可先改成全國或清除地區。');
+  if (lastQuery.CodeRecipient) hints.push('年齡區間可能不符合，可先清除年齡限制。');
+  if (lastQuery.CodeIncome) hints.push('經濟條件可能限制結果，可先清除收入條件。');
+  if (lastQuery.CodeIdentities?.length > 0) hints.push('特殊身分可能沒有對應方案，可先清除身分條件。');
+  if (lastQuery.Query) hints.push('關鍵字可能太細，可改用較短詞，例如「補助」「照顧」「就學」。');
+  return hints.slice(0, 4);
+});
 
 function normalizeCacheValue(value: any): string {
   if (Array.isArray(value)) {
@@ -846,7 +907,9 @@ function SetDataInit(_q: any) {
           area: item.codeDomicile_LabelName,
           hasIndentity: item.codeIdentityList.findIndex((p:any) => p.id == 1) < 0,
           hasIncome: item.codeIncomeList.findIndex((p:any) => p.id == 1) < 0,
-          hasRecipient: item.codeRecipientList.findIndex((p:any) => p.id == 1) < 0
+          hasRecipient: item.codeRecipientList.findIndex((p:any) => p.id == 1) < 0,
+          discontinuedTime: item.discontinuedTime,
+          deadlineInfo: getDeadlineInfo(item.discontinuedTime),
         };
       }
     );
@@ -872,6 +935,7 @@ function syncRouteQueryFromSearch(query: Record<string, any>) {
   if (Array.isArray(query.CodeIdentities) && query.CodeIdentities.length > 0) {
     nextRouteQuery.identity = query.CodeIdentities.map((item: any) => String(item)).join(",");
   }
+  if (query.LifeEvent) nextRouteQuery.event = String(query.LifeEvent);
 
   $router.push({
     path: "/ifare/result",
@@ -923,8 +987,23 @@ function ResetParam() {
   summaryResetKey.value += 1;
   clearPendingSummaryScroll();
   lastQuery = {};
+  selectedLifeEvent.value = ""
+  clearWelfareProfile()
   syncRouteQueryFromSearch({});
   triggerResetFeedback()
+}
+
+function ToggleCompare(item: iFarePolicyItem) {
+  togglePolicy({
+    id: item.id,
+    title: item.title,
+    area: item.area,
+    qualification: item.qualification,
+    discontinuedTime: item.discontinuedTime,
+    hasIndentity: item.hasIndentity,
+    hasIncome: item.hasIncome,
+    hasRecipient: item.hasRecipient,
+  });
 }
 
 function RetryLoad() {
@@ -1049,6 +1128,31 @@ onBeforeUnmount(() => {
   clearResetFeedbackTimer()
   clearSummaryScrollLock()
   clearSummaryResizeObserver()
+})
+
+onMounted(() => {
+  if (Object.keys($route.query).length > 0) return;
+
+  const profile = loadWelfareProfile();
+  if (!profile) return;
+
+  codeSelect_policy.value = profile.policy || "";
+  codeSelect_area.value = profile.area || "";
+  codeSelectRecipient.value = profile.recipient || "";
+  codeSelectIncome.value = profile.income || "";
+  codeSelectIdentity.value.splice(0, codeSelectIdentity.value.length, ...(profile.identities ?? []));
+  searchQuery.value = profile.query || "";
+  selectedLifeEvent.value = profile.lifeEvent || "";
+
+  const query: any = {};
+  if (profile.policy && profile.policy != ALL_POLICY_VALUE) query.CodePolicy = profile.policy;
+  if (profile.recipient) query.CodeRecipient = profile.recipient;
+  if (profile.area && profile.area != ALL_AREA_VALUE) query.CodeDomicile = profile.area;
+  if (profile.income) query.CodeIncome = profile.income;
+  if (profile.query) query.Query = profile.query;
+  if (profile.identities?.length) query.CodeIdentities = profile.identities;
+  if (profile.lifeEvent) query.LifeEvent = profile.lifeEvent;
+  if (Object.keys(query).length > 0) SetDataInit(query);
 })
 </script>
 
@@ -1231,6 +1335,118 @@ onBeforeUnmount(() => {
 
   .query-field-mobile :deep(.query-count) {
     right: 12px;
+  }
+}
+
+.compare-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(44, 80, 97, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #1f3640;
+  font-weight: 700;
+}
+
+.compare-toolbar__link {
+  min-width: auto;
+  padding: 0 16px;
+}
+
+.result-item {
+  position: relative;
+}
+
+.compare-toggle {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 14px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(234, 85, 4, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #c84804;
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.compare-toggle.is-saved {
+  border-color: rgba(35, 84, 71, 0.28);
+  background: #eef6f4;
+  color: #235447;
+}
+
+.compare-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.result-title {
+  padding-right: 96px;
+}
+
+.deadline-badge {
+  display: inline-flex;
+  width: fit-content;
+  margin: 8px 0 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #eef6f4;
+  color: #235447;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.deadline-badge--soon {
+  background: #fff5df;
+  color: #8a5700;
+}
+
+.deadline-badge--urgent {
+  background: #ffe8e2;
+  color: #9f2f13;
+}
+
+.empty-diagnosis-list {
+  display: grid;
+  gap: 8px;
+  max-width: 560px;
+  margin: 12px auto 0;
+  padding: 0;
+  color: #4d5b63;
+  list-style: none;
+  text-align: left;
+}
+
+.empty-diagnosis-list li {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+@media (max-width: 560px) {
+  .compare-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .compare-toolbar__link {
+    width: 100%;
+  }
+
+  .compare-toggle {
+    position: static;
+    margin: 0 0 10px 14px;
+  }
+
+  .result-title {
+    padding-right: 0;
   }
 }
 </style>

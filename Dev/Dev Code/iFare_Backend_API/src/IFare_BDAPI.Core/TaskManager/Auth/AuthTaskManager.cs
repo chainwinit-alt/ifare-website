@@ -1,6 +1,8 @@
 using System.Linq;
 using Abp.Domain.Repositories;
 using Abp.Domain.Services;
+using IFare_BDAPI.Constants;
+using IFare_BDAPI.Security;
 using IFare_BDAPI.TaskManager.Auth.ValueModel;
 
 namespace IFare_BDAPI.TaskManager.Auth 
@@ -15,19 +17,37 @@ namespace IFare_BDAPI.TaskManager.Auth
 
         public AuthUser GetAuthUser(string act, string pwd)
         {
-            return _repository.GetAll()
-                                .Where(p => p.Account == act && p.Password == pwd)
-                                .Select(p => new AuthUser
-                                {
-                                    Id = p.Id,
-                                    UserName = p.UserName,
-                                    Act = p.Account,
-                                    Pwd = p.Password,
-                                    Email = p.Email,
-                                    Permission = p.Permissions,
-                                    State = p.State
-                                })
+            var user = _repository.GetAll()
+                                .Where(p => p.Account == act)
                                 .FirstOrDefault();
+
+            if (user == null || user.State != DataState.Enabled)
+            {
+                return null;
+            }
+
+            var passwordResult = SysUserPasswordHasher.VerifyPassword(user.Password, pwd);
+            if (passwordResult == SysUserPasswordVerificationResult.Failed)
+            {
+                return null;
+            }
+
+            if (passwordResult == SysUserPasswordVerificationResult.SuccessRehashNeeded)
+            {
+                user.Password = SysUserPasswordHasher.HashPassword(pwd);
+                _repository.Update(user);
+            }
+
+            return new AuthUser
+            {
+                Id = user.Id,
+                UserName = user.UserName,
+                Act = user.Account,
+                Pwd = string.Empty,
+                Email = user.Email,
+                Permission = user.Permissions,
+                State = user.State
+            };
         }
 
         

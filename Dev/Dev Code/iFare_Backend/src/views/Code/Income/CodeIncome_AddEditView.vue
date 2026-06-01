@@ -60,6 +60,7 @@ import { ElButton, ElSwitch, ElInput, ElScrollbar } from "element-plus";
 import { Close, Check } from "@element-plus/icons-vue";
 import MainHeader from "@/components/MainHeader.vue";
 import { useUserStore } from "@/stores/user";
+import { useCodeDuplicateCheck } from "@/composables/useCodeDuplicateCheck";
 import { useRouter } from "vue-router";
 
 const app = getCurrentInstance();
@@ -68,6 +69,7 @@ const $WebAPI = app?.appContext.config.globalProperties.$WebAPI;
 const _$route = app?.appContext.config.globalProperties.$route;
 const _router = useRouter();
 const userStore = useUserStore();
+const { checkDuplicate } = useCodeDuplicateCheck();
 const $Message = app?.appContext.config.globalProperties.$message;
 
 const routeNameType = _$route?.name?.toString().toLocaleLowerCase() || "";
@@ -99,12 +101,21 @@ if (routeNameType.indexOf("edit") >= 0) {
   );
 }
 
-function SaveAction() {
+async function SaveAction() {
   const _labelName = input_name.value;
   const _isEnabled = switch_state.value;
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
+    // 2026-05-25 #34 — 新增前先檢查名稱重複,避免送到後端才發現
+    const dupAdd = await checkDuplicate($WebAPI.GetCodeIncome, _labelName, null);
+    if (!dupAdd.ok) {
+      $Message({
+        message: `名稱「${_labelName}」已存在(${dupAdd.conflictItem?.state}),請改用其他名稱`,
+        type: 'warning',
+        duration: 4000,
+      });
+      return;
+    }
     $WebAPI.InsertCodeIncome(
       userStore.token,
       _labelName,
@@ -129,9 +140,18 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids ? ids[0] : 0;
     if (_id == 0) return false;
+    // 2026-05-25 #34 — 編輯前也檢查名稱重複(忽略自己這筆)
+    const dupEdit = await checkDuplicate($WebAPI.GetCodeIncome, _labelName, _id);
+    if (!dupEdit.ok) {
+      $Message({
+        message: `名稱「${_labelName}」與其他資料重複(${dupEdit.conflictItem?.state}),請改用其他名稱`,
+        type: 'warning',
+        duration: 4000,
+      });
+      return;
+    }
     $WebAPI.UpdateCodeIncome(
       userStore.token,
       _id,

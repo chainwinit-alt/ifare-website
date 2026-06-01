@@ -937,6 +937,7 @@ function addDays(date: Date, days: number) {
   gap: 18px;
   padding-bottom: 28px;
   color: #24303a;
+  min-width: 0;
 }
 
 .header-subtitle {
@@ -966,10 +967,17 @@ function addDays(date: Date, days: number) {
   grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
   gap: 24px;
   padding: 30px 32px;
+  min-width: 0;
   background:
     radial-gradient(circle at top left, rgba(255, 183, 3, 0.24), transparent 34%),
     linear-gradient(135deg, #16323f 0%, #0f4c5c 45%, #f4a261 160%);
   color: #fffdf8;
+}
+
+.hero-copy,
+.hero-status-grid,
+.status-tile {
+  min-width: 0;
 }
 
 .hero-kicker {
@@ -1036,14 +1044,16 @@ function addDays(date: Date, days: number) {
 
 .filter-bar {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 1.6fr) 220px;
+  grid-template-columns: minmax(180px, 1.3fr) minmax(280px, 1.6fr) minmax(160px, 220px);
   gap: 18px;
   align-items: end;
+  min-width: 0;
 }
 
 .filter-group {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .filter-label {
@@ -1056,9 +1066,11 @@ function addDays(date: Date, days: number) {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  min-width: 0;
 }
 
 .preset-chip {
+  min-width: 0;
   border: 1px solid rgba(15, 76, 92, 0.14);
   border-radius: 999px;
   background: #ffffff;
@@ -1088,6 +1100,7 @@ function addDays(date: Date, days: number) {
 .date-range,
 .year-select {
   width: 100%;
+  min-width: 0;
 }
 
 .compare-strip {
@@ -1114,11 +1127,13 @@ function addDays(date: Date, days: number) {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+  min-width: 0;
 }
 
 .kpi-card {
   padding: 22px 22px 20px;
   background: #fff;
+  min-width: 0;
 }
 
 .kpi-head {
@@ -1126,12 +1141,14 @@ function addDays(date: Date, days: number) {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
+  min-width: 0;
 }
 
 .kpi-label {
   color: #5f6d77;
   font-size: 13px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .kpi-delta {
@@ -1178,6 +1195,11 @@ function addDays(date: Date, days: number) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+  min-width: 0;
+}
+
+.analytics-grid > * {
+  min-width: 0;
 }
 
 .chart-wide {
@@ -1189,6 +1211,7 @@ function addDays(date: Date, days: number) {
 .device-card {
   padding: 22px 22px 16px;
   background: #fff;
+  min-width: 0;
 }
 
 .card-head {
@@ -1197,12 +1220,14 @@ function addDays(date: Date, days: number) {
   gap: 12px;
   align-items: flex-start;
   margin-bottom: 12px;
+  min-width: 0;
 }
 
 .card-head h3 {
   margin: 0 0 6px;
   color: #14232c;
   font-size: 22px;
+  overflow-wrap: anywhere;
 }
 
 .card-head p {
@@ -1289,6 +1314,12 @@ function addDays(date: Date, days: number) {
   color: #56606b !important;
 }
 
+:deep(.vue-apexcharts),
+:deep(.apexcharts-canvas),
+:deep(.apexcharts-svg) {
+  max-width: 100%;
+}
+
 @media (max-width: 1200px) {
   .filter-bar {
     grid-template-columns: 1fr;
@@ -1299,10 +1330,33 @@ function addDays(date: Date, days: number) {
   }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1024px) {
   .hero-panel,
   .analytics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .hero-status-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-bar {
+    gap: 16px;
+  }
+
+  .preset-chip {
+    flex: 1 1 calc(50% - 10px);
+  }
+
+  .compare-strip {
+    display: grid;
+    gap: 6px;
   }
 }
 
@@ -1325,8 +1379,19 @@ function addDays(date: Date, days: number) {
     grid-template-columns: 1fr;
   }
 
+  .kpi-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .header-subtitle {
     display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .preset-chip {
+    flex-basis: 100%;
   }
 }
 </style>

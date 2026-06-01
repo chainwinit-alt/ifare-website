@@ -183,9 +183,7 @@ function GetCodeDomicileList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;
@@ -220,9 +218,7 @@ function GetOfficeUnitData(){
     null,
     false,
     ids,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;
@@ -274,7 +270,6 @@ const handleClick_AddOfficeUnit = (
   office_index: number,
   isAddMode: boolean
 ) => {
-  //   console.log(index);
   if (isAddMode) {
     return officeList[officeUnitList_index].unitDetailList.push({
       unitName: "",
@@ -289,18 +284,14 @@ const handleClick_AddOfficeUnit = (
 const handleClick_DeleteOfficeDomicile = (
   officeUnitList_index: number
 ) => {
-  //   console.log(index);
   officeList.splice(officeUnitList_index, 1);
 };
 
 function SaveAction() {
-  console.log(officeList)
-  // console.log(datepicker_release.value)
   const _title = input_title.value
   const _state = switch_state.value
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
     $WebAPI.InsertFareOfficeUnit(userStore.token, _title, officeList, _state,(res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {
@@ -321,7 +312,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
     $WebAPI.UpdateFareOfficeUnit(userStore.token, _id, _title, officeList, _state,(res: any) => {

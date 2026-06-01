@@ -83,6 +83,7 @@ import { ElButton, ElSwitch, ElInput, ElScrollbar } from "element-plus";
 import { Close, Check } from "@element-plus/icons-vue";
 import MainHeader from "@/components/MainHeader.vue";
 import { useUserStore } from "@/stores/user";
+import { useCodeDuplicateCheck } from "@/composables/useCodeDuplicateCheck";
 import { useRouter } from "vue-router";
 
 // 取得全域掛載的工具函式與 API 物件
@@ -91,7 +92,8 @@ const $commonLib = app?.appContext.config.globalProperties.$CommonLib; // 共用
 const $WebAPI = app?.appContext.config.globalProperties.$WebAPI;       // Web API 呼叫封裝
 const _$route = app?.appContext.config.globalProperties.$route;        // 當前路由資訊
 const _router = useRouter();                                           // Vue Router 實例
-const userStore = useUserStore();                                      // Pinia 使用者狀態（含 token）
+const userStore = useUserStore();
+const { checkDuplicate } = useCodeDuplicateCheck();                                      // Pinia 使用者狀態（含 token）
 const $Message = app?.appContext.config.globalProperties.$message;     // Element Plus 訊息提示
 
 // 判斷目前路由為「新增」或「編輯」模式（轉小寫後比對）
@@ -136,13 +138,22 @@ if (routeNameType.indexOf("edit") >= 0) {
  * SaveAction — 儲存按鈕點擊處理
  * 根據目前路由模式（add / edit）分別呼叫新增或更新 API
  */
-function SaveAction() {
+async function SaveAction() {
   const _labelName = input_name.value;   // 取得表單名稱欄位值
   const _isEnabled = switch_state.value; // 取得資料狀態布林值
 
   // ── 新增模式 ──
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
+    // 2026-05-25 #34 — 新增前先檢查名稱重複,避免送到後端才發現
+    const dupAdd = await checkDuplicate($WebAPI.GetCodeIdentity, _labelName, null);
+    if (!dupAdd.ok) {
+      $Message({
+        message: `名稱「${_labelName}」已存在(${dupAdd.conflictItem?.state}),請改用其他名稱`,
+        type: 'warning',
+        duration: 4000,
+      });
+      return;
+    }
     // API 說明：InsertCodeIdentity(token, 名稱, 是否啟用, callback)
     $WebAPI.InsertCodeIdentity(
       userStore.token,
@@ -170,9 +181,18 @@ function SaveAction() {
 
   // ── 編輯模式 ──
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids ? ids[0] : 0;
     if (_id == 0) return false; // id 無效則中止
+    // 2026-05-25 #34 — 編輯前也檢查名稱重複(忽略自己這筆)
+    const dupEdit = await checkDuplicate($WebAPI.GetCodeIdentity, _labelName, _id);
+    if (!dupEdit.ok) {
+      $Message({
+        message: `名稱「${_labelName}」與其他資料重複(${dupEdit.conflictItem?.state}),請改用其他名稱`,
+        type: 'warning',
+        duration: 4000,
+      });
+      return;
+    }
     // API 說明：UpdateCodeIdentity(token, id, 名稱, 是否啟用, callback)
     $WebAPI.UpdateCodeIdentity(
       userStore.token,

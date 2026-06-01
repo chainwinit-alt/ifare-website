@@ -32,7 +32,14 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     frontendApiServerBase:
-      process.env.NUXT_FRONTEND_API_SERVER_BASE || "http://localhost/ifare_api/api/services/app",
+      process.env.NUXT_FRONTEND_API_SERVER_BASE ||
+      (process.env.NODE_ENV === "development"
+        ? "http://localhost/ifare_api/api/services/app"
+        : "https://www.i-fare.org.tw/ifare_api/api/services/app"),
+    dynamicApiToken: process.env.NUXT_DYNAMIC_API_TOKEN || "",
+    dynamicApiAllowedOrigins: process.env.NUXT_DYNAMIC_API_ALLOWED_ORIGINS || "",
+    geminiApiKey: readEnv("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+    geminiModel: readEnv("NUXT_GEMINI_MODEL", "GEMINI_MODEL") || "gemini-2.5-flash",
     llm: {
       provider: (readEnv("NUXT_LLM_PROVIDER", "LLM_PROVIDER") || "gemini").toLowerCase(),
       openaiApiKey: readEnv("OPENAI_API_KEY"),
@@ -66,19 +73,38 @@ export default defineNuxtConfig({
 
   modules: ["nuxt-gtag", "nuxt-simple-sitemap"],
   css: ["normalize.css/normalize.css", "~/assets/style/styleIFare.scss"],
+
+  vite: {
+    css: {
+      preprocessorOptions: {
+        scss: {
+          additionalData: `@import "@/assets/style/_color"; @import "@/assets/style/_design-tokens";`,
+        },
+      },
+    },
+  },
+
   app: {
     head: {
       charset: "utf-8",
       viewport: "width=device-width, initial-scale=1",
       meta: [{ name: "format-detection", content: "telephone=no" }],
+      link: [
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
+        { rel: "dns-prefetch", href: "https://fonts.googleapis.com" },
+      ],
     },
   },
+
   gtag: {
     id: "G-QCT2XVFX2L",
   },
+
   site: {
     url: RESOLVED_SITE_URL,
   },
+
   sitemap: {
     xslColumns: [
       { label: "URL", width: "25%" },
@@ -88,6 +114,7 @@ export default defineNuxtConfig({
       { label: "Hreflangs", select: "count(xhtml:link)", width: "12.5%" },
     ],
   },
+
   routeRules: {
     "/": {
       sitemap: {

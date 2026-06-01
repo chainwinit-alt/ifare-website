@@ -34,9 +34,10 @@
     ],
     "permission": "Editor"
   },
-  { "indexKey": "ImgManager", "title": "Image Manager", "url": { "name": "ImgManager" }, "permission": "Editor" },
-  { "indexKey": "PageManagement", "title": "Page Management", "url": { "name": "PageManagement_DataList" }, "permission": "Editor" },
-  {
+
+  { "indexKey": "ImgManager", "title": "圖片管理", "url": {"name": "ImgManager"}, "permission": "Editor" },
+  { "indexKey": "PageManagement", "title": "頁面管理", "url": {"name": "PageManagement_DataList"}, "permission": "Editor" },
+    {
     "indexKey": "SearchGovernance",
     "title": "搜尋治理",
     "subList": [
@@ -46,7 +47,9 @@
     ],
     "permission": "Editor"
   },
-  { "indexKey": "Analysis", "title": "Analysis", "url": { "name": "Analysis" }, "permission": "Editor" },
-  { "indexKey": "Account", "title": "Accounts", "url": { "name": "Account_DataList" }, "permission": "Editor" },
-  { "indexKey": "Personal", "title": "Personal", "url": { "name": "Personal_Detail" }, "permission": "Editor" }
+  { "indexKey": "Analysis", "title": "資料分析", "url": {"name": "Analysis"}, "permission": "Editor" },
+  { "indexKey": "AdminAgent", "title": "AI 維護中心", "url": {"name": "AdminAgent"}, "permission": "Admin" },
+  { "indexKey": "Account", "title": "帳戶維護", "url": {"name": "Account_DataList"}, "permission": "Editor" },
+  { "indexKey": "Personal", "title": "個人資料", "url": {"name": "Personal_Detail"}, "permission": "Editor" }
+
 ]

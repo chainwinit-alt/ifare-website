@@ -14,10 +14,37 @@
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
+    <!-- 2026-05-25 UIUX #62 — 全站 Toast 容器 -->
+    <AppToastStack />
   </div>
 </template>
 
 <script setup lang="ts">
+// 2026-05-25 UIUX #84 — 全站 schema.org 結構化資料(Organization)
+// Google 搜尋結果可顯示組織資訊、官方網站、social profile
+useHead({
+  script: [
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'NGO',
+        name: '長穩社福慈善基金會',
+        alternateName: '長穩基金會',
+        url: 'https://www.i-fare.org.tw',
+        logo: 'https://www.i-fare.org.tw/favicon.ico',
+        description:
+          '長穩社福慈善基金會以推動環境保育、人才培育、社會關懷三大核心行動為使命,透過 i-fare 福利好幫手整合社會福利資訊。',
+        foundingDate: '2017-07-19',
+        founder: {
+          '@type': 'Person',
+          name: '陳進財',
+        },
+      }),
+    },
+  ],
+});
+
 const NETWORK_RESTORED_BANNER_MS = 3000;
 
 const networkBannerVisible = ref(false);

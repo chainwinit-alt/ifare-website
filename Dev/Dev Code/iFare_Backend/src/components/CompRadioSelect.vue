@@ -64,7 +64,6 @@ const modelValue = computed({
         return props.radioValue
     },
     set(value) {
-        console.log(value)
         emits('update:radioValue', value)
     }
 })

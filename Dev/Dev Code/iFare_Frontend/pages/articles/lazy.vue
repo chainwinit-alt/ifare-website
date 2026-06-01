@@ -1,5 +1,7 @@
 <template>
   <div class="app-body-child" :name="$route.name">
+    <!-- 2026-05-25 UIUX #33 — 閱讀進度條 -->
+    <ReadingProgressBar />
     <section class="section section-top">
       <h2 class="article-title">{{ lazyItem.title }}</h2>
       <h6 class="article-date">
@@ -15,9 +17,12 @@
 
     <section class="section section-info">
       <div class="article-info">
-        <button class="btn-icon btn-ic-share" @click="shareCurrentUrlToLine"><i class="ic-share"></i></button>
+        <!-- 2026-05-25 UIUX #35 — 擴展分享:LINE / FB / 複製連結 / Email -->
+        <ShareButtons variant="fixed" />
         <div class="raw-html" v-html="useSanitize(lazyItem.content)"></div>
       </div>
+      <!-- 2026-05-25 UIUX #21 — LINE 訂閱主動推廣 -->
+      <LineSubscribeCallout />
     </section>
 
     <section class="section section-bottom">
@@ -53,7 +58,6 @@ definePageMeta({
 
 const { $WebApiGet } = useNuxtApp();
 const { getApiResultValue } = useApiResult();
-const { shareCurrentUrlToLine } = useShareToLine();
 const { formatDisplayDate } = useDateFormatter();
 const { estimateReadingMinutes } = useReadingTime();
 const route = useRoute();
@@ -111,6 +115,7 @@ async function loadLazyDetail(articleId: number) {
 
   lazyItem.id = data.id;
   lazyItem.title = data.title;
+  // 2026-05-25 UIUX #34 — 懶人包不追蹤已讀(per user feedback),只福利專欄才標記
   lazyItem.content = data.imageList
     .map(
       (_img: any, index: number) =>

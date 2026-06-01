@@ -28,8 +28,15 @@
                             <p>目前沒有最新消息</p>
                         </div>
                         <ul class="list-unstyled article-list" v-else>
-                            <li class="article-item transition-general" v-for="_news in newsList" :key="_news.title">
+                            <!-- 2026-05-25 UIUX #34 — 已讀的 item 加 .is-read class,顯示「已讀」badge + 降低主色亮度 -->
+                            <li
+                                class="article-item transition-general"
+                                :class="{ 'is-read': readMarks.isRead(_news.id) }"
+                                v-for="_news in newsList"
+                                :key="_news.title"
+                            >
                                 <span class="badge-new" v-if="isNewItem(_news.releaseTime)">NEW</span>
+                                <span class="badge-read" v-else-if="readMarks.isRead(_news.id)">已讀</span>
                                 <NuxtLink class="item-page-link" :to="{path: '/news/info', query: {id: _news.id}}">
                                     <div class="item-title">
                                         <h2 class="article-title">{{ _news.title }}</h2>
@@ -72,6 +79,9 @@ definePageMeta({
   toLink: '/'
 })
 import CompPage from "../components/CompPage.vue"
+// 2026-05-25 UIUX #34 — 已讀標記
+const readMarks = useReadMarks('news')
+onMounted(() => readMarks.load())
 const { $WebApiGetDetailed } = useNuxtApp()
 const { formatDisplayDate } = useDateFormatter()
 const { getApiErrorMessage } = useApiErrorMessage()

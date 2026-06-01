@@ -90,6 +90,13 @@ scripts/memory-log-*.csv
 # ===========================
 png/
 
+# Excel lock files (Office 開檔時自動產生)
+~$*.xlsx
+~$*.xls
+
+# AI maintenance runtime
+docs/ai-agent-reports/_tasks-write.lock
+
 # ===========================
 # Secrets / Config overrides
 # ===========================

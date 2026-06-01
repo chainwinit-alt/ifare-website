@@ -60,11 +60,12 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ElButton } from 'element-plus';
 import type { DynamicPage } from '@/composables/useDynamicPages';
+import { FRONTEND_BASE_URL } from '@/config/adminEnv';
 
 const props = defineProps<{ page: DynamicPage }>();
 
-const FRONTEND_URL = 'http://localhost:3000';
-const previewUrl = `${FRONTEND_URL}/preview`;
+const FRONTEND_URL = FRONTEND_BASE_URL;
+const previewUrl = FRONTEND_URL ? `${FRONTEND_URL}/preview` : 'about:blank';
 const ALLOWED_ORIGIN = FRONTEND_URL;
 
 type Status = 'loading' | 'ready' | 'error';
@@ -97,8 +98,10 @@ const statusTitle = computed(() => {
 });
 
 const statusMessage = computed(() => {
+  if (!FRONTEND_URL) return 'VITE_FRONTEND_BASE is not configured.';
+
   if (status.value === 'loading') {
-    return '正在連線到 localhost:3000/preview。';
+    return `Loading preview from ${FRONTEND_URL}/preview.`;
   }
 
   if (status.value === 'error') {
@@ -124,6 +127,8 @@ function clearReadyTimeout() {
 }
 
 function pushPageToIframe() {
+  if (!ALLOWED_ORIGIN) return;
+
   const win = iframeRef.value?.contentWindow;
   if (!win) return;
 
@@ -141,6 +146,7 @@ function onIframeLoad() {
 }
 
 function handleMessage(event: MessageEvent) {
+  if (!ALLOWED_ORIGIN) return;
   if (event.origin !== ALLOWED_ORIGIN) return;
   if (!event.data || typeof event.data !== 'object') return;
 
@@ -261,19 +267,23 @@ onUnmounted(() => {
 
 .preview-frame-shell {
   width: 100%;
+  max-width: 1280px;
   min-height: 680px;
   border: 1px solid #e4e7ed;
   border-radius: 24px;
   overflow: hidden;
   background: #ffffff;
   box-shadow: 0 22px 40px -28px rgba(0, 0, 0, 0.35);
+  transition:
+    max-width 0.25s ease,
+    border-radius 0.25s ease;
 
-  &.tablet {
+  &.device-tablet {
     max-width: 840px;
   }
 
-  &.mobile {
-    max-width: 402px;
+  &.device-mobile {
+    max-width: 390px;
     border-radius: 32px;
   }
 }
@@ -412,8 +422,8 @@ onUnmounted(() => {
     padding: 8px;
   }
 
-  .preview-frame-shell.mobile,
-  .preview-frame-shell.tablet {
+  .preview-frame-shell.device-mobile,
+  .preview-frame-shell.device-tablet {
     max-width: 100%;
   }
 }

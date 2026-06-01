@@ -1,0 +1,435 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-05-26 17:12:06",
+  "reportDate": "2026-05-26",
+  "agentVersion": "1.0.0-mvp",
+  "readOnly": true,
+  "configPath": "docs/agent.config.json",
+  "markdownReport": "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.md",
+  "wordReport": "C:/Users/emma.chung/Desktop/iFare-AI-Maintenance-Reports/2026-05-26.docx",
+  "git": {
+    "sinceDays": 7,
+    "branchName": "feat/uiux-round14-emma",
+    "commitCount": 27,
+    "commits": [
+      {
+        "hash": "ed61844",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-26",
+        "subject": "chore: checkpoint current project updates"
+      },
+      {
+        "hash": "5960f18",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-26",
+        "subject": "feat: add ai maintenance planning workbook updates"
+      },
+      {
+        "hash": "f13a25e",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-26",
+        "subject": "chore: add report and sheet inspection scripts"
+      },
+      {
+        "hash": "feef7b8",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-25",
+        "subject": "fix(uiux): 修 v-scroll-reveal directive SSR 500 錯誤"
+      },
+      {
+        "hash": "4e0908e",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-25",
+        "subject": "fix(uiux): nav 改「福利專欄」+ 懶人包列表移除已讀標記"
+      },
+      {
+        "hash": "cca05b4",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-25",
+        "subject": "feat(uiux): Round 14 第二十四批 — 前端 Wave 4 (#20/#63/#81) 體驗強化"
+      },
+      {
+        "hash": "162cd2b",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-25",
+        "subject": "feat(uiux): Round 14 第二十三批 — 前端 Wave 3 (#39/#42/#43) about 頁強化"
+      },
+      {
+        "hash": "6cbbbfc",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-25",
+        "subject": "feat(uiux): Round 14 第二十二批 — 前端 Wave 1+2 (#21/67/68/69/74/76/84)"
+      },
+      {
+        "hash": "b8452ba",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-25",
+        "subject": "feat(uiux): Round 14 第二十一批 — 前端 #4 熱門搜尋 + #35 分享擴展"
+      },
+      {
+        "hash": "2f713b1",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-25",
+        "subject": "feat(uiux): Round 14 第二十批 — 前端 #5/#33/#34 黏著功能(個人化體驗)"
+      },
+      {
+        "hash": "70bf99f",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-25",
+        "subject": "feat(uiux): Round 14 第十九批 — 前端 #64/#65/#66/#69 設計 token 系統"
+      },
+      {
+        "hash": "0809e14",
+        "author": "yunzhenz-chainwin",
+        "date": "2026-05-25",
+        "subject": "docs+feat(uiux): Round 14 第十八批 — #45/#83/#98 收尾"
+      }
+    ],
+    "changedFileCount": 209,
+    "dirtyCount": 25,
+    "dirtyLines": [
+      "M \"Dev/Dev Code/iFare_Backend/auto-imports.d.ts\"",
+      "M \"Dev/Dev Code/iFare_Backend/components.d.ts\"",
+      "M \"Dev/Dev Code/iFare_Backend/src/config/adminEnv.ts\"",
+      "M \"Dev/Dev Code/iFare_Backend/src/data/AsideMenu.json\"",
+      "M \"Dev/Dev Code/iFare_Backend/src/router/index.ts\"",
+      "M \"Dev/Dev Code/iFare_Backend/src/views/HomeView.vue\"",
+      "M \"Dev/Dev Code/iFare_Frontend/pages/index.vue\"",
+      "M docs/ai-agent-reports/2026-05-26.md",
+      "M package-lock.json",
+      "M scripts/ai-maintenance-report.mjs",
+      "?? \"Dev/Dev Code/iFare_Backend/public/agent/\"",
+      "?? \"Dev/Dev Code/iFare_Backend/src/views/AdminAgent/\"",
+      "?? \"docs/AI_AGENT_\\347\\266\\255\\350\\255\\267\\344\\270\\255\\345\\277\\203\\344\\270\\213\\344\\270\\200\\346\\255\\245\\350\\246\\217\\345\\212\\203.md\"",
+      "?? docs/agent.config.json",
+      "?? docs/ai-agent-reports/2026-05-26.docx",
+      "?? docs/ai-agent-reports/_audit.jsonl",
+      "?? docs/ai-agent-reports/_tasks-cache.json",
+      "?? \"docs/iFare_AI\\344\\273\\273\\345\\213\\231\\347\\234\\213\\346\\235\\277.xlsx\"",
+      "?? \"docs/iFare_\\345\\225\\217\\351\\241\\214\\350\\277\\275\\350\\271\\244\\350\\210\\207AI\\347\\266\\255\\351\\201\\213\\350\\246\\217\\345\\212\\203.xlsx.bak\"",
+      "?? package.json"
+    ],
+    "errors": []
+  },
+  "xlsx": {
+    "trackingFile": "docs/iFare_問題追蹤與AI維運規劃.xlsx",
+    "sheetStatus": [
+      {
+        "name": "後臺優化",
+        "exists": true
+      },
+      {
+        "name": "UIUX問題追蹤清單",
+        "exists": true
+      },
+      {
+        "name": "PoC研究",
+        "exists": true
+      },
+      {
+        "name": "統計摘要",
+        "exists": true
+      }
+    ],
+    "summary": [
+      {
+        "name": "後臺優化",
+        "total": 125,
+        "done": 35,
+        "partial": 15,
+        "pending": 75
+      },
+      {
+        "name": "UIUX 問題追蹤",
+        "total": 182,
+        "done": 151,
+        "partial": 21,
+        "pending": 10
+      },
+      {
+        "name": "PoC 研究",
+        "total": 31,
+        "done": 0,
+        "partial": 0,
+        "pending": 31
+      }
+    ],
+    "backendHighPending": [
+      {
+        "id": "1",
+        "area": "共用元件",
+        "sub": "CRUD 架構",
+        "cat": "維護性",
+        "title": "各模組 CRUD 頁型高度重複，缺少更高層級共用模板"
+      },
+      {
+        "id": "4",
+        "area": "i-Fare 維護",
+        "sub": "福利政策維護",
+        "cat": "互動",
+        "title": "福利政策表單欄位多且資訊密度高，輸入負擔大"
+      },
+      {
+        "id": "5",
+        "area": "i-Fare 維護",
+        "sub": "福利政策維護",
+        "cat": "互動",
+        "title": "大型表單缺少更完整的填寫輔助與錯誤導引"
+      },
+      {
+        "id": "6",
+        "area": "帳戶維護 / 全站權限",
+        "sub": "路由與權限",
+        "cat": "程式碼",
+        "title": "權限控管邏輯以路由字串硬判斷，維護性較差"
+      },
+      {
+        "id": "7",
+        "area": "後台通用",
+        "sub": "API 呼叫層",
+        "cat": "維護性",
+        "title": "WebAPI.ts 過大且所有 API 集中在單一檔案，模組界線不清"
+      },
+      {
+        "id": "24",
+        "area": "帳號管理",
+        "sub": "Account",
+        "cat": "互動",
+        "title": "新增帳號時權限和狀態可編輯，編輯時不可編輯，UI 無清晰說明"
+      },
+      {
+        "id": "53",
+        "area": "效能",
+        "sub": "大列表優化",
+        "cat": "效能",
+        "title": "大列表 lazy load / 虛擬滾動 — 萬筆資料不卡"
+      },
+      {
+        "id": "50",
+        "area": "後台通用",
+        "sub": "操作紀錄 (audit log)",
+        "cat": "維護性",
+        "title": "操作紀錄 (audit log) UI — 誰、何時、做了什麼"
+      },
+      {
+        "id": "52",
+        "area": "後台通用",
+        "sub": "軟刪除 + 復原",
+        "cat": "維護性",
+        "title": "軟刪除 + 復原機制 — 30 天內可救回"
+      },
+      {
+        "id": "55",
+        "area": "後台通用",
+        "sub": "排程 / 任務中心",
+        "cat": "維護性",
+        "title": "同步與排程任務中心 — 匯入 / 匯出 / GA4 / 發布排程都可看狀態"
+      },
+      {
+        "id": "57",
+        "area": "後台通用",
+        "sub": "發布排程",
+        "cat": "效率",
+        "title": "定時上架 / 下架排程中心 — 不要靠人工守時間"
+      },
+      {
+        "id": "62",
+        "area": "資料分析",
+        "sub": "GA4 儀表板整合",
+        "cat": "數據",
+        "title": "GA4 分析儀表板正式版 — 背景同步快取，不直接即時打外部 API"
+      },
+      {
+        "id": "73",
+        "area": "i-Fare 維護",
+        "sub": "人生事件管理",
+        "cat": "導覽",
+        "title": "缺少人生事件對應政策的後台維護機制"
+      },
+      {
+        "id": "74",
+        "area": "i-Fare 維護",
+        "sub": "申請路徑欄位",
+        "cat": "申請流程",
+        "title": "福利政策缺結構化申請路徑資料"
+      },
+      {
+        "id": "75",
+        "area": "i-Fare 維護",
+        "sub": "應備文件管理",
+        "cat": "文件",
+        "title": "應備文件為純文字，無法依條件產生精準清單"
+      },
+      {
+        "id": "76",
+        "area": "i-Fare 維護",
+        "sub": "資格規則",
+        "cat": "資格判斷",
+        "title": "缺少資格規則與不符合原因 API"
+      },
+      {
+        "id": "81",
+        "area": "後台通用",
+        "sub": "發布 / 下架排程",
+        "cat": "效率",
+        "title": "政策上架下架與截止提醒需要排程管理"
+      },
+      {
+        "id": "82",
+        "area": "後台通用",
+        "sub": "審核 / 操作紀錄",
+        "cat": "流程",
+        "title": "福利政策內容需要審核與操作追溯"
+      },
+      {
+        "id": "87",
+        "area": "後台通用",
+        "sub": "部署健康檢查",
+        "cat": "部署",
+        "title": "部署健康檢查頁 — 遠端主機上線後可快速確認環境與服務狀態"
+      },
+      {
+        "id": "88",
+        "area": "後台通用",
+        "sub": "部署驗收",
+        "cat": "流程",
+        "title": "部署後 Smoke Test 清單頁 — 固定驗收登入、上傳、前台顯示與 API 狀態"
+      }
+    ],
+    "pocHighPending": [
+      {
+        "id": "1",
+        "area": "i-Fare 福利查詢",
+        "sub": "搜尋優化",
+        "title": "搜尋條件非必填化與漸進式引導"
+      },
+      {
+        "id": "2",
+        "area": "i-Fare 福利查詢",
+        "sub": "智慧搜尋",
+        "title": "自然語句轉搜尋條件"
+      },
+      {
+        "id": "6",
+        "area": "後台優化",
+        "sub": "福利政策維護",
+        "title": "大型表單分段式編輯"
+      },
+      {
+        "id": "13",
+        "area": "客服 / 互動",
+        "sub": "聊天機器人",
+        "title": "iFare 專屬聊天機器人 — 任務型互動引導助手 (非陪聊型)"
+      },
+      {
+        "id": "14",
+        "area": "AI 維護",
+        "sub": "專案維護",
+        "title": "AI 維護助理 PoC — 讀專案、讀 Excel、產生日報與下一步任務"
+      },
+      {
+        "id": "16",
+        "area": "i-Fare 福利查詢",
+        "sub": "申辦協助",
+        "title": "申請文件清單產生器"
+      },
+      {
+        "id": "17",
+        "area": "i-Fare 福利查詢",
+        "sub": "比較功能",
+        "title": "福利政策並排比較"
+      },
+      {
+        "id": "18",
+        "area": "頁面管理",
+        "sub": "正式化",
+        "title": "PageBuilder 正式資料層 PoC"
+      },
+      {
+        "id": "19",
+        "area": "後台優化",
+        "sub": "內容治理",
+        "title": "內容版本快照與還原 PoC"
+      },
+      {
+        "id": "24",
+        "area": "AI 維護",
+        "sub": "事件處理",
+        "title": "事件驅動型維護 Agent PoC"
+      }
+    ],
+    "error": null
+  },
+  "docs": {
+    "markdownCount": 19,
+    "skippedLargeCount": 0,
+    "deniedCount": 0
+  },
+  "tasks": {
+    "available": true,
+    "generatedAt": "2026-05-26 17:12:06",
+    "total": 1,
+    "counts": {
+      "new": 0,
+      "triaged": 0,
+      "pending_review": 0,
+      "approved": 0,
+      "running": 1,
+      "done": 0,
+      "failed": 0,
+      "blocked": 0
+    },
+    "recent": [
+      {
+        "id": "TASK-2026-05-26-001",
+        "title": "幫我重產今日報告",
+        "category": "report-ops",
+        "priority": "medium",
+        "status": "running",
+        "updatedAt": "2026-05-26 17:12:06"
+      }
+    ]
+  },
+  "safety": {
+    "denySkipCount": 3,
+    "denyPathCount": 12,
+    "allowedActions": [
+      "read-project",
+      "read-xlsx",
+      "read-git-log",
+      "write-report"
+    ],
+    "blockedActions": [
+      "write-xlsx",
+      "modify-code",
+      "commit",
+      "push",
+      "deploy",
+      "call-production-api"
+    ]
+  },
+  "suggestedCommands": [
+    {
+      "label": "重新產生報告",
+      "command": "npm run agent:report",
+      "description": "讀取專案、Excel 與 git log，更新 Word、Markdown 與後台 JSON。"
+    },
+    {
+      "label": "Dry-run 預覽",
+      "command": "npm run agent:report:dry",
+      "description": "只在終端機印出報告，不寫入檔案。"
+    },
+    {
+      "label": "驗收 Agent",
+      "command": "npm run agent:verify",
+      "description": "檢查設定檔、xlsx sheet、denyPaths 與 dry-run 行為。"
+    }
+  ],
+  "decisionsNeeded": [
+    "報告要每日排程，還是維持手動觸發？",
+    "後台 AI 維護中心是否只開給管理者？目前實作為管理者限定。",
+    "第二階段是否允許人工確認後寫回 Excel？",
+    "是否要加入 audit log：docs/ai-agent-reports/_audit.jsonl？",
+    "事件通知是否需要 LINE / Email？"
+  ]
+}

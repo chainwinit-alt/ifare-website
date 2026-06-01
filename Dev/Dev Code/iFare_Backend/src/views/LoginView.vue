@@ -29,8 +29,14 @@
             type="password"
             placeholder="輸入密碼"
             show-password
+            @keydown="syncCapsLockState"
+            @keyup="syncCapsLockState"
+            @blur="isCapsLockOn = false"
             @keyup.enter.native="sendActPwd(ruleFormRef)"
           ></el-input>
+          <p v-if="isCapsLockOn" class="login-hint login-hint--warning">
+            Caps Lock 已開啟，請確認密碼大小寫。
+          </p>
         </el-form-item>
         <el-form-item>
           <!-- 登入按鈕，點擊後執行 sendActPwd；loading 狀態避免重複送出 -->
@@ -108,6 +114,17 @@ $padding-section-login: 40px;
     }
   }
 
+  .login-hint {
+    width: 100%;
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .login-hint--warning {
+    color: #b95f00;
+  }
+
   .btn-card-login {
     margin-top: 36px;
   }
@@ -130,7 +147,8 @@ $padding-section-login: 40px;
  *  5. 導向首頁 (Home)
  */
 import { reactive, ref, getCurrentInstance } from 'vue'
-import { type FormInstance, type FormRules, ElMessage } from 'element-plus';
+import { type FormInstance, type FormRules } from 'element-plus';
+import { useFeedback } from '@/composables/useFeedback';
 import type { RuleForm } from '@/interface/Login';
 import logo from "../components/icons/IconLogo.vue";
 import logoTitle from "../components/icons/IconLogoTitle.vue";
@@ -142,11 +160,13 @@ const $commonLib = app?.appContext.config.globalProperties.$CommonLib
 const $WebAPI = app?.appContext.config.globalProperties.$WebAPI
 const $Message = app?.appContext.config.globalProperties.$message;
 const userStore = useUserStore()
+const { error: showError } = useFeedback();
 
 const act = ref("")
 const pwd = ref("")
 // 控制登入按鈕的 loading 狀態，防止重複提交
 const isLoading = ref(false)
+const isCapsLockOn = ref(false)
 
 // Element Plus 表單實例參考
 const ruleFormRef = ref<FormInstance>()
@@ -166,6 +186,10 @@ const rules = reactive<FormRules<RuleForm>>({
   ]
 })
 
+function syncCapsLockState(event: KeyboardEvent) {
+  isCapsLockOn.value = event.getModifierState?.('CapsLock') ?? false
+}
+
 /**
  * sendActPwd - 執行登入流程
  * @param formEl Element Plus 表單實例，用於驗證
@@ -178,13 +202,8 @@ const rules = reactive<FormRules<RuleForm>>({
 const sendActPwd = (formEl: FormInstance | undefined) => {
   if (!formEl) return
 
-  console.log('send')
-  console.log(formEl)
-
   isLoading.value = true
   $WebAPI.Auth(ruleForm.account, ruleForm.password, (res:any) => {
-    console.log(res)
-
     // 處理 HTTP 500 伺服器錯誤（含帳密錯誤情況）
     if (res.response && res.response.status == 500) {
       isLoading.value = false
@@ -196,27 +215,20 @@ const sendActPwd = (formEl: FormInstance | undefined) => {
         errMsg = `[Error_401]: 帳密有誤`
       }
 
-      ElMessage({
-        message: errMsg,
-        type: 'error'
-      })
+      showError(errMsg)
       return false
     }
 
     // 處理網路層或其他 Error 物件
     if (res.name && res.name.toLowerCase().indexOf('error') >= 0) {
       isLoading.value = false
-      ElMessage({
-        message: `[Error_${res.code}]: ${res.message}`,
-        type: 'error'
-      })
+      showError(`[Error_${res.code}]: ${res.message}`)
       return false
     }
 
     // 取得 AccessToken 及過期秒數
     const token = res.data.result.accessToken
     const expiredTimeSec = res.data.result.expireInSeconds
-    console.log(token)
     if (token) {
       // 使用 Token 呼叫 Login API 取得使用者詳細資訊
       $WebAPI.Login(token, ruleForm.account, ruleForm.password, (resLogin:any) => {

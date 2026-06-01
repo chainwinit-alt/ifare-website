@@ -98,7 +98,11 @@
             </div>
             <div class="member-content">
                 <div class="member-info" name="boss_P">
+                    <!-- 2026-05-25 UIUX #42 — 補上鄔董事長介紹(原為空 list) -->
                     <ul class="list-unstyled member-intros">
+                        <li>全穩生技農業科技集團</li>
+                        <li>副董事長</li>
+                        <li>長穩社福慈善基金會 第一任董事長</li>
                     </ul>
                     <h4 class="member-name">鄔筠軒</h4>
                 </div>
@@ -172,6 +176,56 @@
             </div>
         </div>
       </section>
+      <!-- 2026-05-25 UIUX #43 — 基金會歷程時間軸 + #20 滾動觸發 -->
+      <section class="section section-about-timeline" v-scroll-reveal>
+        <div class="part-top">
+          <div class="title-component">
+            <i class="ic-title-pattern"></i>
+            <h3 class="comp-title">基金會歷程</h3>
+            <span class="comp-shadow">JOURNEY</span>
+          </div>
+          <p class="timeline-subtitle">從 2017 至今,長穩持續耕耘環境、教育與社會關懷</p>
+        </div>
+        <ol class="timeline" aria-label="基金會大事紀">
+          <li v-for="(item, idx) in timeline" :key="item.year + item.title" class="timeline-item" :style="{ animationDelay: `${idx * 0.08}s` }">
+            <span class="timeline-year">{{ item.year }}</span>
+            <span class="timeline-dot" aria-hidden="true"></span>
+            <div class="timeline-content">
+              <h4 class="timeline-title">{{ item.title }}</h4>
+              <p class="timeline-desc">{{ item.desc }}</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- 2026-05-25 UIUX #39 — 合作夥伴 logo 輪播(CSS marquee 無限滑動)+ #20 滾動進場 -->
+      <section v-if="partnerLogos.length > 0" class="section section-about-partners" v-scroll-reveal>
+        <div class="part-top">
+          <div class="title-component">
+            <i class="ic-title-pattern"></i>
+            <h3 class="comp-title">公益夥伴</h3>
+            <span class="comp-shadow">PARTNERS</span>
+          </div>
+          <p class="partners-subtitle">與長穩一起推動社會關懷的公益夥伴們</p>
+        </div>
+        <div class="partner-marquee" aria-label="合作夥伴 logo 滑動展示">
+          <div class="partner-marquee__track">
+            <a
+              v-for="(_p, idx) in marqueeLoop"
+              :key="`${_p.id}-${idx}`"
+              class="partner-marquee__item"
+              href="/collaborator"
+              :aria-label="`查看 ${_p.title} 詳細資訊`"
+            >
+              <img :src="_p.imageFile" :alt="`${_p.title} logo`" loading="lazy" />
+            </a>
+          </div>
+        </div>
+        <div class="partners-cta">
+          <NuxtLink to="/collaborator" class="btn-more transition-general">查看所有夥伴</NuxtLink>
+        </div>
+      </section>
+
       <section class="section section-about-bottom">
         <div class="card-advance">
             <div class="advance-enter">
@@ -208,6 +262,71 @@ const activeHow = ref<number | null>(null);
 function toggleHow(idx: number) {
   activeHow.value = activeHow.value === idx ? null : idx;
 }
+
+// 2026-05-25 UIUX #43 — 基金會歷程時間軸資料
+// (內容依 about 頁既有文字推得;實際年份請以基金會官方資料更新)
+const timeline = [
+  {
+    year: '2017',
+    title: '基金會成立',
+    desc: '由穩懋半導體董事長陳進財先生於 7 月 19 日創辦,鄔筠軒女士擔任第一任董事長,推動公益願景。',
+  },
+  {
+    year: '2018',
+    title: '三大核心行動啟動',
+    desc: '確立環境保育、人才培育、社會關懷三大方向,展開公益佈局。',
+  },
+  {
+    year: '2019',
+    title: '油芒復耕計畫',
+    desc: '推動原生作物油芒復耕,結合永續糧食研究、生態教育與在地文化復振。',
+  },
+  {
+    year: '2020',
+    title: 'i-Fare 福利好幫手上線',
+    desc: '整合全台公部門與民間補助資訊,讓需要的人群更快找到協助。',
+  },
+  {
+    year: '2022',
+    title: '「芒望未來」教育計畫',
+    desc: '從兒少心理健康、土地教育、青年志工到教師支持,打造完整成長陪伴系統。',
+  },
+  {
+    year: '2024',
+    title: '兒少心理健康計畫',
+    desc: '深化兒少心理教育、志工培訓與跨校合作,強化孩子與教育者的心理韌性。',
+  },
+  {
+    year: '至今',
+    title: '持續耕耘',
+    desc: '透過資源整合與跨機構合作,持續推動社會安全網的可近性與效能。',
+  },
+];
+
+// 2026-05-25 UIUX #39 — 合作夥伴 logo 輪播
+const { $WebApiGet } = useNuxtApp();
+const { getApiResultArray } = useApiResult();
+const partnerLogos = ref<Array<{ id: number; title: string; imageFile: string }>>([]);
+
+// CSS marquee 需要把 list 重複一次才能無縫接接(translateX -50% loop)
+const marqueeLoop = computed(() => [...partnerLogos.value, ...partnerLogos.value]);
+
+onMounted(async () => {
+  try {
+    const res: any = await $WebApiGet('/Collaborator/GetCollaboratorList');
+    const arr = getApiResultArray<any>(res);
+    partnerLogos.value = arr
+      .map((c: any) => ({
+        id: c.id,
+        title: c.title,
+        imageFile: c.imageFile,
+      }))
+      .filter((c) => !!c.imageFile)
+      .slice(0, 12);
+  } catch (e) {
+    console.warn('[about] partners load failed', e);
+  }
+});
 </script>
 
 <style lang="scss" scoped>
@@ -394,5 +513,188 @@ $c-black: #171818;
   .purpose-icon { width: 38px; height: 38px; svg { width: 18px; height: 18px; } }
   .purpose-text .purpose-title { font-size: 16px; }
   .purpose-text .purpose-info { font-size: 14px; line-height: 1.6; }
+}
+
+// 2026-05-25 UIUX #43 — 歷程時間軸
+.section-about-timeline {
+  padding: 56px 24px 32px;
+  max-width: 960px;
+  margin: 0 auto;
+
+  .timeline-subtitle {
+    margin: 16px 0 40px;
+    color: rgba($c-black, 0.6);
+    text-align: center;
+    line-height: 1.7;
+  }
+}
+
+.timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 100px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: linear-gradient(180deg, rgba($c-orange, 0.4), rgba($c-orange, 0.1));
+  }
+}
+
+.timeline-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 90px 22px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 16px 0;
+  opacity: 0;
+  transform: translateX(-12px);
+  animation: timelineFadeIn 0.55s ease-out forwards;
+}
+
+@keyframes timelineFadeIn {
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.timeline-year {
+  font-family: 'Noto Serif TC', serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: $c-orange;
+  text-align: right;
+  padding-top: 2px;
+}
+
+.timeline-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid $c-orange;
+  box-shadow: 0 0 0 4px rgba($c-orange, 0.12);
+  z-index: 1;
+  justify-self: center;
+}
+
+.timeline-content {
+  padding: 0 8px 0 6px;
+}
+
+.timeline-title {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 700;
+  color: $c-black;
+  line-height: 1.4;
+}
+
+.timeline-desc {
+  margin: 0;
+  color: rgba($c-black, 0.7);
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .timeline::before { left: 38px; }
+  .timeline-item { grid-template-columns: 36px 22px 1fr; gap: 8px; }
+  .timeline-year { font-size: 15px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-item { animation: none; opacity: 1; transform: none; }
+}
+
+// 2026-05-25 UIUX #39 — 合作夥伴 logo 輪播(CSS marquee 無限滑動)
+.section-about-partners {
+  padding: 32px 0 48px;
+
+  .part-top { padding: 0 24px; text-align: center; }
+  .partners-subtitle {
+    margin: 16px 0 32px;
+    color: rgba($c-black, 0.6);
+    line-height: 1.7;
+  }
+}
+
+.partner-marquee {
+  overflow: hidden;
+  position: relative;
+  // 漸層遮罩讓兩側淡出,看不到 loop 接縫
+  mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+}
+
+.partner-marquee__track {
+  display: flex;
+  gap: 32px;
+  width: max-content;
+  animation: partnerScroll 40s linear infinite;
+}
+
+.partner-marquee:hover .partner-marquee__track {
+  animation-play-state: paused;
+}
+
+@keyframes partnerScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.partner-marquee__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 140px;
+  height: 80px;
+  padding: 8px 16px;
+  background: #ffffff;
+  border: 1px solid rgba($c-black, 0.08);
+  border-radius: 12px;
+  flex-shrink: 0;
+  text-decoration: none;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+
+  img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    opacity: 0.75;
+    filter: grayscale(0.3);
+    transition: opacity 0.2s ease, filter 0.2s ease;
+  }
+
+  &:hover {
+    border-color: rgba($c-orange, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px -10px rgba($c-orange, 0.25);
+
+    img {
+      opacity: 1;
+      filter: grayscale(0);
+    }
+  }
+}
+
+.partners-cta {
+  text-align: center;
+  margin-top: 24px;
+}
+
+@media (max-width: 640px) {
+  .partner-marquee__item { width: 110px; height: 64px; }
+  .partner-marquee__track { gap: 20px; animation-duration: 30s; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .partner-marquee__track { animation: none; }
 }
 </style>

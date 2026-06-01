@@ -22,7 +22,11 @@ export function useShareToLine() {
     } catch (error) {
       console.error('[share-to-line] failed', error);
       if (import.meta.client) {
-        window.alert('分享失敗，請檢查連線後再試一次。');
+        // 2026-05-25 UIUX #62 / #48 — 改 toast,附下一步建議
+        useToast().error('LINE 分享失敗', {
+          description: '可能是網路中斷或彈出視窗被阻擋。請檢查網路後重試；若仍失敗可改用「複製連結」分享。',
+          duration: 6000,
+        });
       }
     }
   }

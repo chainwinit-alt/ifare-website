@@ -1,6 +1,10 @@
 <template>
   <!-- 側邊欄容器，使用 Element Plus 的 el-aside 元件，套用線性漸層背景樣式 -->
-  <el-aside class="section-aside">
+  <el-aside
+    class="section-aside"
+    :class="{ 'is-collapsed': collapsed }"
+    :width="asideWidth"
+  >
     <!-- 使用滾動條包裝，避免選單項目過多時超出視窗 -->
     <el-scrollbar>
       <!-- Logo 區塊，顯示系統品牌標題 -->
@@ -47,6 +51,8 @@
 .section-aside {
   @include linearBgColor;
   height: 100vh;
+  transition: width 0.25s ease;
+  overflow: hidden;
 }
 
 .part-home-logo {
@@ -78,7 +84,7 @@
  * Props：
  * - route：當前路由物件，用於同步選單高亮狀態
  */
-import { ref, reactive, watch } from "vue";
+import { ref, reactive, watch, computed } from "vue";
 import {
   ElScrollbar,
   ElAside,
@@ -92,9 +98,12 @@ import type { AsideMenu } from "@/interface/AppAside";
 import data_AsideMenu from "@/data/AsideMenu.json";
 import { useUserStore } from "@/stores/user";
 
-// 接收父層傳入的路由資訊
-const props = defineProps(["route"]);
+// 接收父層傳入的路由資訊 + sidebar 收合狀態
+const props = defineProps(["route", "collapsed"]);
 const userStore = useUserStore();
+
+// 收合 = 寬度 0；展開 = 300px（el-aside 預設）
+const asideWidth = computed(() => (props.collapsed ? "0px" : "300px"));
 
 // 深複製原始選單設定，避免直接修改原始資料
 let _asideMenu = JSON.parse(JSON.stringify(data_AsideMenu))
@@ -131,15 +140,28 @@ if (userStore.permission == "編輯者") {
 
 // 響應式選單清單
 const menuList = reactive<Array<AsideMenu>>(_asideMenu);
-// 當前選單預設選取的 indexKey
-const activeDefault = ref('')
 
-// 監聽 route prop 變化，當路由切換時更新選單高亮
-watch(props, async (newProps, oldProps) => {
-  console.log("new:", newProps);
-  console.log("old:", oldProps);
-  activeDefault.value = newProps.route.meta.indexKey
-});
+// 2026-05-25 #29 — 從 route.matched 找有 indexKey 的 ancestor,確保編輯/詳情頁返回後側邊欄正確高亮
+//
+// 原本只取 props.route.meta.indexKey,但 Vue Router 子路由不會繼承 parent meta,
+// 子頁(News_Edit / News_Detail 等)的 meta.indexKey 是 undefined → 高亮失效。
+// 改成由內到外掃 matched 陣列,撿第一個有設定的 indexKey 用。
+//
+// 同時改用 computed 派生,免去 watch + 預設空字串造成的初始 flash。
+function resolveIndexKey(route: any): string {
+  if (!route) return '';
+  // 先看當前 route.meta(對應到 matched 的 leaf)
+  if (route.meta?.indexKey) return route.meta.indexKey;
+  // 再從 matched chain 由內到外撿
+  const matched = route.matched ?? [];
+  for (let i = matched.length - 1; i >= 0; i--) {
+    const key = matched[i]?.meta?.indexKey;
+    if (key) return key as string;
+  }
+  return '';
+}
+
+const activeDefault = computed(() => resolveIndexKey(props.route));
 
 //{ "indexKey": "ImgManager", "title": "圖片管理", "url": {"name": "ImgManager"}, "permission": "Editor" },
 </script>

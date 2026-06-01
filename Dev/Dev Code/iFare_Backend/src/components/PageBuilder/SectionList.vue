@@ -68,19 +68,48 @@
         </div>
       </section>
 
+      <!-- 2026-05-25 #92/#91 常用組合：一次插 2-3 個 section，省得逐個拖 -->
+      <section class="combo-card">
+        <div class="panel-head">
+          <div>
+            <h5 class="panel-title">常用組合</h5>
+            <p class="panel-subtitle">一鍵插入常見的版型組合，比逐塊拖快。</p>
+          </div>
+          <span class="panel-badge combo-badge">一鍵</span>
+        </div>
+
+        <div class="combo-grid">
+          <button
+            v-for="combo in SECTION_COMBOS"
+            :key="combo.key"
+            type="button"
+            class="combo-card-btn"
+            :title="combo.description"
+            @click="addCombo(combo.key)"
+          >
+            <span class="combo-icon">{{ combo.icon }}</span>
+            <div class="combo-copy">
+              <strong>{{ combo.label }}</strong>
+              <span>{{ combo.description }}</span>
+            </div>
+            <span class="combo-count">+{{ combo.sectionTypes.length }} 區塊</span>
+          </button>
+        </div>
+      </section>
+
       <section class="guide-card">
         <h6 class="guide-title">操作方式</h6>
-        <p>1. 從上方挑一個版型拖到中間畫布。</p>
+        <p>1. 上方版型「拖」到畫布，或選下方「常用組合」一鍵插多塊。</p>
         <p>2. 點選畫布中的區塊，直接修改文字、圖片與按鈕。</p>
         <p>3. 右側同步預覽桌機、平板、手機畫面。</p>
       </section>
     </aside>
 
-    <section class="builder-canvas">
+    <section class="builder-canvas" :class="{ 'is-dragging-mode': isDragInProgress }">
       <div class="canvas-head">
         <div>
           <h5 class="panel-title">頁面畫布</h5>
-          <p class="panel-subtitle">只會展開目前編輯的區塊，降低表單複雜度。</p>
+          <p class="panel-subtitle">點區塊左上「⠿」把手即可拖動排序，或從左側拖版型進來。</p>
         </div>
         <div class="canvas-stats">
           <span>{{ sections.length }} 個區塊</span>
@@ -94,7 +123,7 @@
         @dragover="onCanvasDragOver($event, 0)"
         @drop="onDropAt($event, 0)"
       >
-        拖到這裡插入第一個區塊
+        <span class="drop-zone-text">{{ dropTargetIdx === 0 ? '↧ 放開插入到這裡' : '拖到這裡插入第一個區塊' }}</span>
       </div>
 
       <div v-if="sections.length === 0" class="empty-state">
@@ -126,7 +155,7 @@
           @dragover="onCanvasDragOver($event, idx + 1)"
           @drop="onDropAt($event, idx + 1)"
         >
-          拖到這裡插入下一個區塊
+          <span class="drop-zone-text">{{ dropTargetIdx === idx + 1 ? '↧ 放開插入到這裡' : '拖到這裡插入下一個區塊' }}</span>
         </div>
       </template>
     </section>
@@ -137,7 +166,9 @@
 import { computed, ref, watch } from 'vue';
 import SectionEditor from './SectionEditor.vue';
 import {
+  SECTION_COMBOS,
   SECTION_TYPE_META,
+  buildSectionsFromCombo,
   createDefaultSection,
   duplicateSection,
   isSectionEmpty,
@@ -154,6 +185,11 @@ const activeSectionId = ref<string | null>(null);
 const dragSourceIdx = ref<number | null>(null);
 const dragTemplateType = ref<SectionType | null>(null);
 const dropTargetIdx = ref<number | null>(null);
+
+// 2026-05-25 拖拽中視覺反饋 — 顯示更明顯的 drop zone
+const isDragInProgress = computed(
+  () => dragSourceIdx.value !== null || dragTemplateType.value !== null,
+);
 
 const activeSectionIndex = computed(() =>
   activeSectionId.value ? sections.value.findIndex((section) => section.id === activeSectionId.value) : -1,
@@ -181,6 +217,16 @@ watch(
 function addTemplate(type: SectionType) {
   const insertIdx = activeSectionIndex.value >= 0 ? activeSectionIndex.value + 1 : sections.value.length;
   insertSectionAt(type, insertIdx);
+}
+
+// 2026-05-25 #92/#91 — 一鍵插入一組常用 section（2-3 個）
+function addCombo(comboKey: string) {
+  const combos = buildSectionsFromCombo(comboKey);
+  if (!combos.length) return;
+
+  const insertIdx = activeSectionIndex.value >= 0 ? activeSectionIndex.value + 1 : sections.value.length;
+  sections.value.splice(insertIdx, 0, ...combos);
+  activeSectionId.value = combos[0].id;
 }
 
 function insertSectionAt(type: SectionType, idx: number) {
@@ -334,8 +380,87 @@ function getDraggedTemplateType(ev: DragEvent): SectionType | null {
 }
 
 .library-card,
-.guide-card {
+.guide-card,
+.combo-card {
   padding: 16px;
+}
+
+.combo-card {
+  border: 1px solid #ebeef5;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.combo-badge {
+  background: rgba(64, 158, 255, 0.12) !important;
+  color: #409eff !important;
+}
+
+.combo-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.combo-card-btn {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #409eff;
+    background: rgba(64, 158, 255, 0.04);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px -14px rgba(64, 158, 255, 0.55);
+  }
+}
+
+.combo-icon {
+  font-size: 22px;
+  line-height: 1;
+  text-align: center;
+}
+
+.combo-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+
+  strong {
+    font-size: 13px;
+    font-weight: 700;
+    color: #303133;
+  }
+
+  span {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+}
+
+.combo-count {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(64, 158, 255, 0.1);
+  color: #409eff;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .library-card {
@@ -354,6 +479,13 @@ function getDraggedTemplateType(ev: DragEvent): SectionType | null {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
+  // 2026-05-25 子項目 min-width: 0 + flex-wrap，避免 canvas 寬度被擠時中文直書
+  flex-wrap: wrap;
+}
+
+.panel-head > *,
+.canvas-head > * {
+  min-width: 0;
 }
 
 .panel-title {
@@ -361,6 +493,7 @@ function getDraggedTemplateType(ev: DragEvent): SectionType | null {
   font-size: 16px;
   font-weight: 700;
   color: #303133;
+  white-space: nowrap;
 }
 
 .panel-subtitle {
@@ -368,6 +501,7 @@ function getDraggedTemplateType(ev: DragEvent): SectionType | null {
   font-size: 13px;
   color: #909399;
   line-height: 1.6;
+  word-break: break-word;
 }
 
 .panel-badge {
@@ -625,29 +759,63 @@ function getDraggedTemplateType(ev: DragEvent): SectionType | null {
   margin-bottom: 0;
 }
 
+// 2026-05-25 drop zone 重新設計：
+//   default — 細線 12px 高，不擋視線
+//   拖拽中（.is-dragging-mode .drop-zone）— 撐高 56px，明顯橘虛線
+//   active hover — 實心橘 + ↧ 提示，hold-it-here
 .drop-zone {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
-  margin: 14px 0;
-  border: 1px dashed #dcdfe6;
+  min-height: 12px;
+  margin: 4px 0;
+  border: 1px dashed transparent;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.7);
-  color: #909399;
-  font-size: 13px;
-  transition: all 0.2s ease;
+  background: transparent;
+  color: transparent;
+  font-size: 12px;
+  transition: min-height 0.18s ease, border-color 0.18s ease,
+    background-color 0.18s ease, color 0.18s ease;
+  pointer-events: auto;
 
   &.compact {
-    min-height: 32px;
-    margin: 10px 0 14px;
-    font-size: 12px;
+    min-height: 8px;
+    margin: 2px 0;
+  }
+
+  .drop-zone-text {
+    transition: opacity 0.18s ease;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.builder-canvas.is-dragging-mode .drop-zone {
+  min-height: 56px;
+  border-color: rgba(234, 85, 4, 0.35);
+  background: rgba(234, 85, 4, 0.04);
+  color: #ea5504;
+  font-weight: 600;
+
+  .drop-zone-text {
+    opacity: 1;
+  }
+
+  &.compact {
+    min-height: 48px;
   }
 
   &.active {
+    border-style: solid;
     border-color: #ea5504;
-    background: rgba(234, 85, 4, 0.08);
+    background: rgba(234, 85, 4, 0.14);
     color: #ea5504;
+    transform: scale(1.01);
+    box-shadow: 0 6px 16px -10px rgba(234, 85, 4, 0.5);
+
+    .drop-zone-text {
+      font-size: 14px;
+    }
   }
 }
 
@@ -677,7 +845,8 @@ function getDraggedTemplateType(ev: DragEvent): SectionType | null {
   opacity: 0.45;
 }
 
-@media (max-width: 1200px) {
+// 2026-05-25 把單欄斷點往上提 — 預覽窗開著時 builder-shell 容易被擠到 canvas 只剩 ~30px，標題會被中文逐字斷直書
+@media (max-width: 1440px) {
   .builder-shell {
     grid-template-columns: 1fr;
   }

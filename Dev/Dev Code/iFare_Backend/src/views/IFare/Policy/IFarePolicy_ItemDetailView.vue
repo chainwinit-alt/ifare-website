@@ -118,7 +118,7 @@
           <div class="info-content info-pre-line">{{ detail_qual }}</div>
         </div>
         <div class="info-item info-welfare">
-          <div class="info-content raw-html" v-html="detail_welfare"></div>
+          <div class="info-content raw-html" v-html="sanitizeHtml(detail_welfare)"></div>
         </div>
         <div class="info-item info-evidence">
           <div class="info-content info-pre-line">{{ detail_evidence }}</div>
@@ -169,6 +169,7 @@ import { EditPen, ArrowLeft } from "@element-plus/icons-vue";
 import MainHeader from "@/components/MainHeader.vue";
 import type { TagObj } from "@/interface/Component";
 import { useUserStore } from "@/stores/user";
+import { sanitizeHtml } from "@/utils/sanitizeHtml";
 
 const app = getCurrentInstance();
 const _global = app?.appContext.config.globalProperties
@@ -224,7 +225,6 @@ $WebAPI.GetFarePolicyList(
     ids,
     null,
     (res: any) => {
-      console.log(res);
       let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 

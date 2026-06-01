@@ -45,7 +45,7 @@
           </div>
         </div>
         <h2 class="raw-html">{{ title }}</h2>
-        <div class="raw-html" v-html="detail">
+        <div class="raw-html" v-html="sanitizeHtml(detail)">
         </div>
       </div>
     </div>
@@ -80,6 +80,7 @@ import { EditPen, ArrowLeft } from "@element-plus/icons-vue";
 import MainHeader from "@/components/MainHeader.vue";
 import type { TagObj } from "@/interface/Component";
 import { useUserStore } from "@/stores/user";
+import { sanitizeHtml } from "@/utils/sanitizeHtml";
 
 const app = getCurrentInstance();
 const _global = app?.appContext.config.globalProperties
@@ -124,7 +125,6 @@ $WebAPI.GetArticlesWelfareList(
     null,
     ids,
     (res: any) => {
-      console.log(res);
       let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 

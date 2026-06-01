@@ -13,6 +13,7 @@
  */
 
 import { ref, computed } from 'vue';
+import { syncPagesToFrontend, type SyncResult } from '@/utils/frontendSync';
 
 // ============================================================
 // 類型定義
@@ -177,8 +178,18 @@ function migrateV1ToV2(v1Page: any): DynamicPage {
   };
 }
 
+// 2026-05-25：把最後一次同步的 Promise 記下來，AddEditView.onSave 可 await
+// 拿到結果做降級提示，避免「儲存成功 → 同步失敗」的假成功。
+let lastSyncPromise: Promise<SyncResult> = Promise.resolve({ ok: true });
+
 function writeAll(pages: DynamicPage[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(pages));
+  // 仍是 fire-and-forget（writeAll 本身不阻塞），但結果可被 waitForLastSync 撿起
+  lastSyncPromise = syncPagesToFrontend(pages);
+}
+
+export function waitForLastSync(): Promise<SyncResult> {
+  return lastSyncPromise;
 }
 
 function uuid(): string {
@@ -264,7 +275,9 @@ export function createDefaultPage(): Omit<DynamicPage, 'id' | 'createDate' | 'up
     tags: [],
     author: '',
     sections: [],
-    status: 'draft',
+    // PoC v2 Day2-fix：預設「已發布」，符合「按下新增就到前端」體驗
+    // 想當草稿仍可主動切回；工程化時應改回 draft 並補審核流程
+    status: 'published',
   };
 }
 
@@ -314,6 +327,59 @@ export const SECTION_TYPE_META: Record<
     description: '兩個並列導頁卡片（像 about 底部「邀請體驗 i-Fare」）',
   },
 };
+
+// 2026-05-25 #92 + #91 — 常用 section 組合，一鍵在編輯頁版型元件庫插多個 sections
+export interface SectionCombo {
+  key: string;
+  label: string;
+  description: string;
+  icon: string;
+  sectionTypes: SectionType[];
+}
+
+export const SECTION_COMBOS: SectionCombo[] = [
+  {
+    key: 'intro',
+    label: '介紹組',
+    description: '主視覺 + 介紹文 + 行動卡',
+    icon: '📖',
+    sectionTypes: ['hero', 'text-section', 'cta-card'],
+  },
+  {
+    key: 'service',
+    label: '服務介紹組',
+    description: '主視覺 + 四欄重點 + 圖文流程',
+    icon: '🎯',
+    sectionTypes: ['hero', 'four-card', 'image-text'],
+  },
+  {
+    key: 'event',
+    label: '活動報名組',
+    description: '主視覺 + 活動圖文 + 行動卡',
+    icon: '🎟️',
+    sectionTypes: ['hero', 'image-text', 'cta-card'],
+  },
+  {
+    key: 'story',
+    label: '故事敘述組',
+    description: '主視覺 + 兩段圖文左右交錯',
+    icon: '✨',
+    sectionTypes: ['hero', 'image-text', 'image-text'],
+  },
+];
+
+export function buildSectionsFromCombo(comboKey: string): Section[] {
+  const combo = SECTION_COMBOS.find((c) => c.key === comboKey);
+  if (!combo) return [];
+  return combo.sectionTypes.map((type, idx) => {
+    const section = createDefaultSection(type);
+    // 同組合 2 個 image-text 時自動交錯左右，省得手動切
+    if (section.type === 'image-text') {
+      section.imagePosition = idx % 2 === 0 ? 'left' : 'right';
+    }
+    return section;
+  });
+}
 
 export const ICON_OPTIONS: { key: IconKey; label: string; svg: string }[] = [
   {
@@ -389,6 +455,16 @@ export interface ValidationError {
   sectionId?: string;
 }
 
+export interface ImportAnalysis {
+  ok: boolean;
+  error?: string;
+  version?: string;
+  pages?: DynamicPage[];
+  added?: number;
+  overwritten?: number;
+  overwrittenTitles?: string[];
+}
+
 export function validatePage(
   page: DynamicPage,
   isSlugConflict: (slug: string, ignoreId?: string) => boolean,
@@ -400,14 +476,14 @@ export function validatePage(
     errors.push({ field: 'title', message: '【頁面標題】不可為空' });
   }
   if (!page.slug.trim()) {
-    errors.push({ field: 'slug', message: '【URL Slug】不可為空' });
+    errors.push({ field: 'slug', message: '【頁面網址】不可為空' });
   } else if (!/^[a-zA-Z0-9_/一-龥-]+$/.test(page.slug)) {
     errors.push({
       field: 'slug',
-      message: 'URL Slug 僅允許英數字、中文、連字號、底線、斜線',
+      message: '頁面網址僅允許英數字、中文、連字號、底線、斜線',
     });
   } else if (isSlugConflict(page.slug, ignoreId)) {
-    errors.push({ field: 'slug', message: `URL Slug 已被使用：/${page.slug}` });
+    errors.push({ field: 'slug', message: `頁面網址已被使用：/${page.slug}` });
   }
 
   if (page.publishTime && page.unpublishTime) {
@@ -489,24 +565,130 @@ export function useDynamicPages() {
     return true;
   }
 
-  function exportJson(): string {
-    return JSON.stringify(pages.value, null, 2);
+  /**
+   * 2026-05-25 #93 真複製 — 把整筆 source 深拷一份：
+   * - id / section.id 重生避免衝突
+   * - title 加「副本」
+   * - slug 套 -copy（衝突自動補 -copy-2 / -copy-3 …）
+   * - status 強制 'draft'，避免不小心發布到正式站
+   * - publishTime / unpublishTime 清空
+   * - createDate / updateDate 重設為 now
+   */
+  function duplicate(id: string): DynamicPage | null {
+    const source = pages.value.find((p) => p.id === id);
+    if (!source) return null;
+
+    const copy: DynamicPage = JSON.parse(JSON.stringify(source));
+    copy.id = uuid();
+    copy.title = `${source.title?.trim() || '未命名頁面'} 副本`;
+
+    const baseSlug = (source.slug || 'page').replace(/-copy(?:-\d+)?$/i, '') || 'page';
+    let candidate = `${baseSlug}-copy`;
+    let n = 2;
+    while (isSlugConflict(candidate)) {
+      candidate = `${baseSlug}-copy-${n}`;
+      n += 1;
+    }
+    copy.slug = candidate;
+
+    copy.status = 'draft';
+    copy.publishTime = null;
+    copy.unpublishTime = null;
+
+    const now = nowIso();
+    copy.createDate = now;
+    copy.updateDate = now;
+
+    if (Array.isArray(copy.sections)) {
+      copy.sections = copy.sections.map((s) => ({ ...s, id: uuid() })) as Section[];
+    } else {
+      copy.sections = [];
+    }
+
+    pages.value.push(copy);
+    writeAll(pages.value);
+    return copy;
   }
 
-  function importJson(json: string): { ok: boolean; count: number; error?: string } {
+  // 2026-05-25 S — schema 版本包裝：匯出帶 version + exportedAt，未來改 DynamicPage schema 才能擋住舊版匯入
+  function exportJson(): string {
+    return JSON.stringify(
+      {
+        version: 'v2',
+        exportedAt: new Date().toISOString(),
+        pages: pages.value,
+      },
+      null,
+      2,
+    );
+  }
+
+  function analyzeImportJson(json: string): ImportAnalysis {
     try {
       const parsed = JSON.parse(json);
-      if (!Array.isArray(parsed)) return { ok: false, count: 0, error: '匯入內容須為陣列' };
-      const map = new Map(pages.value.map((p) => [p.id, p]));
-      for (const p of parsed as DynamicPage[]) {
-        if (p && p.id) map.set(p.id, p);
+
+      // 兩種格式：新版 { version, pages } 或舊版裸陣列（向後相容）
+      let pagesArray: DynamicPage[];
+      let version = 'v1-array';
+      if (Array.isArray(parsed)) {
+        pagesArray = parsed;
+      } else if (parsed && typeof parsed === 'object' && Array.isArray(parsed.pages)) {
+        if (parsed.version !== 'v2') {
+          return {
+            ok: false,
+            error: `不支援的版本：${parsed.version || '未知'}（目前僅支援 v2 或舊版裸陣列）`,
+          };
+        }
+        version = parsed.version;
+        pagesArray = parsed.pages;
+      } else {
+        return { ok: false, error: '格式錯誤：應為 { version, pages } 或頁面陣列' };
       }
-      pages.value = Array.from(map.values());
-      writeAll(pages.value);
-      return { ok: true, count: parsed.length };
-    } catch (err: any) {
-      return { ok: false, count: 0, error: err?.message ?? 'JSON 解析失敗' };
+
+      // 算 diff：哪些是新增、哪些會覆蓋既有
+      const existing = new Map(pages.value.map((p) => [p.id, p]));
+      const overwrittenTitles: string[] = [];
+      let addedCount = 0;
+
+      for (const p of pagesArray) {
+        if (!p || !p.id) continue;
+        if (existing.has(p.id)) {
+          overwrittenTitles.push(existing.get(p.id)!.title || p.title || '(未命名)');
+        } else {
+          addedCount += 1;
+        }
+      }
+
+      return {
+        ok: true,
+        version,
+        pages: pagesArray,
+        added: addedCount,
+        overwritten: overwrittenTitles.length,
+        overwrittenTitles,
+      };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'JSON 解析失敗';
+      return { ok: false, error: message };
     }
+  }
+
+  function applyImportPages(incoming: DynamicPage[]): number {
+    const map = new Map(pages.value.map((p) => [p.id, p]));
+    for (const p of incoming) {
+      if (p && p.id) map.set(p.id, p);
+    }
+    pages.value = Array.from(map.values());
+    writeAll(pages.value);
+    return incoming.length;
+  }
+
+  // 保留舊 API（無確認直接 commit）給可能還在用的呼叫端；新流程建議走 analyze + apply
+  function importJson(json: string): { ok: boolean; count: number; error?: string } {
+    const analysis = analyzeImportJson(json);
+    if (!analysis.ok) return { ok: false, count: 0, error: analysis.error };
+    const count = applyImportPages(analysis.pages!);
+    return { ok: true, count };
   }
 
   const total = computed(() => pages.value.length);
@@ -525,7 +707,10 @@ export function useDynamicPages() {
     insert,
     update,
     remove,
+    duplicate,
     exportJson,
     importJson,
+    analyzeImportJson,
+    applyImportPages,
   };
 }

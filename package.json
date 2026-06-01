@@ -1,0 +1,15 @@
+{
+  "name": "ifare-website-maintenance",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "agent:report": "node scripts/ai-maintenance-report.mjs",
+    "agent:report:dry": "node scripts/ai-maintenance-report.mjs --dry-run",
+    "agent:runner": "node scripts/ai-maintenance-runner.mjs",
+    "agent:verify": "node scripts/ai-maintenance-verify.mjs"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
+  }
+}

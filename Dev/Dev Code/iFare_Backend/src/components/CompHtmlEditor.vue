@@ -82,7 +82,7 @@ const props = defineProps({
     default: "styleselect | bold forecolor | image link media | alignleft aligncenter alignright | bullist numlist outdent indent | table"
   },
   color_map: {
-    type: [String],
+    type: [String, Array],
     default: [
       '171818', 'Black',
       // '#5c5d5d', 'Black_700',
@@ -126,7 +126,6 @@ const init = reactive({
   quickbars_selection_toolbar: props.quickbar,
   branding: false,
   init_instance_callback : (editor:any) => {
-    console.log(editor)
     editor.editorManager.execCommand("mceToggleFormat", false, 'fDefault')
   }
 });
@@ -135,7 +134,6 @@ const init = reactive({
 
 const editorValue = computed({
     get() {
-        console.log(props.editorValue)
         return props.editorValue
     },
     set(value) {

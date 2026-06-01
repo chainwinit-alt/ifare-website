@@ -94,9 +94,7 @@ function WebAPI_GetDataList(
     _codeKeywords,
     _state,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;
@@ -139,7 +137,6 @@ WebAPI_GetDataList( _route.query.create?.toString().split("TO")[0],
                     _route.query.dataState?.toString());
 
 watch(searchParams, (newVal, oldVal) => {
-  console.log(newVal);
 
   let state = newVal.radioSelect.dataState || "";
   let createDate = newVal.datepicker.create || [];

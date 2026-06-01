@@ -77,9 +77,7 @@ function WebAPI_GetDataList(
     _searchName,
     false,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;
@@ -112,7 +110,6 @@ WebAPI_GetDataList(_route.query.create?.toString().split("TO")[0],
                     _route.query.word?.toString());
 
 watch(searchParams, (newVal, oldVal) => {
-  console.log(newVal);
 
   let createDate = newVal.datepicker.create || [];
   let updateDate = newVal.datepicker.update || [];

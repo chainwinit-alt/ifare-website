@@ -106,13 +106,14 @@
         </div>
         <div class="item-group-list">
           <div class="item-group">
+            <!-- 2026-05-25 #45 — placeholder 改成具體例子,讓使用者一眼知道該填什麼 -->
             <label class="item-title">主管機關</label>
             <el-input
                   v-model="input_competentAuthority"
                   class="p-input"
                   type="text"
                   size="large"
-                  placeholder="請輸入內容"
+                  placeholder="例：衛生福利部社會救助及社工司"
                 />
           </div>
           <div class="item-group">
@@ -153,12 +154,13 @@
         </div>
         <div class="item-group textarea">
           <label class="input-title required">申請資格</label>
+          <!-- 2026-05-25 #45 — placeholder 改成具體例子讓使用者更快進入狀況 -->
           <el-input
             v-model="input_qualification"
             rows="8"
             show-word-limit
             type="textarea"
-            placeholder="輸入內容"
+            placeholder="例：設籍本市滿 6 個月以上、年滿 65 歲、家庭總收入低於最低生活費 1.5 倍"
           />
         </div>
         <div class="item-group full-width html-editor">
@@ -167,12 +169,13 @@
         </div>
         <div class="item-group textarea">
           <label class="input-title required">應備證件資料</label>
+          <!-- 2026-05-25 #45 — placeholder 改成具體清單格式,引導使用者用條列式描述 -->
           <el-input
             v-model="input_evidence"
             rows="8"
             show-word-limit
             type="textarea"
-            placeholder="輸入內容"
+            placeholder="例：&#10;1. 身分證正反面影本&#10;2. 戶籍謄本&#10;3. 最近 3 個月收入證明&#10;4. 申請書(可至本所索取)"
           />
         </div>
         <div class="item-group">
@@ -184,12 +187,13 @@
                 :label="item.label"
                 :value="item.value"/>
             </el-select>
+          <!-- 2026-05-25 #45 — 洽辦單位選「其他」時,具體例子 placeholder 引導補單位資訊 -->
           <el-input
             class="p-input"
             v-model="input_officeInfo"
             type="text"
             size="large"
-            placeholder="請輸入內容"
+            placeholder="例:金山區公所社會課"
             v-show="fareOfficeUnitID==1"
           />
           <el-input
@@ -197,7 +201,7 @@
             v-model="input_officeTel"
             type="text"
             size="large"
-            placeholder="請輸入電話"
+            placeholder="例:(02) 2498-7224 分機 100"
             v-show="fareOfficeUnitID==1"
           />
         </div>
@@ -241,16 +245,43 @@
     <div
       class="section-main-card card-fullsize card-ifare-policy card-input-format"
     >
+      <div class="card-info policy-health">
+        <div class="policy-health__head">
+          <div>
+            <h3>前台功能支援檢核</h3>
+            <p>檢查這筆政策是否足夠支援申請助手、文件清單、期限提醒與比較功能。</p>
+          </div>
+          <span class="policy-health__status" :class="{ 'is-pass': policyHealthMissingCount === 0 }">
+            {{ policyHealthLabel }}
+          </span>
+        </div>
+        <ul class="policy-health__list">
+          <li
+            v-for="item in policyHealthItems"
+            :key="item.title"
+            :class="{ 'is-pass': item.pass }"
+          >
+            <span>{{ item.pass ? '已具備' : '待補' }}</span>
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.description }}</p>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div
+      class="section-main-card card-fullsize card-ifare-policy card-input-format"
+    >
       <div class="card-info">
         <div class="item-group textarea">
           <label class="input-title">備註</label>
+          <!-- 2026-05-25 #45 — placeholder 明確告知這欄是內部用,前台不顯示 -->
           <el-input
             v-model="input_remark"
             rows="5"
             show-word-limit
             type="textarea"
             resize="none"
-            placeholder="輸入內容"
+            placeholder="給後台同仁的內部備註,前台不顯示。可記載修訂歷史、特殊處理說明、聯繫紀錄等"
           />
         </div>
       </div>
@@ -258,10 +289,11 @@
   </el-scrollbar>
 </template>
 <script setup lang="ts">
-import { ref, reactive, getCurrentInstance } from "vue";
+import { ref, reactive, onMounted, getCurrentInstance, computed } from "vue";
 import {
   ElInput,
   ElButton,
+  ElMessageBox,
   ElSelect,
   ElSwitch,
   ElDatePicker,
@@ -275,6 +307,7 @@ import HtmlEditor from "@/components/CompHtmlEditor.vue";
 import { useUserStore } from "@/stores/user";
 import type { SelectOption } from "@/interface/SelectOptions";
 import { useRouter } from "vue-router";
+import { useDraftAutosave } from "@/composables/useDraftAutosave";
 
 const app = getCurrentInstance();
 const $commonLib = app?.appContext.config.globalProperties.$CommonLib;
@@ -322,6 +355,125 @@ const codeIdentityIDs = ref()
 const codeKeywordIDs = ref()
 const fareOfficeUnitID = ref()
 
+// 2026-05-25 #56 — 自動儲存草稿 + 離開提醒(範圍最大的 form,所有文字欄位都納入)
+const DRAFT_KEY = computed(() =>
+  `ifare:ifarepolicy-draft:v1:${routeNameType.indexOf('add') >= 0 ? 'new' : ids?.[0] ?? 'new'}`
+);
+const draftData = computed(() => ({
+  title: input_title.value,
+  editor: editorValue.value,
+  evidence: input_evidence.value,
+  qualification: input_qualification.value,
+  competentAuthority: input_competentAuthority.value,
+  officeTel: input_officeTel.value,
+  officeInfo: input_officeInfo.value,
+  remark: input_remark.value,
+  state: switch_state.value,
+  release: datepicker_release.value,
+  discontinued: datepicker_discontinued.value,
+  policyId: codePolicyID.value,
+  domicileId: codeDomicileID.value,
+  recipientIds: codeRecipientIDs.value,
+  incomeIds: codeIncomeIDs.value,
+  identityIds: codeIdentityIDs.value,
+  keywordIds: codeKeywordIDs.value,
+  officeUnitId: fareOfficeUnitID.value,
+}));
+const draft = useDraftAutosave({ storageKey: DRAFT_KEY, data: draftData });
+
+onMounted(async () => {
+  if (!draft.hasDraft()) return;
+  try {
+    await ElMessageBox.confirm(
+      '偵測到先前未儲存的草稿,要還原嗎?(取消會清掉)',
+      '草稿提示',
+      { type: 'info', confirmButtonText: '還原草稿', cancelButtonText: '不要,清掉' },
+    );
+    const d = draft.restore();
+    if (d) {
+      input_title.value = d.title ?? '';
+      editorValue.value = d.editor;
+      input_evidence.value = d.evidence ?? '';
+      input_qualification.value = d.qualification ?? '';
+      input_competentAuthority.value = d.competentAuthority ?? '';
+      input_officeTel.value = d.officeTel ?? '';
+      input_officeInfo.value = d.officeInfo ?? '';
+      input_remark.value = d.remark ?? '';
+      switch_state.value = d.state ?? true;
+      datepicker_release.value = d.release;
+      datepicker_discontinued.value = d.discontinued;
+      codePolicyID.value = d.policyId;
+      codeDomicileID.value = d.domicileId;
+      codeRecipientIDs.value = d.recipientIds;
+      codeIncomeIDs.value = d.incomeIds;
+      codeIdentityIDs.value = d.identityIds;
+      codeKeywordIDs.value = d.keywordIds;
+      fareOfficeUnitID.value = d.officeUnitId;
+    }
+  } catch {
+    draft.clearDraft();
+  }
+});
+
+function normalizeText(value: any) {
+  return String(value ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hasSelectedItems(value: any) {
+  return Array.isArray(value) && value.length > 0;
+}
+
+const policyHealthItems = computed(() => {
+  const qualificationText = normalizeText(input_qualification.value);
+  const evidenceText = normalizeText(input_evidence.value);
+  const welfareText = normalizeText(editorValue.value);
+  const hasOffice = Boolean(
+    fareOfficeUnitID.value &&
+    (fareOfficeUnitID.value !== 1 || input_officeInfo.value || input_officeTel.value)
+  );
+
+  return [
+    {
+      title: "申請條件",
+      pass: qualificationText.length >= 20,
+      description: "申請路徑助手與常見錯誤引導會依賴這段條件說明。",
+    },
+    {
+      title: "應備文件",
+      pass: evidenceText.length >= 10,
+      description: "文件清單產生器會從應備證件資料整理可勾選清單。",
+    },
+    {
+      title: "福利內容",
+      pass: welfareText.length >= 20,
+      description: "比較頁需要足夠內容讓使用者看出方案差異。",
+    },
+    {
+      title: "承辦窗口",
+      pass: hasOffice,
+      description: "申請路徑助手需要洽辦單位、補充窗口或電話。",
+    },
+    {
+      title: "期限提醒",
+      pass: Boolean(datepicker_discontinued.value),
+      description: "下架日期可支援前台近期截止提醒。",
+    },
+    {
+      title: "推薦與比較分類",
+      pass: Boolean(codePolicyID.value && codeDomicileID.value && hasSelectedItems(codeKeywordIDs.value)),
+      description: "政策類別、地區與關鍵字會影響相關政策推薦與比較辨識。",
+    },
+  ];
+});
+const policyHealthMissingCount = computed(() => policyHealthItems.value.filter((item) => !item.pass).length);
+const policyHealthLabel = computed(() =>
+  policyHealthMissingCount.value === 0 ? "前台支援完整" : `尚有 ${policyHealthMissingCount.value} 項待補`
+);
+
 function GetCodePoliceList(callback:any){
   $WebAPI.GetCodePolicy(
     userStore.token,
@@ -332,9 +484,7 @@ function GetCodePoliceList(callback:any){
     null,
     null,
     false,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -368,9 +518,7 @@ function GetCodeDomicileList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -404,9 +552,7 @@ function GetCodeRecipientList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -440,9 +586,7 @@ function GetCodeIncomeList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -476,9 +620,7 @@ function GetCodeIdentityList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -511,9 +653,7 @@ function GetCodeKeywordList(callback:any){
     null,
     null,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -547,9 +687,7 @@ function GetFareOfficeUnitList(callback:any){
     null,
     true,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -591,9 +729,7 @@ function GetIFarePolicyData(){
     null,
     ids,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;
@@ -673,9 +809,7 @@ const promise_fareOfficeUnit = new Promise((resolve, reject) => {
 })
 
 Promise.all([promise_codePolicy, promise_codeDomicile, promise_codeRecipient, promise_codeIncome, promise_codeIdentity, promise_codeKeyword, promise_fareOfficeUnit])
-        .then(res => {
-          console.log(res)
-          if (res.includes('error')) return false;
+        .then(res => {          if (res.includes('error')) return false;
 
           if (routeNameType.indexOf("edit") >= 0) {
             GetIFarePolicyData()
@@ -684,7 +818,6 @@ Promise.all([promise_codePolicy, promise_codeDomicile, promise_codeRecipient, pr
 
 
 function SaveAction() {
-  console.log(datepicker_release.value)
   const _title = input_title.value
   const _state = switch_state.value
   const _competentAuthority = input_competentAuthority.value
@@ -742,7 +875,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
     $WebAPI.InsertFarePolicy(userStore.token, _title, _qualification, _welfareInfo, _evidence, _ifareOfficeUnitID, _officeInfo, _officeTel,
       _codePolicyID, _codeDomicileID, _codeIdentityIDs, _codeIncomeIDs, _codeRecipientIDs, _codeKeywordIDs, _competentAuthority,
       _releaseTime, _discontinued, _remark, _state,(res: any) => {
@@ -759,13 +891,14 @@ function SaveAction() {
         }
 
         $Message({ message: '新增成功', type: "success" })
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         $commonLib.GuideToPage('IFare_Policy_DataList')
       }
     );
   }
 
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
     $WebAPI.UpdateFarePolicy(userStore.token, _id, _title, _qualification, _welfareInfo, _evidence, _ifareOfficeUnitID, _officeInfo, _officeTel,
@@ -784,10 +917,121 @@ function SaveAction() {
         }
 
         $Message({ message: '編輯成功', type: "success" })
-        // $commonLib.GuideToPage('IFare_Policy_DataList')
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         _router.back();
       }
     );
   }
 }
 </script>
+<style scoped>
+.policy-health {
+  display: grid;
+  gap: 18px;
+}
+
+.policy-health__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.policy-health__head h3 {
+  margin: 0 0 6px;
+  color: #171818;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.policy-health__head p {
+  margin: 0;
+  color: rgba(23, 24, 24, 0.62);
+  line-height: 1.7;
+}
+
+.policy-health__status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #fff5df;
+  color: #8a5700;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.policy-health__status.is-pass {
+  background: #eef6f4;
+  color: #235447;
+}
+
+.policy-health__list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.policy-health__list li {
+  display: grid;
+  gap: 6px;
+  min-height: 126px;
+  padding: 14px;
+  border: 1px solid rgba(234, 85, 4, 0.18);
+  border-radius: 8px;
+  background: #fff9f3;
+}
+
+.policy-health__list li.is-pass {
+  border-color: rgba(35, 84, 71, 0.18);
+  background: #f4faf8;
+}
+
+.policy-health__list span {
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: #8a5700;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.policy-health__list li.is-pass span {
+  color: #235447;
+}
+
+.policy-health__list strong {
+  color: #171818;
+  font-size: 15px;
+}
+
+.policy-health__list p {
+  margin: 0;
+  color: rgba(23, 24, 24, 0.62);
+  line-height: 1.65;
+}
+
+@media (max-width: 1180px) {
+  .policy-health__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .policy-health__head {
+    flex-direction: column;
+  }
+
+  .policy-health__list {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

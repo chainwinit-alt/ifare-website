@@ -41,7 +41,6 @@ const $commonLib = app?.appContext.config.globalProperties.$CommonLib;
 const $WebAPI = app?.appContext.config.globalProperties.$WebAPI;
 const userStore = useUserStore();
 const _route = useRoute();
-console.log(_route.query)
 
 const defaultParams = ref(_route.query)
 const searchParams = ref();
@@ -74,9 +73,7 @@ function WebAPI_GetDataList(
     _state,
     _account,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;
@@ -110,7 +107,6 @@ WebAPI_GetDataList(_route.query.permission?.toString(),
                   _route.query.account?.toString());
 
 watch(searchParams, (newVal, oldVal) => {
-  console.log(newVal);
 
   let permission = newVal.radioSelect.permission || "";
   let state = newVal.radioSelect.dataState || "";

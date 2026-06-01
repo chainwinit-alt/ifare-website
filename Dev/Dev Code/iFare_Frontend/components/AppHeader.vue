@@ -27,8 +27,9 @@
             </NuxtLink>
           </li>
           <li :class="{ active: $route.name === 'articles' }">
-            <NuxtLink to="/articles" :aria-current="$route.name === 'articles' ? 'page' : undefined" data-island="文章專區" data-island-style="link">
-              文章專區
+            <!-- 2026-05-25 nav 名稱跟頁內標題對齊:「福利專欄」 -->
+            <NuxtLink to="/articles" :aria-current="$route.name === 'articles' ? 'page' : undefined" data-island="福利專欄" data-island-style="link">
+              福利專欄
             </NuxtLink>
           </li>
           <li :class="{ active: $route.name === 'collaborator' }">
@@ -93,8 +94,8 @@
         </NuxtLink>
       </li>
       <li :class="{ active: $route.name === 'articles' }">
-        <NuxtLink class="mobileNav-link" to="/articles" :aria-current="$route.name === 'articles' ? 'page' : undefined" data-island="文章專區" data-island-style="link" @click="toggleMenu">
-          文章專區
+        <NuxtLink class="mobileNav-link" to="/articles" :aria-current="$route.name === 'articles' ? 'page' : undefined" data-island="福利專欄" data-island-style="link" @click="toggleMenu">
+          福利專欄
         </NuxtLink>
       </li>
       <li :class="{ active: $route.name?.toString().includes('ifare') }">

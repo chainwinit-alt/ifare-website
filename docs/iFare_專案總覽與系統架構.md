@@ -1,6 +1,6 @@
 # iFare 基金會網站 — 專案總覽與系統架構
 
-> 版本：v2.0（整併版）
+> 版本：v2.2（2026-05-25 安全補充版）
 > 建立日期：2026-04-14
 > 整併日期：2026-04-28
 > 負責人：昀臻
@@ -15,7 +15,7 @@
 > - 第五章 API 服務 → 詳見 `iFare_API文件.md`
 > - 第六章 資料庫 → 詳見 `iFare_資料庫文件.md`
 > - 第七章 部署與環境 → 詳見 `iFare_部署維運與異常處理手冊.md`
-> - 第九章 已知問題 → 對照 `iFare_UI_UX_問題追蹤清單.xlsx`
+> - 第九章 已知問題 → 對照 `iFare_問題追蹤與AI維運規劃.xlsx`
 
 ---
 
@@ -118,9 +118,11 @@ iFare 基金會網站採用前後端分離架構，共由四個子系統組成�
 架構分為以下區塊：
 
 - **app.vue + layouts/default.vue**：根元件與全站版面，包含 AppHeader（導覽列）和 AppFooter（頁尾），管理手機選單開關狀態。
-- **pages/**：Nuxt 自動路由，共 12 個頁面路由。核心功能為 i-Fare 福利查詢系列（ifare.vue / result.vue / info.vue / contact.vue）。
+- **pages/**：Nuxt 自動路由，包含既有 12 個靜態/功能頁面，以及 PageBuilder 使用的 `pages/[slug].vue` 動態頁。核心功能為 i-Fare 福利查詢系列（ifare.vue / result.vue / info.vue / contact.vue）。
 - **components/**：共用元件，包含版面元件（Header/Footer）、篩選元件（CompSelect 系列）、分頁元件（CompPage 系列）。
+- **components/DynamicPage/**：PageBuilder 前台渲染元件，依後台儲存的 sections 顯示 Hero、圖文、CTA、資訊區塊。
 - **plugins/WebAPI.ts**：API 通訊封裝，提供 `$WebApiGet` 和 `$WebApiPost` 方法，使用 Nuxt 內建的 `$fetch`。
+- **server/api/dynamic-pages / dynamic-assets**：PageBuilder dev/staging bridge，提供動態頁 JSON 與圖片上傳/讀取。
 - **middleware/route.global.ts**：全域路由中介層，每次頁面切換時記錄訪客路徑、處理 reload 參數、捲動至頂部。
 - **assets/**：靜態資源，包含 SCSS 樣式系統、SVG/PNG 圖片（40+）、字型（Noto Sans TC / Noto Serif TC / Roboto）。
 - **Nuxt Modules**：nuxt-gtag（Google Analytics, ID: G-QCT2XVFX2L）、nuxt-simple-sitemap（SEO）、normalize.css（CSS Reset）。
@@ -147,7 +149,9 @@ iFare_Frontend/
 │   ├── ifare/result.vue       /ifare/result — 查詢結果
 │   ├── ifare/info.vue         /ifare/info — 福利詳情
 │   ├── ifare/contact.vue      /ifare/contact — 洽辦單位
-│   └── collaborator.vue       /collaborator — 公益夥伴
+│   ├── collaborator.vue       /collaborator — 公益夥伴
+│   ├── preview.vue            /preview — 後台 PageBuilder iframe 預覽
+│   └── [slug].vue             /<slug> — PageBuilder 動態頁 SSR
 ├── components/                共用元件
 │   ├── AppHeader.vue          導覽列（桌面選單 + 手機漢堡選單）
 │   ├── AppFooter.vue          頁尾（聯絡資訊 / LINE / Facebook）
@@ -156,7 +160,18 @@ iFare_Frontend/
 │   ├── CompSelectElse.vue     下拉選單(多選)
 │   ├── CompSelectRecipient.vue 受助對象選擇器
 │   ├── CompPage.vue           分頁元件(數字型)
-│   └── CompPageNum.vue        分頁元件(簡潔型)
+│   ├── CompPageNum.vue        分頁元件(簡潔型)
+│   └── DynamicPage/           PageBuilder 前台 sections 渲染器
+├── composables/
+│   └── useDynamicPages.ts     PageBuilder 動態頁讀取與 publish 判斷
+├── server/
+│   ├── api/
+│   │   ├── dynamic-pages.*    PageBuilder JSON 讀寫 route
+│   │   └── dynamic-assets/    PageBuilder 圖片上傳與讀取 route
+│   ├── data/                  runtime 資料（dynamic-pages.json / dynamic-assets）
+│   └── utils/cors.ts          dev/staging CORS helper
+├── utils/
+│   └── dynamicImage.ts        PageBuilder 圖片路徑解析
 ├── plugins/
 │   └── WebAPI.ts              API 封裝（$WebApiGet / $WebApiPost）
 ├── middleware/
@@ -192,6 +207,8 @@ iFare_Frontend/
 | `/ifare/info` | ifare/info.vue | 福利詳情：資格條件、福利內容、應備證件、洽辦單位 |
 | `/ifare/contact` | ifare/contact.vue | 洽辦單位：依地區分類的聯絡資訊 |
 | `/collaborator` | collaborator.vue | 公益夥伴：合作單位展示 |
+| `/preview` | preview.vue | 後台 PageBuilder iframe 預覽接收端 |
+| `/<slug>` | [slug].vue | PageBuilder 動態頁，從 `dynamic-pages` 讀取已發布內容 |
 
 ### 3.4 共用元件說明
 
@@ -304,7 +321,9 @@ Base URL：`https://www.i-fare.org.tw/ifare_api/api/services/app`
 - **main.ts 進入點**：createApp(App).use(ElementPlus, {locale: zhTw}).use(Pinia + persistedstate).use(Router).provide($WebAPI, $CommonLib)。
 - **App.vue**：包含 AppAside（側邊選單，依權限過濾）、AppHeader（頂部列）、RouterView。
 - **views/**：頁面模組，分為內容管理（7 個模組）、代碼維護（6 種）、系統管理（Dashboard / 帳號 / 個人設定 / 圖片管理）。
+- **views/PageManagement/**：PageBuilder 後台頁面管理，支援快速新增、拖拉 sections、前台預覽、同步到前台動態路由。
 - **components/**：共用元件，分為版面元件（AppAside / AppHeader / MainHeader）、資料元件（CardTable / CardSearchParam / CompHtmlEditor）、表單元件（各種 Input / Dialog）。
+- **components/PageBuilder/**：PageBuilder 編輯器元件，包含 SectionList、SectionEditor、PreviewPane 與圖片上傳操作。
 - **plugins/ — API 通訊層**：AjaxRef.ts（HTTP 請求設定類別）、WebAPI.ts（全域 API 端點定義，65+ 方法）、CommonLib.ts（工具函式庫）。
 
 [此處插入圖片：iFare_Backend_架構圖.png]
@@ -335,6 +354,7 @@ iFare_Backend/
 │   │   ├── CardTable.vue          資料表格（分頁 / 排序 / 操作欄）
 │   │   ├── CardSearchParam.vue    搜尋篩選面板
 │   │   ├── CompHtmlEditor.vue     TinyMCE 富文本編輯器
+│   │   ├── PageBuilder/           新增頁面編輯器（sections / preview / image upload）
 │   │   ├── CompDateRangePicker.vue 日期範圍選擇器
 │   │   ├── DialogAddEditImg.vue   圖片上傳/編輯對話框
 │   │   ├── DialogAlert.vue        通用警告對話框
@@ -343,6 +363,7 @@ iFare_Backend/
 │   ├── views/                     頁面模組（CRUD 模式）
 │   │   ├── LoginView.vue          登入頁
 │   │   ├── HomeView.vue           首頁 Dashboard
+│   │   ├── PageManagement/        PageBuilder 頁面管理
 │   │   ├── Analysis/              數據分析（ApexCharts 圖表）
 │   │   ├── News/                  最新消息 CRUD
 │   │   ├── Articles/
@@ -497,6 +518,17 @@ Method:     get / post / get/file / post/file
 
 正式建置輸出為靜態檔案，base path 為 `/ifare_backend/`，部署至 IIS 靜態站點。
 
+### 4.8 PageBuilder 相關環境變數（2026-05-19）
+
+| 變數 | 位置 | 用途 |
+|------|------|------|
+| `VITE_FRONTEND_BASE` | 後台 Vite | 儲存成功後 toast 前往前台預覽的 base URL |
+| `VITE_FRONTEND_SYNC_URL` | 後台 Vite | PageBuilder 儲存後同步到前台 `/api/dynamic-pages` |
+| `VITE_FRONTEND_ASSET_UPLOAD_URL` | 後台 Vite | 圖文區塊本機圖片上傳到前台 `/api/dynamic-assets` |
+| `VITE_FRONTEND_DYNAMIC_API_TOKEN` | 後台 Vite | 後台呼叫前台 dynamic-pages / dynamic-assets 寫入 API 的同步 token |
+| `NUXT_DYNAMIC_API_TOKEN` | 前台 Nuxt runtimeConfig | 前台 Nuxt server route 驗證 PageBuilder 寫入與圖片上傳 |
+| `NUXT_DYNAMIC_API_ALLOWED_ORIGINS` | 前台 Nuxt runtimeConfig | 正式環境 PageBuilder bridge CORS 白名單，逗號分隔 |
+
 ---
 
 ## 第五章｜API 服務（ASP.NET Core + ABP）
@@ -534,6 +566,7 @@ Kestrel + IIS 反向代理，詳見 `iFare_部署維運與異常處理手冊.md`
 - 建置指令說明
 - 部署流程（前台 / 後台 / API）
 - 環境變數與設定檔
+- PageBuilder runtime 資料：`server/data/dynamic-pages.json` 與 `server/data/dynamic-assets/` 目前為 gitignored，部署時要保留且納入備份
 
 ---
 
@@ -562,12 +595,23 @@ Kestrel + IIS 反向代理，詳見 `iFare_部署維運與異常處理手冊.md`
 - TODO：登入失敗鎖定機制
 - TODO：審計 log 完整性
 
+### 8.6 2026-05-25 安全修補狀態
+
+| 項目 | 目前狀態 | 後續建議 |
+|------|----------|----------|
+| PageBuilder Nuxt bridge 寫入 API | 已補 `NUXT_DYNAMIC_API_TOKEN` / `VITE_FRONTEND_DYNAMIC_API_TOKEN`；production 未設 token 會拒絕寫入 | 長期仍建議改 .NET API + SQL Server / 正式檔案儲存 |
+| PageBuilder CORS | 已由 wildcard 改為 localhost 開發白名單與 `NUXT_DYNAMIC_API_ALLOWED_ORIGINS` | 正式部署需列出實際後台 origin，不可留空或 wildcard |
+| PageBuilder 圖片上傳 | 已限制 8MB 與 avif / gif / jpeg / png / webp；不再允許新上傳 SVG | 仍需正式圖片掃描 / CDN / 檔案儲存策略 |
+| 後台 SysUser 密碼 | 新增 / 改密碼寫入 PBKDF2；舊明文密碼登入成功後自動 rehash | 建議安排強制重設或一次性 migration，清掉未登入的舊明文 |
+| 停用帳號取 JWT | `TokenAuth/Authenticate` 已檢查 `SysUser.State == Enabled` | 仍需補登入失敗鎖定、審計與告警 |
+| DTO 密碼外洩 | `AccountResultDto` 不再回傳 `Pwd`，後台列表不應顯示密碼 | 確認正式 API response 與 Swagger 範例同步更新 |
+
 ---
 
 ## 第九章｜已知問題與改善計畫
 
 ### 9.1 UI/UX 問題盤點摘要
-**詳見 → `iFare_UI_UX_問題追蹤清單.xlsx`**（共 81 項，含三波實作優先順序）
+**詳見 → `iFare_問題追蹤與AI維運規劃.xlsx`**（共 81 項，含三波實作優先順序）
 
 ### 9.2 三波改善優先順序
 - **第一波**：搜尋表單 UX、Loading 骨架、卡片微互動、頁面轉場、社群分享 — **2026-04-28 已完成部分**
@@ -640,7 +684,7 @@ Kestrel + IIS 反向代理，詳見 `iFare_部署維運與異常處理手冊.md`
 ## 附錄
 
 ### A. UI/UX 問題追蹤清單
-→ `iFare_UI_UX_問題追蹤清單.xlsx`
+→ `iFare_問題追蹤與AI維運規劃.xlsx`
 
 ### B. API 端點完整清單
 → `iFare_API文件.md`
@@ -657,3 +701,5 @@ Kestrel + IIS 反向代理，詳見 `iFare_部署維運與異常處理手冊.md`
 |------|------|----------|
 | v1.0 | 2026-04-14 | 初版（系統架構書目錄 + 系統技術說明 各自獨立） |
 | v2.0 | 2026-04-28 | 整併兩份文件：用「架構書目錄」9 章結構為骨架，把「系統技術說明」實質內容填入。第 5/6/7 章內容改為指向專屬文件（API/DB/部署） |
+| v2.1 | 2026-05-19 | 補充 PageBuilder 動態頁、圖片上傳 API、後台 PageManagement 與部署 runtime 資料說明 |
+| v2.2 | 2026-05-25 | 補充 PageBuilder bridge 安全環境變數、SysUser 密碼雜湊、停用帳號 JWT 阻擋與 DTO 密碼外洩修正狀態 |

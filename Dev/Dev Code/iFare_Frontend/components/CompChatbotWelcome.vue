@@ -19,7 +19,7 @@
         </div>
         <div class="header-info">
           <h3 id="chatbot-title" class="header-name">i-Fare 智慧小幫手</h3>
-          <span class="header-status">{{ isBotTyping ? '回覆中...' : '可回答常見問題與站內導覽' }}</span>
+          <span class="header-status">{{ chatbotStatusText }}</span>
         </div>
         <button
           type="button"
@@ -30,7 +30,7 @@
           data-island-style="button"
           @click="resetConversation"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
             <path d="M3 6h18" />
             <path d="M8 6V4h8v2" />
             <path d="m8 6 1 13h6l1-13" />
@@ -45,19 +45,37 @@
           data-island-style="button"
           @click="handleClose"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>
         </button>
       </header>
 
+      <section class="chatbot-mode-switch" aria-label="小幫手測試模式">
+        <span class="mode-label">測試模式</span>
+        <div class="mode-options">
+          <button
+            v-for="option in chatbotModeOptions"
+            :key="option.value"
+            type="button"
+            :class="['mode-option', { 'is-active': selectedChatbotMode === option.value }]"
+            :aria-pressed="selectedChatbotMode === option.value"
+            :title="option.description"
+            :disabled="isBotTyping"
+            @click="setChatbotMode(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+      </section>
+
       <div ref="bodyRef" class="chatbot-body">
         <template v-if="messages.length === 0">
           <section class="welcome-block">
             <p class="welcome-kicker">i-Fare 智慧小幫手</p>
-            <h4 class="welcome-title">先用固定 FAQ 幫你快速找到入口，再交給 AI 補充整理。</h4>
+            <h4 class="welcome-title">{{ welcomeTitle }}</h4>
             <p class="welcome-copy">
-              你可以直接問福利政策、公益夥伴、捐款方式、聯絡資訊，或點下方快捷操作。
+              {{ welcomeCopy }}
             </p>
           </section>
 
@@ -216,7 +234,7 @@
           data-island="送出問題"
           data-island-style="button"
         >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
             <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
           </svg>
         </button>
@@ -227,6 +245,8 @@
 
 <script setup lang="ts">
 type ChatRole = 'user' | 'bot';
+type ChatbotRunMode = 'script' | 'ai' | 'hybrid';
+type ChatbotApiMode = Exclude<ChatbotRunMode, 'script'>;
 type ActionVariant = 'button' | 'link' | 'card';
 type FollowUpActionType = 'message' | 'route' | 'link';
 
@@ -247,6 +267,7 @@ interface ChatMessage {
 
 interface ChatbotApiResponse {
   configured: boolean;
+  mode?: ChatbotRunMode;
   model?: string;
   source?: string;
   errorCode?: string;
@@ -268,6 +289,93 @@ interface FollowUpGroup {
   title: string;
   actions: FollowUpAction[];
 }
+
+interface SearchIntent {
+  key: string;
+  keywords: RegExp;
+  reply: string;
+  actions: FollowUpAction[];
+}
+
+// Default mode for the UI switch below.
+// - 'script': pure script, only local rules, no API call.
+// - 'ai': pure AI, call API directly and skip local scripted replies.
+// - 'hybrid': script first, then API fallback.
+const CHATBOT_DEFAULT_MODE = 'hybrid' as ChatbotRunMode;
+const CHATBOT_MODE_STORAGE_KEY = 'ifare-chatbot-mode';
+
+const chatbotModeOptions: Array<{ value: ChatbotRunMode; label: string; description: string }> = [
+  { value: 'script', label: '純腳本', description: '只用固定規則回答，不呼叫 API' },
+  { value: 'ai', label: '純 AI', description: '直接呼叫 API，不先吃固定問答' },
+  { value: 'hybrid', label: '混合版', description: '固定規則優先，沒命中再呼叫 API' },
+];
+
+function resultSearchTo(query: string) {
+  return `/ifare/result?query=${encodeURIComponent(query)}`;
+}
+
+const searchIntents: SearchIntent[] = [
+  {
+    key: 'elder',
+    keywords: /老人|長者|高齡|銀髮|長照|照顧|失能|失智/,
+    reply:
+      '如果是老人相關需求，可以先從「老人福利」、「長照照顧」、「照顧者支持」這幾個方向找。建議先看搜尋結果，再依地區、身分與收入條件縮小範圍。',
+    actions: [
+      { label: '搜尋老人福利', type: 'route', to: resultSearchTo('老人'), variant: 'button' },
+      { label: '搜尋長照照顧', type: 'route', to: resultSearchTo('長照'), variant: 'button' },
+      { label: '搜尋照顧補助', type: 'route', to: resultSearchTo('照顧'), variant: 'link' },
+      { label: '完整福利篩選', type: 'route', to: '/ifare', variant: 'link' },
+    ],
+  },
+  {
+    key: 'birth',
+    keywords: /生育|懷孕|孕婦|產檢|新生兒|嬰幼兒|育兒|托育|保母/,
+    reply:
+      '如果是生育或育兒補助，可以先分成「生育補助」、「育兒津貼」、「托育服務」三類查。若你有戶籍地或孩子年齡，進結果頁後再補篩會更準。',
+    actions: [
+      { label: '搜尋生育補助', type: 'route', to: resultSearchTo('生育補助'), variant: 'button' },
+      { label: '搜尋育兒津貼', type: 'route', to: resultSearchTo('育兒津貼'), variant: 'button' },
+      { label: '搜尋托育服務', type: 'route', to: resultSearchTo('托育'), variant: 'link' },
+      { label: '完整福利篩選', type: 'route', to: '/ifare', variant: 'link' },
+    ],
+  },
+  {
+    key: 'disability',
+    keywords: /身障|身心障礙|障礙|輔具|復健|無障礙/,
+    reply:
+      '如果是身心障礙相關需求，可以先查「身心障礙福利」、「輔具補助」、「照顧服務」。這類福利通常會再看障礙證明、收入與戶籍地。',
+    actions: [
+      { label: '搜尋身障福利', type: 'route', to: resultSearchTo('身心障礙'), variant: 'button' },
+      { label: '搜尋輔具補助', type: 'route', to: resultSearchTo('輔具'), variant: 'button' },
+      { label: '搜尋照顧服務', type: 'route', to: resultSearchTo('照顧服務'), variant: 'link' },
+      { label: '完整福利篩選', type: 'route', to: '/ifare', variant: 'link' },
+    ],
+  },
+  {
+    key: 'income',
+    keywords: /低收入|中低收入|弱勢|急難|生活補助|生活扶助|經濟困難|救助/,
+    reply:
+      '如果是經濟壓力或急難需求，可以先查「生活補助」、「急難救助」、「低收入戶」。這類通常會看收入、家庭狀況與戶籍地。',
+    actions: [
+      { label: '搜尋生活補助', type: 'route', to: resultSearchTo('生活補助'), variant: 'button' },
+      { label: '搜尋急難救助', type: 'route', to: resultSearchTo('急難救助'), variant: 'button' },
+      { label: '搜尋低收入戶', type: 'route', to: resultSearchTo('低收入'), variant: 'link' },
+      { label: '完整福利篩選', type: 'route', to: '/ifare', variant: 'link' },
+    ],
+  },
+  {
+    key: 'student',
+    keywords: /學生|就學|學費|教育|助學|獎助學金|兒童|青少年|少年/,
+    reply:
+      '如果是兒少或就學需求，可以先查「就學補助」、「兒少福利」、「獎助學金」。如果有年齡或學籍條件，進結果頁後再縮小範圍。',
+    actions: [
+      { label: '搜尋就學補助', type: 'route', to: resultSearchTo('就學補助'), variant: 'button' },
+      { label: '搜尋兒少福利', type: 'route', to: resultSearchTo('兒少'), variant: 'button' },
+      { label: '搜尋獎助學金', type: 'route', to: resultSearchTo('獎助學金'), variant: 'link' },
+      { label: '完整福利篩選', type: 'route', to: '/ifare', variant: 'link' },
+    ],
+  },
+];
 
 const quickActions: QuickAction[] = [
   {
@@ -298,11 +406,14 @@ const quickActions: QuickAction[] = [
 
 const suggestionChips = [
   '有哪些常見問題？',
+  '老人福利',
+  '生育補助',
   '我要找福利政策',
   '如何聯絡基金會？',
-  '怎麼捐款或支持？',
-  '想看最新消息',
 ];
+
+const SCRIPT_MODE_FALLBACK_REPLY =
+  '目前是純腳本測試模式，我只能依照固定關鍵字回覆。請改用更明確的對象或情境，例如：老人福利、生育補助、身心障礙、低收入、就學補助、公益夥伴、聯絡方式。';
 
 const isOpen = defineModel<boolean>('open', { default: false });
 const inputText = ref('');
@@ -315,10 +426,35 @@ const lastErrorCode = ref('');
 const lastErrorRetryable = ref(false);
 const chatSessionId = ref(0);
 const shouldResetAfterClose = ref(false);
+const selectedChatbotMode = ref<ChatbotRunMode>(CHATBOT_DEFAULT_MODE);
 
 let messageId = 0;
 
 const canSend = computed(() => inputText.value.trim().length > 0 && !isBotTyping.value);
+const activeModeOption = computed(
+  () => chatbotModeOptions.find((option) => option.value === selectedChatbotMode.value) || chatbotModeOptions[2],
+);
+const chatbotStatusText = computed(() =>
+  isBotTyping.value ? '回覆中...' : `目前使用：${activeModeOption.value.label}`,
+);
+const welcomeTitle = computed(() => {
+  const titles: Record<ChatbotRunMode, string> = {
+    script: '目前測試純腳本：只用固定規則快速導覽。',
+    ai: '目前測試純 AI：直接交給 AI 回覆與整理。',
+    hybrid: '目前測試混合版：先用固定 FAQ，再交給 AI 補充整理。',
+  };
+
+  return titles[selectedChatbotMode.value];
+});
+const welcomeCopy = computed(() => {
+  const copies: Record<ChatbotRunMode, string> = {
+    script: '適合確認固定問答、關鍵字命中與站內入口按鈕是否清楚。',
+    ai: '適合確認 API 回覆是否自然、人性化，以及是否能處理開放式問題。',
+    hybrid: '適合測試正式方向：常見問題省成本，複雜問題再交給 AI。',
+  };
+
+  return copies[selectedChatbotMode.value];
+});
 
 const actionGroups = computed<FollowUpGroup[]>(() => {
   const groups: FollowUpGroup[] = [];
@@ -340,7 +476,7 @@ const actionGroups = computed<FollowUpGroup[]>(() => {
     });
   }
 
-  const keywordActions = buildKeywordActions(lastPrompt.value);
+  const keywordActions = selectedChatbotMode.value === 'ai' ? [] : buildKeywordActions(lastPrompt.value);
   if (keywordActions.length > 0) {
     groups.push({
       title: '站內導覽',
@@ -365,16 +501,30 @@ function escapeHtml(value: string) {
     .replaceAll("'", '&#39;');
 }
 
-function formatPlainText(text: string) {
-  return escapeHtml(text).replace(/\n/g, '<br>');
+function stripBotHtml(text: string) {
+  return text
+    .replace(/<a\b[^>]*>(.*?)<\/a>/gis, '$1')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>\s*<p[^>]*>/gi, '\n')
+    .replace(/<\/?[^>]+>/g, '')
+    .trim();
 }
 
-function pushMessage(role: ChatRole, text: string, options?: { html?: boolean; isError?: boolean }) {
+function formatPlainText(text: string, options?: { stripHtml?: boolean }) {
+  const normalized = options?.stripHtml ? stripBotHtml(text) : text;
+  return escapeHtml(normalized).replace(/\n/g, '<br>');
+}
+
+function formatTrustedHtml(text: string) {
+  return useSanitize(text).replace(/\n/g, '<br>');
+}
+
+function pushMessage(role: ChatRole, text: string, options?: { html?: boolean; isError?: boolean; stripHtml?: boolean }) {
   messages.value.push({
     id: nextId(),
     role,
     content: text,
-    contentHtml: options?.html ? text : formatPlainText(text),
+    contentHtml: options?.html ? formatTrustedHtml(text) : formatPlainText(text, { stripHtml: options?.stripHtml }),
     isError: options?.isError,
   });
 }
@@ -390,9 +540,51 @@ function normalizePrompt(prompt: string) {
   return prompt.trim().slice(0, 200);
 }
 
+function isChatbotRunMode(value: unknown): value is ChatbotRunMode {
+  return value === 'script' || value === 'ai' || value === 'hybrid';
+}
+
+function persistChatbotMode(mode: ChatbotRunMode) {
+  if (!import.meta.client) return;
+
+  try {
+    localStorage.setItem(CHATBOT_MODE_STORAGE_KEY, mode);
+  } catch (error) {
+    console.warn('[chatbot] failed to persist mode', error);
+  }
+}
+
+function setChatbotMode(mode: ChatbotRunMode) {
+  if (isBotTyping.value || selectedChatbotMode.value === mode) return;
+  selectedChatbotMode.value = mode;
+  persistChatbotMode(mode);
+  resetConversation({ focus: false });
+}
+
+function matchSearchIntent(prompt: string) {
+  const text = prompt.toLowerCase();
+  return searchIntents.find((intent) => intent.keywords.test(text));
+}
+
+function uniqueActions(actions: FollowUpAction[]) {
+  const seen = new Set<string>();
+
+  return actions.filter((action) => {
+    const key = `${action.type}:${action.to || action.href || action.prompt || action.label}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function buildKeywordActions(prompt: string): FollowUpAction[] {
   const text = prompt.toLowerCase();
   const actions: FollowUpAction[] = [];
+  const matchedIntent = matchSearchIntent(prompt);
+
+  if (matchedIntent) {
+    actions.push(...matchedIntent.actions);
+  }
 
   if (/福利|政策|補助|資格|申請|ifare/.test(text)) {
     actions.push(
@@ -410,7 +602,7 @@ function buildKeywordActions(prompt: string): FollowUpAction[] {
   }
 
   if (/文章|資源|懶人包/.test(text)) {
-    actions.push({ label: '文章專區', type: 'route', to: '/articles', variant: 'link' });
+    actions.push({ label: '福利專欄', type: 'route', to: '/articles', variant: 'link' });
   }
 
   if (/捐款|支持|donate|donation/.test(text)) {
@@ -443,34 +635,51 @@ function buildKeywordActions(prompt: string): FollowUpAction[] {
     );
   }
 
-  return actions.slice(0, 4);
+  return uniqueActions(actions).slice(0, 4);
+}
+
+function getBroadWelfareGuidanceReply() {
+  return [
+    '福利政策範圍很大，建議先從這 4 類開始選：',
+    '1. 老人 / 長照',
+    '2. 生育 / 育兒',
+    '3. 身心障礙',
+    '4. 低收入 / 急難 / 就學補助',
+    '如果你告訴我「對象」或「情境」，我可以直接幫你縮小到更精準的搜尋方向。',
+    '站內入口：/ifare',
+  ].join('\n');
 }
 
 function getLocalKnowledgeReply(prompt: string) {
   const text = prompt.toLowerCase();
+  const matchedIntent = matchSearchIntent(prompt);
+
+  if (matchedIntent) {
+    return matchedIntent.reply;
+  }
 
   if (/福利|補助|資格|申請|ifare/.test(text)) {
-    return '如果你想先篩出適合自己的福利政策，建議直接進入 <a href="/ifare" target="_self">i-Fare 福利查詢</a>，依照地區、受助對象與條件逐步篩選。';
+    return getBroadWelfareGuidanceReply();
   }
 
   if (/公益|夥伴|合作/.test(text)) {
-    return '目前站上有公益夥伴整理頁，包含服務項目與合作資訊，你可以直接查看 <a href="/collaborator" target="_self">公益夥伴</a>。';
+    return '目前站上有公益夥伴整理頁，包含服務項目與合作資訊，你可以直接查看公益夥伴頁。';
   }
 
   if (/捐款|支持|donate|donation/.test(text)) {
-    return '如果你想支持基金會，建議先查看 <a href="/about" target="_self">關於我們</a> 了解服務方向，若需要捐款方式與合作資訊，也可以直接聯絡基金會。';
+    return '如果你想支持基金會，建議先查看關於我們了解服務方向，若需要捐款方式與合作資訊，也可以直接聯絡基金會。';
   }
 
   if (/聯絡|客服|電話|line|email/.test(text)) {
-    return '你可以用以下方式聯絡基金會：電話 <a href="tel:0227978383">02-2797-8383</a>、Email <a href="mailto:ifaretw@gmail.com">ifaretw@gmail.com</a>、或加入 <a href="https://lin.ee/eHw9VpL" target="_blank" rel="noopener noreferrer">LINE 客服</a>。';
+    return '你可以用以下方式聯絡基金會：電話 02-2797-8383、Email ifaretw@gmail.com，或加入 LINE 客服。';
   }
 
   if (/新聞|最新|活動/.test(text)) {
-    return '如果你想看基金會最新公告與活動，建議直接前往 <a href="/news" target="_self">最新消息</a>。';
+    return '如果你想看基金會最新公告與活動，建議直接前往最新消息頁。';
   }
 
   if (/文章|資源|懶人包/.test(text)) {
-    return '站上有政策文章與圖文整理，建議直接到 <a href="/articles" target="_self">文章專區</a> 查看。';
+    return '站上有政策文章與圖文整理，建議直接到福利專欄查看。';
   }
 
   return '';
@@ -482,14 +691,44 @@ async function requestBotReply(prompt: string) {
   lastErrorCode.value = '';
   lastErrorRetryable.value = false;
 
+  const mode = selectedChatbotMode.value;
+  if (mode === 'script') {
+    await requestScriptModeReply(prompt, sessionId);
+    return;
+  }
+
+  if (mode === 'ai') {
+    await requestAiModeReply(prompt, sessionId);
+    return;
+  }
+
+  await requestHybridModeReply(prompt, sessionId);
+}
+
+async function requestScriptModeReply(prompt: string, sessionId: number) {
+  const localReply = getLocalKnowledgeReply(prompt) || SCRIPT_MODE_FALLBACK_REPLY;
+  if (sessionId !== chatSessionId.value) return;
+  pushMessage('bot', localReply);
+  await scrollToBottom();
+}
+
+async function requestAiModeReply(prompt: string, sessionId: number) {
+  await requestApiReply(prompt, sessionId, 'ai');
+}
+
+async function requestHybridModeReply(prompt: string, sessionId: number) {
   const localReply = getLocalKnowledgeReply(prompt);
   if (localReply) {
     if (sessionId !== chatSessionId.value) return;
-    pushMessage('bot', localReply, { html: true });
+    pushMessage('bot', localReply);
     await scrollToBottom();
     return;
   }
 
+  await requestApiReply(prompt, sessionId, 'hybrid');
+}
+
+async function requestApiReply(prompt: string, sessionId: number, mode: ChatbotApiMode) {
   isBotTyping.value = true;
   await scrollToBottom();
 
@@ -497,6 +736,7 @@ async function requestBotReply(prompt: string) {
     const response = await $fetch<ChatbotApiResponse>('/api/chatbot', {
       method: 'POST',
       body: {
+        mode,
         message: prompt,
         history: messages.value.slice(-8).map((message) => ({
           role: message.role === 'bot' ? 'assistant' : 'user',
@@ -506,7 +746,7 @@ async function requestBotReply(prompt: string) {
     });
 
     if (sessionId !== chatSessionId.value) return;
-    pushMessage('bot', response.reply);
+    pushMessage('bot', response.reply, { stripHtml: true });
 
     if (response.errorCode) {
       lastErrorCode.value = response.errorCode;
@@ -583,6 +823,19 @@ function handleAfterLeave() {
   shouldResetAfterClose.value = false;
   resetConversation({ focus: false });
 }
+
+onMounted(() => {
+  if (!import.meta.client) return;
+
+  try {
+    const storedMode = localStorage.getItem(CHATBOT_MODE_STORAGE_KEY);
+    if (isChatbotRunMode(storedMode)) {
+      selectedChatbotMode.value = storedMode;
+    }
+  } catch (error) {
+    console.warn('[chatbot] failed to read mode', error);
+  }
+});
 
 watch(isOpen, async (open, previousOpen) => {
   if (!open) {
@@ -672,6 +925,61 @@ watch(isOpen, async (open, previousOpen) => {
   &:hover {
     transform: translateY(-1px);
     background: #ffffff;
+  }
+
+  &:focus-visible {
+    outline: 3px solid rgba(243, 110, 33, 0.22);
+    outline-offset: 2px;
+  }
+}
+
+.chatbot-mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px 12px;
+  border-bottom: 1px solid rgba(23, 24, 24, 0.06);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.mode-label {
+  flex: 0 0 auto;
+  color: rgba(23, 24, 24, 0.62);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.mode-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 1 1 auto;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(23, 24, 24, 0.06);
+}
+
+.mode-option {
+  min-height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(23, 24, 24, 0.68);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+
+  &.is-active {
+    background: #171818;
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(23, 24, 24, 0.14);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.56;
   }
 
   &:focus-visible {

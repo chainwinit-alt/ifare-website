@@ -878,7 +878,6 @@ export default {
                 })
                 .then((res) => {
                     // 成功時原樣把 Axios 回應物件交回呼叫端
-                    console.log(res)
                     callback(res)
                 })
                 .catch((error) => {

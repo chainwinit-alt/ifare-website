@@ -54,11 +54,14 @@
               <p>目前沒有符合條件的福利專欄</p>
             </div>
             <ul class="list-unstyled article-list" v-else>
+              <!-- 2026-05-25 UIUX #34 — 已讀標記 -->
               <li
                 class="article-item transition-general"
+                :class="{ 'is-read': readMarksWelfare.isRead(_welfare.id) }"
                 v-for="_welfare in welfareList"
                 :key="_welfare.id"
               >
+                <span class="badge-read" v-if="readMarksWelfare.isRead(_welfare.id)">已讀</span>
                 <NuxtLink
                   class="item-page-link"
                   :to="{
@@ -133,6 +136,7 @@
               <p>目前沒有符合條件的懶人包</p>
             </div>
             <ul class="list-unstyled article-list" v-else>
+              <!-- 2026-05-25 — 懶人包列表移除「已讀」標記(per user feedback,僅福利專欄保留) -->
               <li
                 class="article-item transition-general"
                 v-for="_lazy in lazyList"
@@ -173,6 +177,12 @@
 <script setup lang="ts">
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue";
+
+// 2026-05-25 UIUX #34 — 已讀標記(只開福利專欄;懶人包視覺型內容不需追蹤已讀)
+const readMarksWelfare = useReadMarks('articles-welfare')
+onMounted(() => {
+  readMarksWelfare.load()
+})
 
 const isSelectOpened = ref(false);
 

@@ -1,6 +1,6 @@
 # iFare 基金會網站 — 開發上手與協作規範
 
-> 版本：v2.0（整併版）
+> 版本：v2.2（2026-05-25 安全補充版）
 > 建立日期：2026-04-14
 > 整併日期：2026-04-28
 > 負責人：昀臻
@@ -128,6 +128,100 @@
 - 11.5 git push 被拒絕
 - 11.6 dotnet restore 失敗
 
+### 十二、2026-05-19 補充：UIUX 修改到遠端部署前流程
+- 12.1 本機分支確認與 push 流程
+- 12.2 PageBuilder 開發環境變數
+- 12.3 RWD 與後台回歸檢查
+
+---
+
+## 2026-05-19 補充：UIUX 修改到遠端部署前流程
+
+這段對應目前分支 `feat/uiux-round14-emma` 的工作方式：先在本機完成 UIUX + 後台調整，確認 build 與基本回歸後再推到 GitHub，遠端主機只負責拉版與部署。
+
+### 1. 每次 push 前先確認分支與狀態
+
+```bash
+git branch --show-current
+git status --short
+```
+
+目前 Emma 這輪修改應維持在：
+
+```bash
+feat/uiux-round14-emma
+```
+
+如果分支不是這個，先不要 commit/push，避免把 UIUX 修改推到錯的分支。
+
+### 2. 本機驗證順序
+
+前台：
+
+```bash
+cd "Dev/Dev Code/iFare_Frontend"
+npm run build
+```
+
+後台：
+
+```bash
+cd "Dev/Dev Code/iFare_Backend"
+npm run type-check
+npm run build
+```
+
+後台 build 通過後，再回 repo 根目錄看異動：
+
+```bash
+git status --short
+```
+
+後端 C# 專案仍需在有 .NET SDK / Visual Studio Build Tools 的環境跑 `dotnet build` 或 CI。若本機沒有 `dotnet` / `msbuild`，只能完成前後台 npm build 與程式碼檢查，不能宣稱 API 已本機編譯通過。
+
+### 3. commit / push
+
+```bash
+git add -A
+git commit -m "feat: finalize uiux and page builder fixes"
+git push origin feat/uiux-round14-emma
+```
+
+commit message 依實際內容調整；文件類可用 `docs:`，UI 或功能修正可用 `fix:` / `feat:`。
+
+### 4. PageBuilder 開發環境
+
+PageBuilder 預覽、同步、圖片上傳需要前台與後台 dev server 同時啟動：
+
+- 前台：`http://localhost:3000`
+- 後台：`http://localhost:5173`
+
+後台 Vite 可用的環境變數：
+
+| 變數 | 預設用途 |
+|------|----------|
+| `VITE_FRONTEND_BASE` | 前往前台預覽的 base URL |
+| `VITE_FRONTEND_SYNC_URL` | 儲存 PageBuilder 後同步到 `/api/dynamic-pages` |
+| `VITE_FRONTEND_ASSET_UPLOAD_URL` | 圖片上傳到 `/api/dynamic-assets` |
+| `VITE_FRONTEND_DYNAMIC_API_TOKEN` | 後台呼叫前台動態頁 / 圖片 API 的同步 token |
+
+不要直接貼 `C:\Users\...\image.png` 到圖片網址欄位，瀏覽器正式站讀不到本機檔。需要顯示本機圖片時，請用 PageBuilder 的圖片上傳功能。
+
+前台 Nuxt 需配合設定：
+
+| 變數 | 預設用途 |
+|------|----------|
+| `NUXT_DYNAMIC_API_TOKEN` | 驗證 PageBuilder 寫入與圖片上傳 API；需與後台 token 相同 |
+| `NUXT_DYNAMIC_API_ALLOWED_ORIGINS` | 正式環境 CORS 白名單，逗號分隔 |
+
+本機開發可暫時不設定 token；正式環境必須設定，否則 production 寫入 API 會回 503。
+
+### 5. 遠端部署前檢查
+
+- 依 `docs/iFare_RWD回歸檢查清單.md` 巡登入頁、Dashboard、資料列表、Add/Edit、PageBuilder preview。
+- 確認 `server/data/dynamic-pages.json` 與 `server/data/dynamic-assets/` 在遠端主機會被保留，不會被部署流程覆蓋。
+- 遠端主機上的修改不建議直接手改；本機完成、push 到 GitHub，再由遠端拉版部署，比較能追蹤與回復。
+
 ---
 
 ## 變更紀錄
@@ -136,3 +230,5 @@
 |------|------|----------|
 | v1.0 | 2026-04-14 | 初版（新人上手指南 + 開發規範各自獨立） |
 | v2.0 | 2026-04-28 | 整併兩份骨架成單一文件，依入職時間軸重排章節 |
+| v2.1 | 2026-05-19 | 補充 UIUX 修改、PageBuilder 開發環境、分支驗證與遠端部署前流程 |
+| v2.2 | 2026-05-25 | 補充 PageBuilder dynamic API token / CORS 設定與 C# build 驗證注意事項 |

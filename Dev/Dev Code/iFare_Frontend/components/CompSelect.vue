@@ -1,47 +1,72 @@
 <template>
+  <!--
+    2026-05-25 UIUX #57:
+    variant="list" 以清單呈現
+    variant="tags" 以 tag 呈現
+    allow-deselect="true" 可再次點擊取消選取
+  -->
   <div
     class="component-select no-userselect"
-    :class="{ active: isShow}"
+    :class="[{ active: isShow }, `variant-${variant}`]"
+    :name="selectType"
     tabindex="0"
     role="combobox"
     :aria-expanded="isShow"
     aria-haspopup="listbox"
     :aria-label="props.selectTitle || props.placeholder"
-    @click="ToggleSelectDialog"
+    @click="toggleSelectDialog"
     @keydown.enter.prevent="onEnterSelect"
     @keydown.space.prevent="onEnterSelect"
-    @keydown.esc.prevent="CloseDialog"
+    @keydown.esc.prevent="closeDialog"
     @keydown.down.prevent="onArrow(1)"
     @keydown.up.prevent="onArrow(-1)"
   >
     <div class="comp-group">
-      <span class="comp-placeholder" v-show="selectName == ''">{{
-        props.placeholder
-      }}</span>
-      <span class="comp-name" v-show="selectName != ''">{{ selectName }}</span>
+      <span v-show="selectName === ''" class="comp-placeholder">{{ props.placeholder }}</span>
+      <span v-show="selectName !== ''" class="comp-name">{{ selectName }}</span>
       <i class="icon ic-select-arrow"></i>
     </div>
-    <div class="select-content-bg" v-show="isShow">
-      <div class="select-content" @click.stop.prevent="PreventClick($event)">
+
+    <div v-show="isShow" class="select-content-bg">
+      <div class="select-content" @click.stop.prevent="preventClick">
         <div class="part-top">
           <h5 class="select-title">{{ props.selectTitle }}</h5>
         </div>
-        <ul class="list-unstyled select-list" role="listbox">
+
+        <ul v-if="variant === 'list'" class="list-unstyled select-list" role="listbox">
           <li
+            v-for="(item, idx) in selectList"
+            :key="item.val"
             class="select-item"
-            :class="{ active: _item.name == selectName, focused: idx === focusedIndex }"
-            v-for="(_item, idx) in selectList"
-            :key="_item.val"
+            :class="{ active: item.name === selectName, focused: idx === focusedIndex }"
             role="option"
-            :aria-selected="_item.name == selectName"
+            :aria-selected="item.name === selectName"
             tabindex="-1"
-            @click.stop.prevent="ClickSelectItem(_item.name, _item.val)"
+            @click.stop.prevent="clickSelectItem(item.name, item.val)"
           >
-            {{ _item.name }}
+            {{ item.name }}
           </li>
         </ul>
+
+        <div v-else class="btn-tag-list" role="listbox">
+          <span
+            v-for="(item, idx) in selectList"
+            :key="item.val"
+            class="btn btn-tag"
+            :class="{ active: item.name === selectName, focused: idx === focusedIndex }"
+            role="option"
+            :aria-selected="item.name === selectName"
+            tabindex="-1"
+            @click.stop.prevent="clickSelectItem(item.name, item.val)"
+          >
+            {{ item.name }}
+          </span>
+        </div>
+
         <div class="part-bottom">
-          <button class="btn btn-select-close transition-general" @click.stop.prevent="ToggleSelectDialog">關閉</button>
+          <button class="btn btn-select-close transition-general" @click.stop.prevent="toggleSelectDialog">
+            關閉
+          </button>
         </div>
       </div>
     </div>
@@ -49,108 +74,144 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
+
+type SelectItem = {
+  name: string;
+  val: string;
+};
 
 const selectVal = ref("");
 const selectName = ref("");
 const isShow = ref(false);
 const focusedIndex = ref(-1);
 
-function ToggleSelectDialog() {
+const props = defineProps<{
+  placeholder?: string;
+  selectList?: SelectItem[];
+  selectValue?: string;
+  selectType?: string;
+  selectTitle?: string;
+  selectDefault?: string;
+  variant?: "list" | "tags";
+  allowDeselect?: boolean;
+}>();
+
+const emits = defineEmits(["update:selectValue", "isOpened"]);
+
+const variant = computed(() => props.variant ?? "list");
+const selectList = computed(() => props.selectList ?? []);
+const selectType = computed(() => props.selectType ?? "");
+
+function toggleSelectDialog() {
   isShow.value = !isShow.value;
+
   if (isShow.value) {
-    // 開啟時，預設 focus 已選項目，無則 focus 第一個
-    const list = (props.selectList || []) as any[];
-    const cur = list.findIndex((p: any) => p.name === selectName.value);
-    focusedIndex.value = cur >= 0 ? cur : 0;
+    const currentIndex = selectList.value.findIndex((item) => item.name === selectName.value);
+    focusedIndex.value = currentIndex >= 0 ? currentIndex : 0;
   } else {
     focusedIndex.value = -1;
   }
-  emits("isOpened", props.selectType, isShow.value)
+
+  emits("isOpened", props.selectType, isShow.value);
 }
 
-function CloseDialog() {
-  if (isShow.value) {
-    isShow.value = false;
-    focusedIndex.value = -1;
-    emits("isOpened", props.selectType, false);
-  }
+function closeDialog() {
+  if (!isShow.value) return;
+
+  isShow.value = false;
+  focusedIndex.value = -1;
+  emits("isOpened", props.selectType, false);
 }
 
 function onArrow(delta: number) {
   if (!isShow.value) {
-    // 關閉狀態下方向鍵也可開啟
-    ToggleSelectDialog();
+    toggleSelectDialog();
     return;
   }
-  const list = (props.selectList || []) as any[];
-  if (list.length === 0) return;
+
+  if (selectList.value.length === 0) return;
+
   let next = focusedIndex.value + delta;
-  if (next < 0) next = list.length - 1;
-  if (next >= list.length) next = 0;
+  if (next < 0) next = selectList.value.length - 1;
+  if (next >= selectList.value.length) next = 0;
   focusedIndex.value = next;
-  // Enter 在 focused option 上會觸發 click
-  const item = list[next];
-  if (item) {
-    // 視覺反饋：滾到可視範圍 (簡單版)
-  }
 }
 
-function PreventClick(e:any) {
+function preventClick() {
   return false;
 }
 
-function ClickSelectItem(name: string, val: string) {
+function clickSelectItem(name: string, val: string) {
+  if (props.allowDeselect && selectVal.value === val) {
+    selectName.value = "";
+    selectVal.value = "";
+    emits("update:selectValue", props.selectType, "");
+    toggleSelectDialog();
+    return;
+  }
+
   selectName.value = name;
   selectVal.value = val;
   emits("update:selectValue", props.selectType, selectVal.value);
-  ToggleSelectDialog()
+  toggleSelectDialog();
 }
 
-// 讓 Enter 在外層 keydown 時，如果有 focusedIndex，選中該項
 function onEnterSelect() {
   if (isShow.value && focusedIndex.value >= 0) {
-    const list = (props.selectList || []) as any[];
-    const item = list[focusedIndex.value];
-    if (item) ClickSelectItem(item.name, item.val);
-  } else {
-    ToggleSelectDialog();
+    const item = selectList.value[focusedIndex.value];
+    if (item) {
+      clickSelectItem(item.name, item.val);
+    }
+    return;
   }
-}
 
-const props = defineProps([
-  "placeholder",
-  "selectList",
-  "selectValue",
-  "selectType",
-  "selectTitle",
-  "selectDefault"
-]);
-const emits = defineEmits(["update:selectValue", "isOpened"]);
+  toggleSelectDialog();
+}
 
 watch(
   () => props.selectList,
   (newList) => {
-    if (!newList || !Array.isArray(newList)) return;  // null / undefined / 非 array 防呆
+    if (!newList || !Array.isArray(newList)) return;
 
     if (props.selectDefault) {
-      const _defaultItem = newList.find((p:any) => p.val == props.selectDefault)
-      if (_defaultItem) {
-        selectName.value = _defaultItem.name
-        selectVal.value = _defaultItem.val
+      const defaultItem = newList.find((item) => item.val === props.selectDefault);
+      if (defaultItem) {
+        selectName.value = defaultItem.name;
+        selectVal.value = defaultItem.val;
       } else {
-        selectName.value = ""
-        selectVal.value = ""
+        selectName.value = "";
+        selectVal.value = "";
       }
     }
 
-    if (props.selectDefault == "") {
-      selectName.value = ""
-      selectVal.value = ""
+    if (props.selectDefault === "") {
+      selectName.value = "";
+      selectVal.value = "";
     }
   },
-  { deep: true, immediate: true }
-)
+  { deep: true, immediate: true },
+);
+
+watch(
+  () => props.selectValue,
+  (newValue) => {
+    if (typeof newValue !== "string") return;
+
+    const matchedItem = selectList.value.find((item) => item.val === newValue);
+    if (matchedItem) {
+      selectName.value = matchedItem.name;
+      selectVal.value = matchedItem.val;
+      return;
+    }
+
+    if (newValue === "") {
+      selectName.value = "";
+      selectVal.value = "";
+    }
+  },
+  { immediate: true },
+);
 
 const modelValue = computed({
   get() {

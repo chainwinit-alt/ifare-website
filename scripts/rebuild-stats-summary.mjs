@@ -63,7 +63,7 @@ function setRow(ws, row, vals, styles) {
 
 // ===== 讀取現況 =====
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FILE = path.resolve(__dirname, '..', 'docs', 'iFare_UI_UX_問題追蹤清單.xlsx');
+const FILE = path.resolve(__dirname, '..', 'docs', 'iFare_問題追蹤與AI維運規劃.xlsx');
 const wb = XLSX.readFile(FILE, { cellStyles: true });
 const wsUiux = wb.Sheets['UIUX問題追蹤清單'];
 const wsBackend = wb.Sheets['後臺優化'];
@@ -161,6 +161,11 @@ const rounds = [
   ['Round 7', '2026-05-12', '後台進階功能建議補充', 0, 0, 8, '-', '補充 GA4 同步快取、任務中心、自動儲存與編輯鎖定、發布排程、審稿指派、內容健康檢查、通知中心、資產治理'],
   ['Round 8', '2026-05-12', '後台首頁搜尋 + 表單欄位人性化快改', 0, 0, 0, '-', 'HomeView 新增搜尋 / 分組 / 最近使用；PageManagement 補上 URL 預覽、狀態說明、SEO 預覽、常用標籤建議、排程快捷鍵'],
   ['Round 9', '2026-05-12', '前台 future 頁空狀態版面優化', 0, 2, 0, '-', 'future.vue 補強手機版主標換行、空狀態導引卡、上下留白與 footer CTA 銜接'],
+  ['Round 10', '2026-05-11', 'Round 14 第一+二批 — UIUX 細節打磨', 16, 0, 0, '-', '378c508 第一批 #15/36/41/48/50/58/61/71 (a11y/視覺/RWD)；a7fbf5d 第二批 #1/7/9/28/30/38/60/113 (視覺/互動補強)'],
+  ['Round 11', '2026-05-12', 'Round 14 第三~五批 — Codex 多主題 + i-Fare 收尾 + 共用元件', 6, 0, 0, '-', 'e0c0050 Codex 第三輪多主題；ab54066 第四批 i-Fare 收尾 6 條；0edc1c2 第五批 #67/68/70/73/82/116（完成率 65.8%→66.9%）'],
+  ['Round 12', '2026-05-18', 'Round 14 第六輪 — Codex 後端/SEO/Chatbot/後台大批推進', 0, 0, 0, '-', '93d1186 後端/SEO/Chatbot 整批；321aa91 後台優化規劃依 sheet2 54 條 backlog 分三階段；12b2271 backend page-management inline 紅框錯誤'],
+  ['Round 13', '2026-05-19', 'Round 14 第七~九輪 — Dashboard/PageBuilder/Loading/PoC v2', 0, 0, 0, '-', 'cea8433 第七輪 Codex 後台 Dashboard/PageBuilder/future 大改；20dcad6 第八輪 Loading 主題 (#3 useFeedback)；9a5cbca 第九輪 PageBuilder PoC v2 升級（自動同步 + SSR）'],
+  ['Round 14', '2026-05-25', 'page-management UX 收尾 + dynamic page 資安加固 + critical audit', 2, 8, 0, '+ #175-182', '4a953bd/c93db5f/507b9ca/d7246a6 page-management 操作列升級；ae1c85a #175 部分修正 (dynamic API token + CORS 白名單)、#181 部分修正 (.env runtime config)；770e517 新增 audit issues #175-182'],
 ];
 rounds.forEach(r => {
   setRow(wsStat, row, r, [STYLE_CELL, STYLE_CELL, STYLE_CELL, STYLE_NUM, STYLE_NUM, STYLE_NUM, STYLE_CELL, STYLE_CELL]);
@@ -252,6 +257,11 @@ const byRound = {
   'Round 3': { fixed: [], partial: [], date: '2026-04-28' },
   'Round 4': { fixed: [], partial: [], date: '2026-05-04' },
   'Round 9': { fixed: [], partial: [], date: '2026-05-12' },
+  'Round 10': { fixed: [], partial: [], date: '2026-05-11' },
+  'Round 11': { fixed: [], partial: [], date: '2026-05-12' },
+  'Round 12': { fixed: [], partial: [], date: '2026-05-18' },
+  'Round 13': { fixed: [], partial: [], date: '2026-05-19' },
+  'Round 14': { fixed: [], partial: [], date: '2026-05-25' },
 };
 
 for (let r = 2; r <= uiuxRange.e.r; r++) {
@@ -265,6 +275,13 @@ for (let r = 2; r <= uiuxRange.e.r; r++) {
   else if (id >= 91 && id <= 92) round = 'Round 2';
   else if (id >= 93 && id <= 97) round = 'Round 3';
   else if (id >= 88 && id <= 90) round = 'Round 1';
+  else if (date === '2026-05-25') round = 'Round 14';
+  else if (date === '2026-05-19' || date === '2026-05-18') round = 'Round 13';
+  else if (date === '2026-05-12') {
+    if ([67, 68, 70, 73, 82, 116].includes(id)) round = 'Round 11';
+    else round = 'Round 12';
+  }
+  else if (date === '2026-05-11') round = 'Round 10';
   else if (date === '2026-04-28') {
     if ([19, 73].includes(id)) round = 'Round 2';
     else if ([25, 26, 28, 46].includes(id)) round = 'Round 3';
@@ -280,9 +297,14 @@ const roundHighlights = {
   'Round 3': 'About 三大核心 morph 卡 + News 浮起卡 + 浮現動畫 + line-clamp + NEW pill + 社群 target="_blank"',
   'Round 4': 'cf47cfa+5dfbf91 補回 16 檔 + 環境設定 (devProxy/baseURL) + 未來規劃 nav + News videoUrl wiring + tsconfig + about hover bug + footer label 重複',
   'Round 9': 'future.vue 補強手機版主標換行、空狀態導引卡與上下節奏，讓頁面在未上線時也有清楚下一步',
+  'Round 10': 'Round 14 第一+二批 16 條 — a11y/視覺/RWD 細節打磨 (378c508+a7fbf5d)',
+  'Round 11': 'Round 14 第三~五批 — Codex 多主題 + i-Fare 收尾 + 共用元件 #67/68/70/73/82/116 (e0c0050+ab54066+0edc1c2)',
+  'Round 12': 'Round 14 第六輪 — Codex 後端/SEO/Chatbot/後台大批推進 (93d1186+12b2271)',
+  'Round 13': 'Round 14 第七~九輪 — Dashboard/PageBuilder/Loading/PoC v2 (cea8433+20dcad6+9a5cbca)',
+  'Round 14': 'page-management UX 收尾 + dynamic page 資安加固 (#175/#181 部分修正) + 新增 critical audit #175-182',
 };
 
-for (const round of ['Round 1', 'Round 2', 'Round 3', 'Round 4', 'Round 9']) {
+for (const round of ['Round 1', 'Round 2', 'Round 3', 'Round 4', 'Round 9', 'Round 10', 'Round 11', 'Round 12', 'Round 13', 'Round 14']) {
   const data = byRound[round];
   data.fixed.sort((a, b) => a - b);
   data.partial.sort((a, b) => a - b);

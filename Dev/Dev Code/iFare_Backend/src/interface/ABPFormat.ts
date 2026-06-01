@@ -60,7 +60,6 @@ export interface ResAccount_GetAccountList {
     Email: string
     Permission: string
     State: string
-    Pwd: string
 }
 //#endregion
 

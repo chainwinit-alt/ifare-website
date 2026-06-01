@@ -108,10 +108,11 @@
   </el-scrollbar>
 </template>
 <script setup lang="ts">
-import { ref, reactive, getCurrentInstance } from "vue";
+import { computed, ref, reactive, onMounted, getCurrentInstance } from "vue";
 import {
   ElInput,
   ElButton,
+  ElMessageBox,
   ElSelect,
   ElSwitch,
   ElDatePicker,
@@ -125,6 +126,7 @@ import HtmlEditor from '@/components/CompHtmlEditor.vue'
 import { useUserStore } from "@/stores/user";
 import type { SelectOption } from "@/interface/SelectOptions";
 import { useRouter, useRoute } from "vue-router";
+import { useDraftAutosave } from "@/composables/useDraftAutosave";
 
 const app = getCurrentInstance();
 const $commonLib = app?.appContext.config.globalProperties.$CommonLib;
@@ -155,6 +157,44 @@ const codeKeywordList = reactive<Array<SelectOption>>([])
 const codePolicyID = ref()
 const codeKeywordIDs = ref()
 
+// 2026-05-25 #56 — 自動儲存草稿 + 離開提醒
+const DRAFT_KEY = computed(() =>
+  `ifare:articles-welfare-draft:v1:${routeNameType.indexOf('add') >= 0 ? 'new' : ids?.[0] ?? 'new'}`
+);
+const draftData = computed(() => ({
+  title: input_title.value,
+  editor: editorValue.value,
+  release: datepicker_release.value,
+  discontinued: datepicker_discontinued.value,
+  state: switch_state.value,
+  policyId: codePolicyID.value,
+  keywordIds: codeKeywordIDs.value,
+}));
+const draft = useDraftAutosave({ storageKey: DRAFT_KEY, data: draftData });
+
+onMounted(async () => {
+  if (!draft.hasDraft()) return;
+  try {
+    await ElMessageBox.confirm(
+      '偵測到先前未儲存的草稿,要還原嗎?(圖片不會還原,需重新上傳)',
+      '草稿提示',
+      { type: 'info', confirmButtonText: '還原草稿', cancelButtonText: '不要,清掉' },
+    );
+    const d = draft.restore();
+    if (d) {
+      input_title.value = d.title ?? '';
+      editorValue.value = d.editor;
+      datepicker_release.value = d.release;
+      datepicker_discontinued.value = d.discontinued;
+      switch_state.value = d.state ?? true;
+      codePolicyID.value = d.policyId;
+      codeKeywordIDs.value = d.keywordIds;
+    }
+  } catch {
+    draft.clearDraft();
+  }
+});
+
 
 function GetCodePoliceList(callback:any){
   $WebAPI.GetCodePolicy(
@@ -166,9 +206,7 @@ function GetCodePoliceList(callback:any){
     null,
     null,
     false,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -202,9 +240,7 @@ function GetCodeKeywordList(callback:any){
     null,
     null,
     null,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") {
         callback('error')
         return console.error(`API res ${_resData}`);
@@ -244,9 +280,7 @@ function GetArticlesWelfareData(){
     null,
     null,
     ids,
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;
@@ -285,9 +319,7 @@ const promise_codeKeyword = new Promise((resolve, reject) => {
 })
 
 Promise.all([promise_codePolicy, promise_codeKeyword])
-        .then(res => {
-          console.log(res)
-          if (res.includes('error')) return false;
+        .then(res => {          if (res.includes('error')) return false;
 
           if (routeNameType.indexOf("edit") >= 0) {
             GetArticlesWelfareData()
@@ -296,7 +328,6 @@ Promise.all([promise_codePolicy, promise_codeKeyword])
 
 
 function SaveAction() {
-  console.log(datepicker_release.value)
   const _title = input_title.value
   const _state = switch_state.value
 
@@ -318,10 +349,6 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
-    console.log(datepicker_release)
-    console.log(datepicker_release.value)
-    console.log(_releaseTime)
     $WebAPI.InsertArticlesWelfare(userStore.token, _title, _detail, _codePolicyID, _codeKeywordIDs, _releaseTime, _discontinued, _state,(res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {
@@ -336,13 +363,14 @@ function SaveAction() {
         }
 
         $Message({ message: '新增成功', type: "success" })
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         $commonLib.GuideToPage('Articles_Welfare_DataList')
       }
     );
   }
 
   if (routeNameType.indexOf("edit") >= 0) {
-    console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
     $WebAPI.UpdateArticlesWelfare(userStore.token, _id, _title, _detail, _codePolicyID, _codeKeywordIDs, _releaseTime, _discontinued, _state,(res: any) => {
@@ -359,7 +387,8 @@ function SaveAction() {
         }
 
         $Message({ message: '編輯成功', type: "success" })
-        // $commonLib.GuideToPage('Articles_Welfare_DataList')
+        // 2026-05-25 #56 — 儲存成功後清掉草稿
+        draft.markClean();
         _router.back()
       }
     );

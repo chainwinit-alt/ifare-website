@@ -84,10 +84,36 @@
             </template>
           </el-table-column>
           <el-table-column :prop="column.prop" :label="column.label" width="180" v-else>
+            <!-- 2026-05-25 #35 — 「資料狀態」column header 加 tooltip 區分於「上架狀態」 -->
+            <template #header v-if="column.opts.type == 'state_data'">
+              <span class="state-header">
+                {{ column.label }}
+                <el-tooltip placement="top" effect="dark">
+                  <template #content>
+                    <div style="max-width: 240px; line-height: 1.6">
+                      <strong>資料狀態</strong>(啟用 / 停用)<br />
+                      指這筆<strong>資料本身</strong>是否啟用,停用後前台會自動隱藏。<br />
+                      不同於「上架狀態」(上架日期 / 下架日期),後者是控制公開時段。
+                    </div>
+                  </template>
+                  <el-icon class="state-info-icon" aria-label="說明資料狀態與上架狀態的差異">
+                    <QuestionFilled />
+                  </el-icon>
+                </el-tooltip>
+              </span>
+            </template>
+            <!-- 2026-05-25 #35 — 「資料狀態」改 el-tag + icon,視覺上跟未來的「上架狀態」明顯區分 -->
             <template #default="scope" v-if="column.opts.type == 'state_data'">
-              <el-text :type="scope.row.state_data == '停用' ? 'danger' : ''">{{
-                scope.row.state_data
-              }}</el-text>
+              <el-tag
+                :type="scope.row.state_data == '停用' ? 'info' : 'success'"
+                :effect="scope.row.state_data == '停用' ? 'plain' : 'light'"
+                size="small"
+                class="state-data-tag"
+                :title="scope.row.state_data == '停用' ? '此資料目前停用,前台不顯示' : '此資料目前啟用'"
+              >
+                <span class="state-data-dot" :class="scope.row.state_data == '停用' ? 'is-off' : 'is-on'"></span>
+                {{ scope.row.state_data }}
+              </el-tag>
             </template>
             <template #default="scope" v-if="column.opts.type == 'url'">
               <el-button
@@ -120,7 +146,7 @@
       />
     </div>
   </div>
-  <DialogAlert v-model:isVisable="isDialogAlertVisible" :alertMsg="alertMsg" confirmBtnName="刪除" width="15%" @confirm="deleteConfirm" :confirmApiName="confirmApiName" :param="param"/>
+  <DialogAlert v-model:isVisable="isDialogAlertVisible" :alertMsg="alertMsg" confirmBtnName="刪除" title="刪除資料" width="min(420px, 92vw)" @confirm="deleteConfirm" :confirmApiName="confirmApiName" :param="param"/>
   <DialogAddEditImg v-model:isVisable="isVisableAddEditImgDialog" v-model:format_title="editImgTitle" v-model:format_type="editImgType" v-model:format_img="editImg" v-model:format_id="editImgID" v-model:updateTime="editImgUpdateTime" title="編輯圖片"></DialogAddEditImg>
   <DialogErrorInfo v-model:isVisable="isVisableErrorInfoDialog" alertMsg="複製連結成功！" />
 </template>
@@ -134,8 +160,12 @@ import {
   ElButton,
   ElPagination,
   ElImage,
+  ElTag,
+  ElTooltip,
+  ElIcon,
 type UploadUserFile,
 } from "element-plus";
+import { QuestionFilled } from "@element-plus/icons-vue";
 import { stringifyQuery } from "vue-router";
 import { useUserStore } from "@/stores/user";
 import DialogAlert from './DialogAlert.vue'
@@ -215,18 +245,15 @@ watch(totalRows, () => {
 });
 
 watch(pageSize, () => {
+  currentPage.value = 1;
   clampCurrentPage();
 });
 
 const currentPageChange = (page: any) => {
-  console.log("page: ", page);
   currentPage.value = page;
 };
 
 const handleClick = (_data: any, _btnType: string) => {
-  console.log("table link clicked.");
-  console.log(_data);
-  console.log(_btnType);
   switch (props.tbName) {
     case "Account":
       handleClick_Account(_data);
@@ -267,7 +294,6 @@ const handleClick = (_data: any, _btnType: string) => {
 };
 
 const handleClick_Account = (_data: any) => {
-  console.log("-----> handleClick_Account");
   // const permission = _data.row.permission
   const _id = _data.row.id;
   _global?.$router.push({ name: "Account_Detail", query: { id: _id } });
@@ -276,37 +302,90 @@ const handleClick_Account = (_data: any) => {
 const handleClick_Code = (_data: any) => {
   const editPageName =
     _global?.$route.path.replace("/", "").replace("-", "_") + "_Edit";
-  console.log(editPageName);
   const _id = _data.row.id;
-  console.log(_id);
   _global?.$router.push({ name: editPageName, query: { id: _id } });
 };
+
+function getDeleteTargetLabel(row: any) {
+  const candidates = [
+    row.title,
+    row.question,
+    row.user_name,
+    row.name,
+    row.account,
+    row.email,
+    row.id ? `編號 ${row.id}` : "",
+  ];
+  const label = candidates.find((value) => value !== undefined && value !== null && `${value}`.trim() !== "");
+
+  return label ? `${label}` : "這筆資料";
+}
+
+// 2026-05-25 #46 — 依不同資料類型給「影響範圍」說明,
+// 讓使用者刪除前知道會牽動哪些前台/關聯資料,避免誤刪
+function getDeleteImpactHint(tbName: string): string {
+  switch (tbName) {
+    case 'News':
+      return '影響範圍:前台「最新消息」列表會立即少一筆,已分享過的網址會 404。';
+    case 'Articles_Welfare':
+    case 'Articles_Lazy':
+      return '影響範圍:前台「福利專欄」會立即下架這篇,已分享過的網址會 404。';
+    case 'IFare_Policy':
+      return '影響範圍:訪客將無法在福利搜尋找到這筆政策。如只是暫停顯示,建議改用「停用」。';
+    case 'IFare_QA':
+      return '影響範圍:前台「常見福利問題」會少一筆。';
+    case 'IFare_OfficeUnit':
+      return '影響範圍:前台「聯絡單位」資訊將不再顯示。';
+    case 'Collaborator':
+      return '影響範圍:前台「合作夥伴」頁面該筆會消失。';
+    case 'Account':
+      return '影響範圍:該使用者帳號將無法登入,但歷史操作紀錄保留。';
+    case 'ImgManager':
+      return '影響範圍:若有頁面或文章引用此圖,前台會顯示破圖。建議先確認沒被使用再刪。';
+    case 'Code_Policy':
+    case 'Code_Recipient':
+    case 'Code_Keyword':
+    case 'Code_Income':
+    case 'Code_Identity':
+    case 'Code_Domicile':
+      return '影響範圍:若有福利政策使用此分類,該政策的相關欄位會顯示空白。建議改用「停用」取代刪除。';
+    default:
+      return '';
+  }
+}
+
+function openDeleteConfirm(row: any, apiName: string) {
+  const label = getDeleteTargetLabel(row);
+  const impact = getDeleteImpactHint(props.tbName || '');
+
+  param.value = { id: row.id };
+  confirmApiName.value = apiName;
+  // 2026-05-25 #46 — 加影響範圍提示,讓使用者知道刪除後會牽動哪些地方
+  alertMsg.value = impact
+    ? `確定要刪除「${label}」嗎?\n\n${impact}\n\n刪除後無法復原。`
+    : `確定要刪除「${label}」嗎?\n刪除後無法復原。`;
+  isDialogAlertVisible.value = true;
+}
 
 const handleClick_Articles_Welfare = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "Articles_Welfare_Detail", query: { id: _id } });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteArticlesWelfare'
+  openDeleteConfirm(_data.row, 'DeleteArticlesWelfare')
 };
 
 const handleClick_Articles_Lazy = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "Articles_Lazy_Detail", query: { id: _id } });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteArticlesLazy'
+  openDeleteConfirm(_data.row, 'DeleteArticlesLazy')
 };
 
 const handleClick_IFare_QA = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "IFare_QA_Detail", query: {id: _id} });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteFareQA'
+  openDeleteConfirm(_data.row, 'DeleteFareQA')
 };
 
 const handleClick_IFare_OfficeUnit = (_data: any) => {
@@ -318,27 +397,21 @@ const handleClick_IFare_Policy = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "IFare_Policy_Detail", query: {id: _id} });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteFarePolicy'
+  openDeleteConfirm(_data.row, 'DeleteFarePolicy')
 };
 
 const handleClick_Collaborator = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "Collaborator_Detail", query: { id: _id } });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteCollaborator'
+  openDeleteConfirm(_data.row, 'DeleteCollaborator')
 };
 
 const handleClick_News = (_data: any, _btnType: string) => {
   const _id = _data.row.id;
   if (_btnType != "刪除") return _global?.$router.push({ name: "News_Detail", query: { id: _id } });
 
-  param.value = { id: _id}
-  isDialogAlertVisible.value = true
-  confirmApiName.value = 'DeleteNews'
+  openDeleteConfirm(_data.row, 'DeleteNews')
 };
 
 const handleClick_ImgManager = async (_data:any, _btnType: string) => {
@@ -368,9 +441,7 @@ const handleClick_ImgManager = async (_data:any, _btnType: string) => {
   }
 
   if (_btnType == "刪除") {
-    param.value = { id: _id}
-    isDialogAlertVisible.value = true
-    confirmApiName.value = 'DeleteImgManager'
+    openDeleteConfirm(_data.row, 'DeleteImgManager')
     return;
   }
 }
@@ -494,7 +565,6 @@ const deleteConfirm = (callApiName:string, _param:any) => {
       });
       break;
     case "DeleteImgManager":
-      console.log(_id)
       $WebAPI.DeleteImg(userStore.token, _id, (res: any) => {
           let _resData = res.data || "error";
           if (_resData == "error") {
@@ -566,6 +636,45 @@ const deleteConfirm = (callApiName:string, _param:any) => {
 
   span {
     font-size: 13px;
+  }
+}
+
+// 2026-05-25 #35 — 資料狀態 column 視覺強化
+.state-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.state-info-icon {
+  color: #909399;
+  font-size: 14px;
+  cursor: help;
+
+  &:hover {
+    color: #ea5504;
+  }
+}
+
+.state-data-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.state-data-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+
+  &.is-on {
+    background: #409eff;
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.18);
+  }
+
+  &.is-off {
+    background: #c0c4cc;
   }
 }
 </style>

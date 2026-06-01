@@ -5,6 +5,7 @@ using Abp.Domain.Repositories;
 using IFare_BDAPI.Common;
 using IFare_BDAPI.Common.ValueModel;
 using IFare_BDAPI.Constants;
+using IFare_BDAPI.Security;
 using IFare_BDAPI.TaskManager.Account.Common;
 using IFare_BDAPI.TaskManager.Account.ValueModel;
 
@@ -27,8 +28,6 @@ namespace IFare_BDAPI.TaskManager.Account
 
             if (!paramChecker.IsCheckPass()) return new AccountResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_ParamFail), null);
 
-            var searchUser = _repositorySysUser.GetAll().Where(p => p.Id == searchUserID).FirstOrDefault();
-
             var query = _repositorySysUser.GetAll();
 
             if (param.IsPermissionFiltered && param.Permission != UserPermission.All) query = query.Where(p => p.Permissions == param.Permission);
@@ -44,7 +43,6 @@ namespace IFare_BDAPI.TaskManager.Account
                             Email = p.Email,
                             Permission = p.Permissions,
                             State = p.State,
-                            Pwd = searchUser.Permissions == UserPermission.Admin ? p.Password : "",
                             CreateDate = p.CreateTime,
                             CreateUserID = p.CreateUserId,
                             CreateUserName = p.CreateUser.UserName,
@@ -78,7 +76,7 @@ namespace IFare_BDAPI.TaskManager.Account
                     Email = insertData.Email,
                     Permissions = insertData.Permission,
                     State = insertData.State,
-                    Password = insertData.Pwd,
+                    Password = SysUserPasswordHasher.HashPassword(insertData.Pwd),
                     CreateUserId = insertData.CreateUserID
                 });
 

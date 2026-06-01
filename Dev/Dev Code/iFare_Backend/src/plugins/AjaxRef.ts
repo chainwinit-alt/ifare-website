@@ -7,6 +7,7 @@
  * 統一包裝成一個可傳遞的物件，最後交由 WebAPI.ts 內的 ajax() 送出。
  */
 import type { AxiosRequestConfig } from "axios";
+import { BACKEND_API_BASE_URL } from "@/config/adminEnv";
 
 /**
  * 將查詢參數中值為 null 的欄位剔除，避免把無效條件一併送給後端。
@@ -137,9 +138,7 @@ export class AjaxRef {
      * 開發環境走本機站台，正式環境走公開後端站台。
      */
     getBaseUrl(): string {
-        return import.meta.env.DEV
-            ? "https://localhost:44311"
-            : "https://www.i-fare.org.tw/ifare_bdapi"
+        return BACKEND_API_BASE_URL
     }
 
     /**

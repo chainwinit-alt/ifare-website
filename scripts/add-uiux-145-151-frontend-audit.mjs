@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const file = path.resolve(__dirname, '..', 'docs', 'iFare_UI_UX_問題追蹤清單.xlsx');
+const file = path.resolve(__dirname, '..', 'docs', 'iFare_問題追蹤與AI維運規劃.xlsx');
 const sheetName = 'UIUX問題追蹤清單';
 const summarySheetName = '統計摘要';
 
@@ -135,8 +135,8 @@ const issues = [
     '統計摘要與實際 UIUX 問題追蹤資料列數量不一致',
     '統計摘要顯示前台已修正 61、部分修正 7、待處理 74，但直接讀 UIUX問題追蹤清單資料列為已修正 62、部分修正 10、待處理 72。摘要可能未隨最新批次更新。',
     '重建統計摘要，或將摘要改成公式/腳本產生；每次新增或改狀態後自動同步統計。',
-    'docs/iFare_UI_UX_問題追蹤清單.xlsx scripts/rebuild-stats-summary.mjs',
-    'docs/iFare_UI_UX_問題追蹤清單.xlsx\r\nscripts/rebuild-stats-summary.mjs',
+    'docs/iFare_問題追蹤與AI維運規劃.xlsx scripts/rebuild-stats-summary.mjs',
+    'docs/iFare_問題追蹤與AI維運規劃.xlsx\r\nscripts/rebuild-stats-summary.mjs',
     '本次直接讀 workbook 發現摘要與資料列不一致。',
     '待處理',
     '',

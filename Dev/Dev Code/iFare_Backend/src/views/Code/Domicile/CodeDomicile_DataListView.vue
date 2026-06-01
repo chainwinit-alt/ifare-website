@@ -115,9 +115,7 @@ function WebAPI_GetDataList(
     searchName,
     false,  // false = 不限制只取啟用資料
     null,   // null = 不指定特定 id
-    (res: any) => {
-      console.log(res);
-      let _resData = res.data || "error";
+    (res: any) => {      let _resData = res.data || "error";
       if (_resData == "error") return console.error(`API res ${_resData}`);
 
       let _res = _resData.result;
@@ -153,7 +151,6 @@ WebAPI_GetDataList(_route.query.create?.toString().split("TO")[0],  // 建立日
 
 // 監聽搜尋條件變更，重新呼叫 API 更新列表
 watch(searchParams, (newVal, oldVal) => {
-  console.log(newVal);
 
   let createDate = newVal.datepicker.create || []  // 建立日期範圍陣列 [start, end]
   let updateDate = newVal.datepicker.update || []  // 異動日期範圍陣列 [start, end]

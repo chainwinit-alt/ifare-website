@@ -7,6 +7,11 @@
           <label class="date-release">{{ formatDisplayDate(_welfareItem.releaseTime) }}</label>
           <label class="date-update">{{ formatDisplayDate(_welfareItem.updateTime) }}</label>
           <label class="article-num">{{ _welfareItem.id }}</label>
+          <label
+            v-if="deadlineInfo"
+            class="deadline-badge"
+            :class="`deadline-badge--${deadlineInfo.level}`"
+          >{{ deadlineInfo.label }}</label>
         </div>
       </section>
       <section class="section-body">
@@ -45,6 +50,42 @@
             >
               <span class="share-label">{{ copyToastVisible ? '✓ 已複製' : '複製連結' }}</span>
             </button>
+            <button
+              class="btn-compare-save"
+              :class="{ 'is-saved': isCurrentSaved }"
+              type="button"
+              :aria-pressed="isCurrentSaved"
+              @click="ToggleCurrentCompare"
+            >
+              {{ isCurrentSaved ? '已收藏比較' : '收藏比較' }}
+            </button>
+            <NuxtLink v-if="compareCount > 0" class="btn-compare-link" to="/ifare/compare">
+              比較 {{ compareCount }}
+            </NuxtLink>
+          </div>
+          <div class="apply-helper" aria-labelledby="apply-helper-title">
+            <div class="title-component">
+              <i class="ic-title-pattern"></i>
+              <h2 id="apply-helper-title" class="comp-title">申請路徑助手</h2>
+            </div>
+            <div class="apply-helper-grid">
+              <div class="apply-helper-card">
+                <strong>1. 先看是否符合</strong>
+                <span>{{ qualificationSummary }}</span>
+              </div>
+              <div class="apply-helper-card">
+                <strong>2. 準備文件</strong>
+                <span>{{ documentChecklist.length > 0 ? `已整理 ${documentChecklist.length} 項可能文件` : '請先查看應備文件說明' }}</span>
+              </div>
+              <div class="apply-helper-card">
+                <strong>3. 確認承辦窗口</strong>
+                <span>{{ displayOfficeUnitInfo || '請洽承辦單位確認申請細節' }}</span>
+              </div>
+              <div class="apply-helper-card">
+                <strong>4. 留意期限</strong>
+                <span>{{ deadlineInfo?.label || '目前未顯示 30 天內截止提醒' }}</span>
+              </div>
+            </div>
           </div>
           <div class="part-info-list">
             <div class="part part-qualify">
@@ -69,6 +110,14 @@
                 <i class="ic-title-pattern"></i>
                 <h2 class="comp-title">應備證件資料</h2>
               </div>
+              <ul v-if="documentChecklist.length > 0" class="document-checklist">
+                <li v-for="item in documentChecklist" :key="item.id">
+                  <label>
+                    <input type="checkbox" />
+                    <span>{{ item.text }}</span>
+                  </label>
+                </li>
+              </ul>
               <div class="info-content info-content--plain" v-html="useSanitize(renderPlainText(_welfareItem.evidence))"></div>
             </div>
             <div class="part part-remark" v-if="_welfareItem.remark">
@@ -123,6 +172,7 @@
                   }"
                 >
                 <h3 class="link-title">{{ _welfare.title }}</h3>
+                <p class="relation-reason">{{ getRelationReason(_welfare) }}</p>
                 <div class="relation-item-bottom">
                   <ul class="list-unstyled filter-list">
                     <li name="area">{{ _welfare.area }}</li>
@@ -164,6 +214,14 @@ const { getApiResultValue } = useApiResult();
 const { shareCurrentUrlToLine } = useShareToLine();
 const { shareCurrentUrlToFacebook, shareCurrentUrlToEmail, copyCurrentUrl } = useShareUrl();
 const { formatDisplayDate } = useDateFormatter();
+const { getDeadlineInfo } = usePolicyDeadline();
+const { parseDocumentChecklist } = useDocumentChecklist();
+const {
+  count: compareCount,
+  isSaved: isCompareSaved,
+  addPolicy: addComparePolicy,
+  togglePolicy: toggleComparePolicy,
+} = useWelfareCompare();
 const route = useRoute();
 const $router = useRouter();
 
@@ -192,6 +250,7 @@ function JumpTo(id: any) {
 interface infoItem {
   id: number;
   title: string;
+  area: string;
   qualification: string;
   evidence: string;
   remark: string;
@@ -199,14 +258,21 @@ interface infoItem {
   welfareTel: string;
   welfareTelStr: string;
   releaseTime: string;
+  discontinuedTime: string;
   updateTime: string;
   officeUnitInfo: string;
   officeUnitID: number;
+  codeDomicileID: number;
+  codePolicyID: number;
+  codeIdentityIDs: number[];
+  codeIncomeIDs: number[];
+  codeRecipientIDs: number[];
 }
 
 const _welfareItem = reactive<infoItem>({
   id: 0,
   title: "",
+  area: "",
   qualification: "",
   evidence: "",
   remark: "",
@@ -214,9 +280,15 @@ const _welfareItem = reactive<infoItem>({
   welfareTel: "",
   welfareTelStr: "",
   releaseTime: "",
+  discontinuedTime: "",
   updateTime: "",
   officeUnitInfo: "",
   officeUnitID: 0,
+  codeDomicileID: 0,
+  codePolicyID: 0,
+  codeIdentityIDs: [],
+  codeIncomeIDs: [],
+  codeRecipientIDs: [],
 });
 
 // Office Unit
@@ -232,6 +304,36 @@ const displayOfficeUnitInfo = computed(
     officeList.find((p) => p.id == _welfareItem.officeUnitID)?.title ||
     ""
 );
+const deadlineInfo = computed(() => getDeadlineInfo(_welfareItem.discontinuedTime));
+const documentChecklist = computed(() => parseDocumentChecklist(_welfareItem.evidence));
+const qualificationSummary = computed(() => {
+  const text = (_welfareItem.qualification ?? '').replace(/<[^>]+>/g, '').trim();
+  if (!text) return '請先查看申請條件說明';
+  return text.length > 80 ? `${text.slice(0, 80)}...` : text;
+});
+const isCurrentSaved = computed(() => _welfareItem.id > 0 && isCompareSaved(_welfareItem.id));
+
+function getCurrentComparePolicy() {
+  return {
+    id: _welfareItem.id,
+    title: _welfareItem.title,
+    area: _welfareItem.area,
+    qualification: _welfareItem.qualification,
+    evidence: _welfareItem.evidence,
+    welfareInfo: _welfareItem.welfareInfo,
+    officeUnitInfo: displayOfficeUnitInfo.value,
+    welfareTel: _welfareItem.welfareTelStr,
+    discontinuedTime: _welfareItem.discontinuedTime,
+    hasIndentity: _welfareItem.codeIdentityIDs.length > 0 && !_welfareItem.codeIdentityIDs.includes(1),
+    hasIncome: _welfareItem.codeIncomeIDs.length > 0 && !_welfareItem.codeIncomeIDs.includes(1),
+    hasRecipient: _welfareItem.codeRecipientIDs.length > 0 && !_welfareItem.codeRecipientIDs.includes(1),
+  };
+}
+
+function ToggleCurrentCompare() {
+  if (!_welfareItem.id) return;
+  toggleComparePolicy(getCurrentComparePolicy());
+}
 
 async function loadOfficeList() {
   const res: any = await $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
@@ -251,6 +353,7 @@ async function loadOfficeList() {
 function resetWelfareItem() {
   _welfareItem.id = 0;
   _welfareItem.title = "";
+  _welfareItem.area = "";
   _welfareItem.qualification = "";
   _welfareItem.evidence = "";
   _welfareItem.remark = "";
@@ -258,9 +361,15 @@ function resetWelfareItem() {
   _welfareItem.welfareTel = "";
   _welfareItem.welfareTelStr = "";
   _welfareItem.releaseTime = "";
+  _welfareItem.discontinuedTime = "";
   _welfareItem.updateTime = "";
   _welfareItem.officeUnitInfo = "";
   _welfareItem.officeUnitID = 0;
+  _welfareItem.codeDomicileID = 0;
+  _welfareItem.codePolicyID = 0;
+  _welfareItem.codeIdentityIDs = [];
+  _welfareItem.codeIncomeIDs = [];
+  _welfareItem.codeRecipientIDs = [];
 }
 
 function decodeWelfareHtml(value: string) {
@@ -376,6 +485,7 @@ async function loadPolicyDetail(infoID: number) {
 
   _welfareItem.id = _data.id;
   _welfareItem.title = _data.title;
+  _welfareItem.area = _data.codeDomicile_LabelName ?? "";
   _welfareItem.qualification = _data.qualification;
   _welfareItem.evidence = _data.evidence;
   _welfareItem.remark = _data.remark ?? "";
@@ -387,9 +497,18 @@ async function loadPolicyDetail(infoID: number) {
     : "";
   _welfareItem.welfareTelStr = _data.officeUnitTel ?? "";
   _welfareItem.releaseTime = _data.releaseTime;
+  _welfareItem.discontinuedTime = _data.discontinuedTime;
   _welfareItem.updateTime = _data.updateTime;
   _welfareItem.officeUnitInfo = _data.officeUnitInfo ?? "";
   _welfareItem.officeUnitID = _data.iFareOfficeUnitID ?? 0;
+  _welfareItem.codeDomicileID = _data.codeDomicile_ID ?? 0;
+  _welfareItem.codePolicyID = _data.codePolicy_ID ?? 0;
+  _welfareItem.codeIdentityIDs = Array.isArray(_data.codeIdentityList) ? _data.codeIdentityList.map((p: any) => Number(p.id)) : [];
+  _welfareItem.codeIncomeIDs = Array.isArray(_data.codeIncomeList) ? _data.codeIncomeList.map((p: any) => Number(p.id)) : [];
+  _welfareItem.codeRecipientIDs = Array.isArray(_data.codeRecipientList) ? _data.codeRecipientList.map((p: any) => Number(p.id)) : [];
+  if (isCompareSaved(_welfareItem.id)) {
+    addComparePolicy(getCurrentComparePolicy());
+  }
 }
 
 interface iFarePolicyItem {
@@ -400,9 +519,28 @@ interface iFarePolicyItem {
   hasIndentity: boolean;
   hasIncome: boolean;
   hasRecipient: boolean;
+  codeDomicileID: number;
+  codePolicyID: number;
+  codeIdentityIDs: number[];
+  codeIncomeIDs: number[];
+  codeRecipientIDs: number[];
 }
 
 const iFarePolicyList = reactive<Array<iFarePolicyItem>>([]);
+
+function hasAnyIntersection(source: number[], target: number[]) {
+  return source.some((id) => id !== 1 && target.includes(id));
+}
+
+function getRelationReason(item: iFarePolicyItem) {
+  const reasons: string[] = [];
+  if (item.codeDomicileID && item.codeDomicileID === _welfareItem.codeDomicileID) reasons.push('同地區');
+  if (item.codePolicyID && item.codePolicyID === _welfareItem.codePolicyID) reasons.push('同類型');
+  if (hasAnyIntersection(item.codeRecipientIDs, _welfareItem.codeRecipientIDs)) reasons.push('年齡條件相近');
+  if (hasAnyIntersection(item.codeIncomeIDs, _welfareItem.codeIncomeIDs)) reasons.push('經濟條件相近');
+  if (hasAnyIntersection(item.codeIdentityIDs, _welfareItem.codeIdentityIDs)) reasons.push('身分條件相近');
+  return reasons.length > 0 ? `推薦理由：${reasons.slice(0, 3).join('、')}` : '推薦理由：可作為補充方案參考';
+}
 
 let relationRequestToken = 0;
 async function loadRelationList(infoID: number) {
@@ -425,6 +563,11 @@ async function loadRelationList(infoID: number) {
       hasIndentity: item.codeIdentityList.findIndex((p: any) => p.id == 1) < 0,
       hasIncome: item.codeIncomeList.findIndex((p: any) => p.id == 1) < 0,
       hasRecipient: item.codeRecipientList.findIndex((p: any) => p.id == 1) < 0,
+      codeDomicileID: item.codeDomicile_ID ?? 0,
+      codePolicyID: item.codePolicy_ID ?? 0,
+      codeIdentityIDs: Array.isArray(item.codeIdentityList) ? item.codeIdentityList.map((p: any) => Number(p.id)) : [],
+      codeIncomeIDs: Array.isArray(item.codeIncomeList) ? item.codeIncomeList.map((p: any) => Number(p.id)) : [],
+      codeRecipientIDs: Array.isArray(item.codeRecipientList) ? item.codeRecipientList.map((p: any) => Number(p.id)) : [],
     }))
   );
 }
@@ -442,6 +585,41 @@ watch(
 </script>
 
 <style scoped>
+.share-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-compare-save,
+.btn-compare-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(234, 85, 4, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #c84804;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.btn-compare-save.is-saved {
+  border-color: rgba(35, 84, 71, 0.28);
+  background: #eef6f4;
+  color: #235447;
+}
+
+.btn-compare-link {
+  border-color: rgba(44, 80, 97, 0.2);
+  color: #1f3640;
+}
+
 .info-content--plain {
   line-height: 2;
 }
@@ -462,5 +640,98 @@ watch(
 
 .raw-html:deep(a) {
   word-break: break-word;
+}
+
+.deadline-badge {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #eef6f4;
+  color: #235447;
+  font-weight: 700;
+}
+
+.deadline-badge--soon {
+  background: #fff5df;
+  color: #8a5700;
+}
+
+.deadline-badge--urgent {
+  background: #ffe8e2;
+  color: #9f2f13;
+}
+
+.apply-helper {
+  margin: 0 0 24px;
+  padding: 20px;
+  border: 1px solid rgba(44, 80, 97, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.apply-helper-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.apply-helper-card {
+  display: flex;
+  min-height: 104px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f7faf9;
+  line-height: 1.55;
+}
+
+.apply-helper-card strong {
+  color: #1f3640;
+}
+
+.apply-helper-card span {
+  color: #52616b;
+}
+
+.document-checklist {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.document-checklist label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f7faf9;
+  line-height: 1.6;
+}
+
+.document-checklist input {
+  margin-top: 6px;
+}
+
+.relation-reason {
+  margin: 6px 0 0;
+  color: #52616b;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 960px) {
+  .apply-helper-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .apply-helper-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
