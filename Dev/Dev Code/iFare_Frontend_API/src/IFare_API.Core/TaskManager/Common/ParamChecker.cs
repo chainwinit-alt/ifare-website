@@ -90,7 +90,7 @@ namespace IFare_API.TaskManager.Common
         /// </summary>
         public bool IsCodeIdentitiesFiltered(List<long> codeIdentities)
         {
-            return codeIdentities.Count > 0;
+            return codeIdentities != null && codeIdentities.Count > 0;
         }
 
         /// <summary>
@@ -98,7 +98,7 @@ namespace IFare_API.TaskManager.Common
         /// </summary>
         public bool IsCodeKeywordsFiltered(List<long> codeKeywords)
         {
-            return codeKeywords.Count > 0;
+            return codeKeywords != null && codeKeywords.Count > 0;
         }
 
         /// <summary>
@@ -106,7 +106,7 @@ namespace IFare_API.TaskManager.Common
         /// </summary>
         public bool IsIDsFiltered(List<long> ids)
         {
-            return ids.Count > 0;
+            return ids != null && ids.Count > 0;
         }
 
         #endregion

@@ -9,5 +9,6 @@ namespace IFare_API.Fare.Policy
         Task<FarePolicyResultDto> GetIFarePolicyList(FarePolicyFilterParamDto param);
         Task<FarePolicyResultDto> GetIFarePolicyRelation(long farePolicyID);
         Task<FarePolicyDetailDto> GetIFarePolicyDetail(long farePolicyID);
+        Task<FarePolicySuggestionResultDto> GetIFareSearchSuggestions(FarePolicySuggestionParamDto param);
     }
 }

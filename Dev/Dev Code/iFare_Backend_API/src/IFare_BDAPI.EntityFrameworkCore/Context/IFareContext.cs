@@ -76,12 +76,12 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.Title)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.UpdateTime)
                     .HasColumnType("datetime")
@@ -179,12 +179,12 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.Title)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
 
@@ -248,11 +248,11 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.LabelName)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
@@ -287,11 +287,11 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.LabelName)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
@@ -326,11 +326,11 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.LabelName)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
@@ -365,11 +365,11 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.LabelName)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
@@ -404,11 +404,11 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.LabelName)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
@@ -443,11 +443,11 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.LabelName)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
@@ -481,24 +481,24 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.ServiceItem)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
-                entity.Property(e => e.Tel).HasMaxLength(-1);
+                entity.Property(e => e.Tel).HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.Title)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
 
                 entity.Property(e => e.UpdateUserId).HasColumnName("UpdateUser_ID");
 
-                entity.Property(e => e.Url).HasMaxLength(-1);
+                entity.Property(e => e.Url).HasColumnType("nvarchar(max)");
 
                 entity.HasOne(d => d.CreateUser)
                     .WithMany(p => p.CollaboratorCreateUsers)
@@ -530,12 +530,12 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.Title)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
 
@@ -591,7 +591,7 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.Id).HasColumnName("ID");
 
-                entity.Property(e => e.Address).HasMaxLength(-1);
+                entity.Property(e => e.Address).HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.CreateTime)
                     .HasColumnType("datetime")
@@ -601,9 +601,9 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.IfareOfficeUnitDomicileId).HasColumnName("IFareOfficeUnit_Domicile_ID");
 
-                entity.Property(e => e.Tel).HasMaxLength(-1);
+                entity.Property(e => e.Tel).HasColumnType("nvarchar(max)");
 
-                entity.Property(e => e.UnitName).HasMaxLength(-1);
+                entity.Property(e => e.UnitName).HasColumnType("nvarchar(max)");
 
                 entity.HasOne(d => d.CreateUser)
                     .WithMany(p => p.IfareOfficeUnitDomicileDetails)
@@ -626,7 +626,7 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.CodePolicyId).HasColumnName("CodePolicy_ID");
 
-                entity.Property(e => e.CompetentAuthority).HasMaxLength(-1);
+                entity.Property(e => e.CompetentAuthority).HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.CreateTime)
                     .HasColumnType("datetime")
@@ -639,25 +639,25 @@ namespace IFare_BDAPI.Context
                 entity.Property(e => e.IfareOfficeUnitId).HasColumnName("IFareOfficeUnit_ID");
 
                 entity.Property(e => e.OfficeUnitInfo)
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasColumnName("OfficeUnit_Info");
 
                 entity.Property(e => e.OfficeUnitTel)
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasColumnName("OfficeUnit_Tel");
 
                 entity.Property(e => e.ReleaseTime).HasColumnType("datetime");
 
-                entity.Property(e => e.Remark).HasMaxLength(-1);
+                entity.Property(e => e.Remark).HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.Title)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
 
@@ -805,11 +805,11 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.Question)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
@@ -837,9 +837,9 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.CreateUserId).HasColumnName("CreateUser_ID");
 
-                entity.Property(e => e.ImageName).HasMaxLength(-1);
+                entity.Property(e => e.ImageName).HasColumnType("nvarchar(max)");
 
-                entity.Property(e => e.ImageNameExtension).HasMaxLength(-1);
+                entity.Property(e => e.ImageNameExtension).HasColumnType("nvarchar(max)");
 
                 entity.HasOne(d => d.CreateUser)
                     .WithMany(p => p.Images)
@@ -855,17 +855,17 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.ImgExtension)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.ImgPath).IsRequired();
 
                 entity.Property(e => e.Title)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.Type)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.UpdateTime)
                     .HasColumnType("datetime")
@@ -896,7 +896,7 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.Title).IsRequired();
@@ -927,7 +927,7 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.Account)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.CreateTime)
                     .HasColumnType("datetime")
@@ -935,18 +935,18 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.CreateUserId).HasColumnName("CreateUser_ID");
 
-                entity.Property(e => e.Email).HasMaxLength(-1);
+                entity.Property(e => e.Email).HasColumnType("nvarchar(max)");
 
                 entity.Property(e => e.Password).IsRequired();
 
                 entity.Property(e => e.Permissions)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Reader')");
 
                 entity.Property(e => e.State)
                     .IsRequired()
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasDefaultValueSql("(N'Disabled')");
 
                 entity.Property(e => e.UpdateTime).HasColumnType("datetime");
@@ -955,7 +955,7 @@ namespace IFare_BDAPI.Context
 
                 entity.Property(e => e.UserName)
                     .IsRequired()
-                    .HasMaxLength(-1);
+                    .HasColumnType("nvarchar(max)");
 
                 entity.HasOne(d => d.CreateUser)
                     .WithMany(p => p.InverseCreateUser)
@@ -979,14 +979,14 @@ namespace IFare_BDAPI.Context
                     .HasDefaultValueSql("(getdate())");
 
                 entity.Property(e => e.Ip)
-                    .HasMaxLength(-1)
+                    .HasColumnType("nvarchar(max)")
                     .HasColumnName("IP");
 
-                entity.Property(e => e.VisitorFrom).HasMaxLength(-1);
+                entity.Property(e => e.VisitorFrom).HasColumnType("nvarchar(max)");
 
-                entity.Property(e => e.VisitorName).HasMaxLength(-1);
+                entity.Property(e => e.VisitorName).HasColumnType("nvarchar(max)");
 
-                entity.Property(e => e.VisitorRoute).HasMaxLength(-1);
+                entity.Property(e => e.VisitorRoute).HasColumnType("nvarchar(max)");
             });
 
             OnModelCreatingPartial(modelBuilder);
@@ -995,3 +995,4 @@ namespace IFare_BDAPI.Context
         partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
     }
 }
+

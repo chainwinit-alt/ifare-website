@@ -83,37 +83,28 @@
           </div>
           <div class="item item-query">
             <label class="filter-name">關鍵字</label>
-            <div class="query-input-wrap">
-              <input
-                v-model="searchQuery"
-                class="input-query"
-                type="text"
-                maxlength="50"
-                placeholder="請輸入關鍵字"
-              />
+            <div class="query-action-row">
+              <div class="query-field">
+                <IfareSearchAutocomplete
+                  v-model="searchQuery"
+                  :filters="autocompleteFilters"
+                  placeholder="輸入關鍵字"
+                  @submit="Search"
+                />
+              </div>
               <button
-                v-show="searchQuery.trim()"
-                class="btn-clear-query transition-general"
-                type="button"
-                aria-label="清空關鍵字"
-                @click="ClearSearchQuery"
+                class="btn-filter transition-general btn-query-submit"
+                type="submit"
+                @click="Search"
+                :disabled="!canSearch"
+                :aria-disabled="!canSearch"
               >
-                <i class="icon ic-close" aria-hidden="true"></i>
+                <span>搜尋</span>
+                <i class="icon ic-search" aria-hidden="true"></i>
               </button>
-              <div class="query-count" aria-live="polite">{{ searchQuery.length }}/50</div>
             </div>
           </div>
           <div class="item item-bottom">
-            <button
-              class="btn-filter transition-general"
-              type="submit"
-              @click="Search"
-              :disabled="!canSearch"
-              :aria-disabled="!canSearch"
-            >
-              <span>搜尋</span>
-              <i class="icon ic-search" aria-hidden="true"></i>
-            </button>
             <p
               v-if="hasAttemptedSearch && !canSearch"
               class="search-error"
@@ -253,6 +244,7 @@ const $router = useRouter();
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue"
 import CompPageNum from "../components/CompPageNum.vue";
+import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
 
 interface selectItem {
   name: string;
@@ -291,6 +283,11 @@ const canSearch = computed(() => {
     searchQuery.value.trim()
   );
 });
+const autocompleteFilters = computed(() => ({
+  CodePolicy: codeSelect_policy.value && codeSelect_policy.value !== ALL_POLICY_VALUE ? codeSelect_policy.value : undefined,
+  CodeRecipient: codeSelectRecipient.value || undefined,
+  CodeDomicile: codeSelect_area.value && codeSelect_area.value !== ALL_AREA_VALUE ? codeSelect_area.value : undefined,
+}));
 
 // #1 — 篩選不完整時錯誤訊息。使用者點過搜尋且 canSearch 仍為 false 時顯示
 const hasAttemptedSearch = ref(false);
@@ -379,6 +376,9 @@ function Search() {
   if (codeSelectRecipient.value) query.recipient = codeSelectRecipient.value;
   if (codeSelect_area.value) query.area = codeSelect_area.value;
   if (searchQuery.value.trim()) query.query = searchQuery.value.trim();
+  if (process.client) {
+    sessionStorage.setItem("ifare:scroll-to-summary", "1");
+  }
   $router.push({ path: "/ifare/result", query: query });
   // Init value.
   codeSelect_policy.value = ""
@@ -388,10 +388,6 @@ function Search() {
   });
   codeSelect_area.value = ""
   searchQuery.value = ""
-}
-
-function ClearSearchQuery() {
-  searchQuery.value = "";
 }
 
 // Office Unit
@@ -641,3 +637,69 @@ const currentPage_QA = ref(1);
 loadOfficeList();
 loadQAList();
 </script>
+
+<style scoped>
+.query-action-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  flex-direction: unset !important;
+}
+
+.query-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100% !important;
+}
+
+.btn-query-submit {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  width: auto !important;
+  min-width: 110px;
+}
+
+:deep(.input-query) {
+  min-width: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .card-ifare-filter {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .item-query {
+    order: 10;
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  .item-bottom {
+    order: 11;
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .query-action-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .query-field,
+  .btn-query-submit {
+    width: 100% !important;
+  }
+
+  .btn-query-submit {
+    min-width: 0;
+    justify-content: center;
+  }
+}
+</style>

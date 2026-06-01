@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="app-body-child" :name="$route.name">
     <div class="section-list">
-      <section class="section-filter">
+      <section ref="filterSectionRef" class="section-filter">
         <div class="card-filter">
           <div class="part-top">
             <div class="filter-group">
@@ -42,7 +42,19 @@
             </div>
             <div class="filter-group">
               <label class="filter-title">關鍵字</label>
-              <input v-model="searchQuery" class="input-query" type="text" placeholder="請輸入關鍵字" />
+              <div class="query-action-row">
+                <div class="query-field">
+                  <IfareSearchAutocomplete
+                    v-model="searchQuery"
+                    :filters="autocompleteFilters"
+                    @submit="Search"
+                  />
+                </div>
+                <button class="btn btn-filter btn-query-submit" @click="Search" :disabled="!isClientReady || !canSearch || isLoading">
+                  <span>搜尋</span>
+                  <i class="icon ic-search"></i>
+                </button>
+              </div>
             </div>
           </div>
           <div class="part-bottom" v-show="isOpts">
@@ -84,10 +96,6 @@
               ></i>
               <span>篩選</span>
             </button>
-            <button class="btn btn-filter" @click="Search" :disabled="!isClientReady || !canSearch || isLoading">
-              <span>搜尋</span>
-              <i class="icon ic-search"></i>
-            </button>
           </div>
           <div class="part-reset">
             <button class="btn btn-reset" :class="{ 'is-clearing': showResetFeedback }" @click="ResetParam">清空</button>
@@ -124,6 +132,17 @@
                 @is-opened="isSelectOpen"
                 @update:select-value="getSelectValue"
               />
+              <div class="query-field query-field-mobile">
+                <div class="query-field-mobile-inner">
+                  <IfareSearchAutocomplete
+                    v-model="searchQuery"
+                    :filters="autocompleteFilters"
+                    placeholder="關鍵字搜尋"
+                    :show-count="false"
+                    @submit="Search"
+                  />
+                </div>
+              </div>
             </div>
             <div class="part-end">
               <CompSelectElse 
@@ -147,17 +166,22 @@
         </div>
       </section>
       <section class="section-result">
-        <div class="part-list">
+        <div ref="resultContentRef" class="part-list">
           <ClientOnly>
-            <IfareSummaryCard
-              :query="appliedSearchQuery"
-              :cases="storageiFarePolicyList"
-              :provider="llmProvider"
-              :search-context="appliedSummarySearchContext"
-              :summary-trigger-key="summaryTriggerKey"
-              :summary-cache-key="routeSearchSignature"
-              :summary-reset-key="summaryResetKey"
-            />
+            <div ref="summaryScrollAnchorRef" class="summary-scroll-anchor" aria-hidden="true"></div>
+            <div ref="summarySectionRef">
+              <IfareSummaryCard
+                :query="appliedSearchQuery"
+                :cases="storageiFarePolicyList"
+                :provider="llmProvider"
+                :results-loading="isLoading"
+                :search-context="appliedSummarySearchContext"
+                :summary-trigger-key="summaryTriggerKey"
+                :summary-cache-key="routeSearchSignature"
+                :summary-reset-key="summaryResetKey"
+                @summary-complete="handleSummaryComplete"
+              />
+            </div>
             <span class="result-total">{{ storageiFarePolicyList.length }}</span>
             <div class="result-loading" v-if="isLoading">載入中...</div>
             <div class="result-loading result-error" v-else-if="hasError">
@@ -239,11 +263,13 @@ import CompSelectRecipient from "../components/CompSelectRecipient.vue";
 import CompSelectElse from "~/components/CompSelectElse.vue";
 import CompPage from "../components/CompPage.vue"
 import IfareSummaryCard from "~/components/IfareSummaryCard.vue";
+import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
 
 const isOpts = ref(false);
 const llmProvider = "gemini" as const;
 const SEARCH_CACHE_KEY_PREFIX = "ifare-search-cache:";
 const SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
+const SEARCH_CACHE_MAX_ITEMS = 120;
 
 // interface selectItem {
 //   name: string;
@@ -276,11 +302,18 @@ const errorMessage = ref('載入福利政策時發生錯誤');
 const showResetFeedback = ref(false);
 const RESET_FEEDBACK_MS = 1800;
 let resetFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
+let summaryScrollLockTimer: ReturnType<typeof setInterval> | null = null;
+let summaryResizeObserver: ResizeObserver | null = null;
 let lastQuery: any = {};
 const isClientReady = ref(false);
 const $route = useRoute();
 const $router = useRouter();
 const appliedSearchParams = ref<Record<string, any>>({});
+const filterSectionRef = ref<HTMLElement | null>(null);
+const resultContentRef = ref<HTMLElement | null>(null);
+const summaryScrollAnchorRef = ref<HTMLElement | null>(null);
+const summarySectionRef = ref<HTMLElement | null>(null);
+const pendingScrollToSummary = ref(false);
 const routeSearchParams = computed(() => buildQueryFromRoute($route.query as Record<string, any>));
 const routeSearchSignature = computed(() => {
   return Object.keys(routeSearchParams.value || {})
@@ -330,6 +363,25 @@ const appliedSummarySearchContext = computed(() => ({
   query: String(effectiveAppliedSearchParams.value.Query || ""),
 }));
 
+function markPendingSummaryScroll() {
+  pendingScrollToSummary.value = true;
+  if (process.client) {
+    sessionStorage.setItem("ifare:scroll-to-summary", "1");
+  }
+}
+
+function clearPendingSummaryScroll() {
+  pendingScrollToSummary.value = false;
+  if (process.client) {
+    sessionStorage.removeItem("ifare:scroll-to-summary");
+  }
+}
+
+function syncPendingSummaryScrollFromSession() {
+  if (!process.client) return;
+  pendingScrollToSummary.value = sessionStorage.getItem("ifare:scroll-to-summary") === "1";
+}
+
 function isAllPolicyValue(value: any) {
   return value == ALL_POLICY_VALUE || value == "全部";
 }
@@ -353,6 +405,13 @@ const canSearch = computed(() => {
   const routeQuery = buildQueryFromRoute($route.query as Record<string, any>);
   return Object.keys({ ...routeQuery, ...formQuery }).length > 0;
 });
+const autocompleteFilters = computed(() => ({
+  CodePolicy: codeSelect_policy.value && !isAllPolicyValue(codeSelect_policy.value) ? codeSelect_policy.value : undefined,
+  CodeRecipient: codeSelectRecipient.value || undefined,
+  CodeDomicile: codeSelect_area.value && !isAllAreaValue(codeSelect_area.value) ? codeSelect_area.value : undefined,
+  CodeIncome: codeSelectIncome.value || undefined,
+  CodeIdentities: codeSelectIdentity.value.length > 0 ? [...codeSelectIdentity.value] : undefined,
+}));
 function getSelectValue(type: string, val: string) {
   if (type == "policy") {
     codeSelect_policy.value = val;
@@ -599,6 +658,7 @@ function SwitchIdentity(codeVal: any) {
 function Search() {
   if (!canSearch.value) return false;
   summaryResetKey.value += 1;
+  markPendingSummaryScroll();
   const nextQuery = buildFarePolicyApiQuery();
   lastQuery = { ...nextQuery };
   const currentQuery = buildQueryFromRoute($route.query as Record<string, any>);
@@ -687,13 +747,50 @@ function readSearchCache(query: Record<string, any>) {
 function writeSearchCache(query: Record<string, any>, items: iFarePolicyItem[]) {
   if (!process.client) return;
 
-  sessionStorage.setItem(
-    buildSearchCacheKey(query),
-    JSON.stringify({
-      savedAt: Date.now(),
-      items,
-    })
-  );
+  const cacheKey = buildSearchCacheKey(query);
+  const payload = JSON.stringify({
+    savedAt: Date.now(),
+    items: items.slice(0, SEARCH_CACHE_MAX_ITEMS),
+  });
+
+  try {
+    sessionStorage.setItem(cacheKey, payload);
+  } catch (error) {
+    if (!isStorageQuotaExceeded(error)) {
+      return;
+    }
+
+    clearIfareSearchCache();
+
+    try {
+      sessionStorage.setItem(cacheKey, payload);
+    } catch {
+    }
+  }
+}
+
+function clearIfareSearchCache() {
+  if (!process.client) return;
+
+  const keysToRemove: string[] = [];
+  for (let index = 0; index < sessionStorage.length; index += 1) {
+    const key = sessionStorage.key(index);
+    if (key?.startsWith(SEARCH_CACHE_KEY_PREFIX)) {
+      keysToRemove.push(key);
+    }
+  }
+
+  keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+}
+
+function isStorageQuotaExceeded(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.name === "QuotaExceededError" ||
+    error.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+    error.message.includes("exceeded the quota");
 }
 
 function applyPolicyList(items: iFarePolicyItem[]) {
@@ -824,6 +921,7 @@ function ResetParam() {
   SwitchIncome("reset")
   SwitchIdentity("reset")
   summaryResetKey.value += 1;
+  clearPendingSummaryScroll();
   lastQuery = {};
   syncRouteQueryFromSearch({});
   triggerResetFeedback()
@@ -831,6 +929,7 @@ function ResetParam() {
 
 function RetryLoad() {
   summaryResetKey.value += 1;
+  markPendingSummaryScroll();
   SetDataInit(lastQuery);
 }
 
@@ -840,6 +939,29 @@ function ScrollToFilter() {
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+function handleSummaryComplete() {
+  if (typeof window === "undefined" || !pendingScrollToSummary.value) return;
+
+  nextTick(() => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        scrollToSummaryAnchor("smooth");
+        clearSummaryScrollLock();
+        let ticks = 0;
+        summaryScrollLockTimer = setInterval(() => {
+          scrollToSummaryAnchor("auto");
+          ticks += 1;
+
+          if (ticks >= 10) {
+            clearSummaryScrollLock();
+            clearPendingSummaryScroll();
+          }
+        }, 120);
+      });
+    });
+  });
+}
+
 function clearResetFeedbackTimer() {
   if (!resetFeedbackTimer) {
     return;
@@ -847,6 +969,52 @@ function clearResetFeedbackTimer() {
 
   clearTimeout(resetFeedbackTimer);
   resetFeedbackTimer = null;
+}
+
+function clearSummaryScrollLock() {
+  if (!summaryScrollLockTimer) {
+    return;
+  }
+
+  clearInterval(summaryScrollLockTimer);
+  summaryScrollLockTimer = null;
+}
+
+function scrollToSummaryAnchor(behavior: ScrollBehavior = "auto") {
+  if (typeof window === "undefined") return;
+
+  const anchor = summaryScrollAnchorRef.value || summarySectionRef.value;
+  if (!anchor) return;
+
+  anchor.scrollIntoView({
+    behavior,
+    block: "start",
+  });
+}
+
+function setupSummaryResizeObserver() {
+  if (typeof window === "undefined" || summaryResizeObserver || typeof ResizeObserver === "undefined") {
+    return;
+  }
+
+  const observedElement = resultContentRef.value || summarySectionRef.value;
+  if (!observedElement) return;
+
+  summaryResizeObserver = new ResizeObserver(() => {
+    if (!pendingScrollToSummary.value) return;
+    scrollToSummaryAnchor("auto");
+  });
+
+  summaryResizeObserver.observe(observedElement);
+}
+
+function clearSummaryResizeObserver() {
+  if (!summaryResizeObserver) {
+    return;
+  }
+
+  summaryResizeObserver.disconnect();
+  summaryResizeObserver = null;
 }
 
 function triggerResetFeedback() {
@@ -863,6 +1031,7 @@ function triggerResetFeedback() {
 watch(
   () => $route.fullPath,
   () => {
+    syncPendingSummaryScrollFromSession();
     hydrateFromRoute($route.query as Record<string, any>);
   },
   { immediate: true }
@@ -870,9 +1039,198 @@ watch(
 
 onMounted(() => {
   isClientReady.value = true;
+  syncPendingSummaryScrollFromSession();
+  nextTick(() => {
+    setupSummaryResizeObserver();
+  });
 });
 
 onBeforeUnmount(() => {
   clearResetFeedbackTimer()
+  clearSummaryScrollLock()
+  clearSummaryResizeObserver()
 })
 </script>
+
+<style scoped>
+.summary-scroll-anchor {
+  display: block;
+  width: 100%;
+  height: 1px;
+  scroll-margin-top: 88px;
+}
+
+.query-action-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  flex-direction: unset !important;
+}
+
+.query-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100% !important;
+}
+
+.query-field-mobile {
+  width: 100%;
+}
+
+.btn-query-submit {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  width: auto !important;
+  min-width: 110px;
+}
+
+:deep(.ifare-search-autocomplete) {
+  width: 100%;
+}
+
+:deep(.query-input-wrap) {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 2px 10px 2px 20px;
+  box-sizing: border-box;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: none !important;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  font-family: Noto Sans TC, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 34px;
+}
+
+:deep(.query-input-wrap:focus-within),
+:deep(.ifare-search-autocomplete.is-open .query-input-wrap) {
+  border-color: rgba(20, 70, 72, 0.4);
+  box-shadow: none !important;
+}
+
+:deep(.input-query) {
+  display: block;
+  align-self: center;
+  width: 100%;
+  min-width: 0 !important;
+  height: 34px;
+  margin: 0;
+  padding: 0 44px 0 0;
+  border: 0 !important;
+  border-radius: 0;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font: inherit;
+  color: #000;
+  letter-spacing: 0;
+  line-height: inherit;
+  transform: translateY(-1px);
+}
+
+:deep(.input-query::placeholder) {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+:deep(.query-count) {
+  right: 12px;
+  color: rgba(0, 0, 0, 0.42);
+}
+
+:deep(.input-query:focus),
+:deep(.input-query:focus-visible) {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 768px) {
+  .summary-scroll-anchor {
+    scroll-margin-top: 72px;
+  }
+
+  .query-field-mobile {
+    width: 100%;
+  }
+
+  .query-field-mobile .query-field-mobile-inner {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .query-field-mobile :deep(.ifare-search-autocomplete),
+  .query-field-mobile :deep(.query-input-wrap) {
+    width: 100%;
+  }
+
+  .query-field-mobile :deep(.query-input-wrap) {
+    min-height: 44px;
+    padding: 2px 10px 2px 20px;
+    border: 1px solid rgba(0, 0, 0, 0.2) !important;
+    border-radius: 5px;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  .query-field-mobile :deep(.input-query) {
+    display: block;
+    align-self: center;
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    margin: 0;
+    padding: 0 44px 0 0;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    font: inherit;
+    color: #000;
+    letter-spacing: 0;
+    line-height: inherit;
+    transform: translateY(-1px);
+  }
+
+  .query-field-mobile :deep(.input-query::placeholder) {
+    color: rgba(0, 0, 0, 0.3);
+  }
+
+  .query-field-mobile :deep(.input-query:focus) {
+    outline: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  .query-field-mobile :deep(.search-suggestion-panel) {
+    top: calc(100% + 8px);
+    border-radius: 14px;
+    padding: 10px;
+    box-shadow: 0 16px 32px rgba(21, 74, 76, 0.12);
+  }
+
+  .query-field-mobile :deep(.query-count) {
+    right: 12px;
+  }
+}
+</style>
