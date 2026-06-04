@@ -28,6 +28,7 @@
           title="清除對話"
           data-island="清除對話"
           data-island-style="button"
+          data-mascot-tip="這裡會清掉目前對話，重新開始聊天。"
           @click="resetConversation"
         >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
@@ -43,6 +44,7 @@
           title="關閉智慧小幫手"
           data-island="關閉小幫手"
           data-island-style="button"
+          data-mascot-tip="這裡會關閉智慧小幫手視窗。"
           @click="handleClose"
         >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
@@ -62,6 +64,7 @@
             :aria-pressed="selectedChatbotMode === option.value"
             :title="option.description"
             :disabled="isBotTyping"
+            :data-mascot-tip="`這裡會切換成${option.label}模式。${option.description}`"
             @click="setChatbotMode(option.value)"
           >
             {{ option.label }}
@@ -87,6 +90,7 @@
               class="quick-action-btn"
               :data-island="action.label"
               data-island-style="card"
+              :data-mascot-tip="`點這個我會直接幫你送出「${action.label}」這個問題。`"
               @click="runQuickAction(action.prompt)"
             >
               <span class="qa-icon" aria-hidden="true" v-html="action.icon" />
@@ -104,6 +108,7 @@
                 class="chip-suggestion"
                 :data-island="chip"
                 data-island-style="link"
+                :data-mascot-tip="`點這個我會直接用「${chip}」幫你發問。`"
                 @click="runQuickAction(chip)"
               >
                 {{ chip }}
@@ -225,6 +230,7 @@
           maxlength="200"
           data-island="輸入問題"
           data-island-style="field"
+          data-mascot-tip="這裡可以直接輸入你的問題，我會根據內容幫你找答案。"
         />
         <button
           type="submit"
@@ -233,6 +239,7 @@
           :aria-label="isBotTyping ? '小幫手回覆中' : '送出問題'"
           data-island="送出問題"
           data-island-style="button"
+          :data-mascot-tip="isBotTyping ? '我正在整理回覆，先等我一下。' : '點這裡會送出你剛剛輸入的問題。'"
         >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
             <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />

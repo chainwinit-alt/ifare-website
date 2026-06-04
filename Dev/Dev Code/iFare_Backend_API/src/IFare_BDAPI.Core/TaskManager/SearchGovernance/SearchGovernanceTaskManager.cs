@@ -51,18 +51,27 @@ namespace IFare_BDAPI.TaskManager.SearchGovernance
                     null);
             }
 
-            using var connection = new SqlConnection(connectionString);
-            connection.Open();
-
-            var dashboard = new SearchGovernanceDashboardData
+            try
             {
-                OverviewStats = BuildOverviewStats(connection),
-                TrendPoints = BuildTrendPoints(connection),
-                QueueItems = BuildQueueItems(connection),
-                TopTerms = BuildTopTerms(connection)
-            };
+                using var connection = new SqlConnection(connectionString);
+                connection.Open();
 
-            return new SearchGovernanceDashboardResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), dashboard);
+                var dashboard = new SearchGovernanceDashboardData
+                {
+                    OverviewStats = BuildOverviewStats(connection),
+                    TrendPoints = BuildTrendPoints(connection),
+                    QueueItems = BuildQueueItems(connection),
+                    TopTerms = BuildTopTerms(connection)
+                };
+
+                return new SearchGovernanceDashboardResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), dashboard);
+            }
+            catch
+            {
+                return new SearchGovernanceDashboardResult(
+                    _commonTools.GetErrorInfo_API(ErrAPI.Code_Success),
+                    new SearchGovernanceDashboardData());
+            }
         }
 
         public SearchGovernanceTermResult GetTerms(string connectionString)
@@ -74,11 +83,20 @@ namespace IFare_BDAPI.TaskManager.SearchGovernance
                     null);
             }
 
-            using var connection = new SqlConnection(connectionString);
-            connection.Open();
+            try
+            {
+                using var connection = new SqlConnection(connectionString);
+                connection.Open();
 
-            var list = BuildTermList(connection, limit: 200);
-            return new SearchGovernanceTermResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), list);
+                var list = BuildTermList(connection, limit: 200);
+                return new SearchGovernanceTermResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), list);
+            }
+            catch
+            {
+                return new SearchGovernanceTermResult(
+                    _commonTools.GetErrorInfo_API(ErrAPI.Code_Success),
+                    new List<SearchGovernanceTermData>());
+            }
         }
 
         public SearchGovernanceAliasResult GetAliases(string connectionString)
@@ -90,11 +108,20 @@ namespace IFare_BDAPI.TaskManager.SearchGovernance
                     null);
             }
 
-            using var connection = new SqlConnection(connectionString);
-            connection.Open();
+            try
+            {
+                using var connection = new SqlConnection(connectionString);
+                connection.Open();
 
-            var list = BuildAliasList(connection, limit: 200);
-            return new SearchGovernanceAliasResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), list);
+                var list = BuildAliasList(connection, limit: 200);
+                return new SearchGovernanceAliasResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), list);
+            }
+            catch
+            {
+                return new SearchGovernanceAliasResult(
+                    _commonTools.GetErrorInfo_API(ErrAPI.Code_Success),
+                    new List<SearchGovernanceAliasData>());
+            }
         }
 
         public SearchGovernanceTermItemResult CreateTerm(string connectionString, SearchGovernanceTermCreateData createData)
