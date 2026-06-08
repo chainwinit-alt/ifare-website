@@ -45,7 +45,7 @@
             </div>
         </div>
         <div class="part-how-body">
-            <div class="how-content" :class="{ 'is-active': activeHow === 0 }" tabindex="0" @click="toggleHow(0)" @keyup.enter="toggleHow(0)" @keyup.space.prevent="toggleHow(0)">
+            <div class="how-content" :class="{ 'is-active': activeHow === 0 }" tabindex="0" data-mascot-tip="這裡會展開我們如何整理福利資訊與提供陪伴服務。" @click="toggleHow(0)" @keyup.enter="toggleHow(0)" @keyup.space.prevent="toggleHow(0)">
                 <div class="how-top">
                     <i class="how-logo ic-about-how-2"></i>
                     <h4 class="how-title">環境保育</h4>
@@ -54,7 +54,7 @@
                     <div class="how-info">面對極端氣候與環境變遷挑戰，長穩以油芒復耕為起點，推動永續糧食研究、生態教育與在地文化復振，並透過跨域合作提升土地與社會的永續韌性。</div>
                 </div>
             </div>
-            <div class="how-content" :class="{ 'is-active': activeHow === 1 }" tabindex="0" @click="toggleHow(1)" @keyup.enter="toggleHow(1)" @keyup.space.prevent="toggleHow(1)">
+            <div class="how-content" :class="{ 'is-active': activeHow === 1 }" tabindex="0" data-mascot-tip="這裡會展開我們的服務方式與核心理念。" @click="toggleHow(1)" @keyup.enter="toggleHow(1)" @keyup.space.prevent="toggleHow(1)">
                 <div class="how-top">
                     <i class="how-logo ic-about-how-1"></i>
                     <h4 class="how-title">人才培育</h4>
@@ -65,7 +65,7 @@
 </div>
                 </div>
             </div>
-            <div class="how-content" :class="{ 'is-active': activeHow === 2 }" tabindex="0" @click="toggleHow(2)" @keyup.enter="toggleHow(2)" @keyup.space.prevent="toggleHow(2)">
+            <div class="how-content" :class="{ 'is-active': activeHow === 2 }" tabindex="0" data-mascot-tip="這裡會展開我們和 i-Fare 的合作與推進方式。" @click="toggleHow(2)" @keyup.enter="toggleHow(2)" @keyup.space.prevent="toggleHow(2)">
                 <div class="how-top">
                     <i class="how-logo ic-about-how-3"></i>
                     <h4 class="how-title">社會關懷</h4>
@@ -187,7 +187,7 @@
           <p class="timeline-subtitle">從 2017 至今,長穩持續耕耘環境、教育與社會關懷</p>
         </div>
         <ol class="timeline" aria-label="基金會大事紀">
-          <li v-for="(item, idx) in timeline" :key="item.year + item.title" class="timeline-item" :style="{ animationDelay: `${idx * 0.08}s` }">
+          <li v-for="(item, idx) in timeline" :key="item.year + item.title" class="timeline-item" :style="{ animationDelay: `${idx * 0.08}s` }" :data-mascot-tip="`這裡是 ${item.year} 年的里程碑：${item.title}。`">
             <span class="timeline-year">{{ item.year }}</span>
             <span class="timeline-dot" aria-hidden="true"></span>
             <div class="timeline-content">
@@ -215,6 +215,7 @@
               :key="`${_p.id}-${idx}`"
               class="partner-marquee__item"
               href="/collaborator"
+              :data-mascot-tip="`點這裡會帶你看 ${_p.title} 的公益夥伴介紹。`"
               :aria-label="`查看 ${_p.title} 詳細資訊`"
             >
               <img :src="_p.imageFile" :alt="`${_p.title} logo`" loading="lazy" />
@@ -222,7 +223,7 @@
           </div>
         </div>
         <div class="partners-cta">
-          <NuxtLink to="/collaborator" class="btn-more transition-general">查看所有夥伴</NuxtLink>
+          <NuxtLink to="/collaborator" class="btn-more transition-general" data-mascot-tip="點這裡會打開完整的公益夥伴列表。">查看所有夥伴</NuxtLink>
         </div>
       </section>
 
@@ -230,14 +231,14 @@
         <div class="card-advance">
             <div class="advance-enter">
                 <span class="advance-info">邀請你體驗我們的 i-Fare 社福資訊搜尋服務</span>
-                <NuxtLink to="/ifare" class="advance-link">
+                <NuxtLink to="/ifare" class="advance-link" data-mascot-tip="點這裡會直接前往 i-Fare 福利查詢。">
                     <span>前往 i-Fare</span>
                     <i class="ic-arrow-right-primary-dark link-url"></i>
                 </NuxtLink>
             </div>
             <div class="advance-search">
                 <span class="advance-info">或者進一步瞭解我們的行動</span>
-                <NuxtLink to="/news" class="advance-link">
+                <NuxtLink to="/news" class="advance-link" data-mascot-tip="點這裡會帶你去看最新消息。">
                     <span>查看最新消息</span>
                     <i class="ic-arrow-right-orange link-url"></i>
                 </NuxtLink>

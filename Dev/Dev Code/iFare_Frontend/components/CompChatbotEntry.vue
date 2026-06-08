@@ -211,9 +211,10 @@ function handleClick() {
 
   .chatbot-entry.is-open .chatbot-entry-mascot {
     position: absolute;
-    right: 148px;
-    bottom: -18px;
-    transform: scale(0.92);
+    right: 104px;
+    bottom: -10px;
+    transform: scale(0.88);
+    transform-origin: right bottom;
   }
 
   .chatbot-entry-tooltip {

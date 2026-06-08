@@ -17,6 +17,7 @@
               select-title="分類"
               select-type="policy"
               :select-list="policySelectList"
+              data-mascot-tip="這裡可以切換福利專欄分類。"
               @update:select-value="setFilter"
               @is-opened="isSelectOpen"
             />
@@ -25,10 +26,11 @@
               select-title="關鍵字"
               select-type="keyword"
               :select-list="keywordSelectList"
+              data-mascot-tip="這裡可以挑關鍵字，縮小福利專欄內容。"
               @update:select-value="setFilter"
               @is-opened="isSelectOpen"
             />
-            <button class="btn-icon btn-search" @click="FilterWelfare">
+            <button class="btn-icon btn-search" data-mascot-tip="點這裡會依照目前條件篩選福利專欄。" @click="FilterWelfare">
               <i class="ic-search"></i>
             </button>
           </div>
@@ -68,6 +70,7 @@
                     path: '/articles/welfare',
                     query: { id: _welfare.id },
                   }"
+                  :data-mascot-tip="`點這裡會打開「${_welfare.title}」的福利專欄內容。`"
                 >
                   <div class="item-top">
                     <span class="btn btn-tag active">{{ _welfare.codePolicy }}</span>
@@ -110,6 +113,7 @@
               select-title="關鍵字"
               select-type="keyword"
               :select-list="keywordSelectList"
+              data-mascot-tip="這裡可以用關鍵字篩選懶人包。"
               @update:select-value="FilterLazy"
               @is-opened="isSelectOpen"
             />
@@ -145,6 +149,7 @@
                 <NuxtLink
                   class="item-page-link"
                   :to="{ path: '/articles/lazy', query: { id: _lazy.id } }"
+                  :data-mascot-tip="`點這裡會打開「${_lazy.title}」的福利懶人包。`"
                 >
                   <div class="item-info">
                     <i class="ic-box item-pattern"></i>

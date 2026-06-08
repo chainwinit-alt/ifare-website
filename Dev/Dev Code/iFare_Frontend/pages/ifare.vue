@@ -111,7 +111,7 @@
                   v-model="searchQuery"
                   :filters="autocompleteFilters"
                   placeholder="輸入關鍵字"
-                  data-mascot-tip="這裡可以輸入像育兒津貼、老人福利這類關鍵字。"
+                  :data-mascot-tip="keywordSuggestionTip"
                   @submit="Search"
                 />
               </div>
@@ -417,6 +417,50 @@ const autocompleteFilters = computed(() => ({
   CodeRecipient: codeSelectRecipient.value || undefined,
   CodeDomicile: codeSelect_area.value && codeSelect_area.value !== ALL_AREA_VALUE ? codeSelect_area.value : undefined,
 }));
+
+const KEYWORD_FALLBACK_SUGGESTIONS = ['補助', '津貼', '照顧', '就學', '就業'];
+
+const keywordSuggestionList = computed(() => {
+  const suggestions = new Set<string>();
+  const policyName = policySelectList.find((item) => item.val === codeSelect_policy.value)?.name || '';
+  const recipientName = recipientSelectList.find((item) => item.val === codeSelectRecipient.value)?.name || '';
+  const lifeEventName = welfareLifeEvents.find((item) => item.key === selectedLifeEvent.value)?.name || '';
+
+  [policyName, recipientName, lifeEventName]
+    .filter((item) => item && item !== '全部' && item !== '全國')
+    .forEach((item) => suggestions.add(item));
+
+  if (policyName.includes('育')) {
+    suggestions.add('育兒津貼');
+    suggestions.add('托育補助');
+  }
+
+  if (policyName.includes('老')) {
+    suggestions.add('老人福利');
+    suggestions.add('長照');
+  }
+
+  if (policyName.includes('障礙')) {
+    suggestions.add('身心障礙');
+    suggestions.add('輔具補助');
+  }
+
+  if (recipientName.includes('兒')) {
+    suggestions.add('兒童補助');
+  }
+
+  if (recipientName.includes('青') || recipientName.includes('學生')) {
+    suggestions.add('就學補助');
+  }
+
+  KEYWORD_FALLBACK_SUGGESTIONS.forEach((item) => suggestions.add(item));
+
+  return Array.from(suggestions).slice(0, 5);
+});
+
+const keywordSuggestionTip = computed(() => {
+  return `這裡可以直接搜關鍵字，我建議你試試：${keywordSuggestionList.value.join('、')}。`;
+});
 
 // #1 — 篩選不完整時錯誤訊息。使用者點過搜尋且 canSearch 仍為 false 時顯示
 const hasAttemptedSearch = ref(false);
