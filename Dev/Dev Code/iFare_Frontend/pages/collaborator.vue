@@ -15,7 +15,7 @@
         <div class="collaborator-filter" role="search" aria-labelledby="collaborator-filter-title">
           <span id="collaborator-filter-title" class="sr-only">公益夥伴篩選</span>
 
-          <div class="filter-row filter-row-tags">
+          <div class="filter-row filter-row-tags" data-mascot-tip="這裡可以切換公益夥伴分類，像醫療、就業或照顧服務。">
             <span class="filter-label" id="label-category">分類</span>
             <div class="btn-tag-list" role="group" aria-labelledby="label-category">
               <span
@@ -37,7 +37,7 @@
             </div>
           </div>
 
-          <div class="filter-row filter-row-search">
+          <div class="filter-row filter-row-search" data-mascot-tip="這裡可以輸入夥伴名稱或服務項目，快速找到合作單位。">
             <label class="filter-label" for="collaborator-search">關鍵字</label>
             <div class="search-input-wrap">
               <i class="ic-search input-icon" aria-hidden="true"></i>
@@ -73,13 +73,13 @@
             </div>
           </div>
           <!-- #38 載入失敗 -->
-          <div v-else-if="hasError" class="empty-state empty-error" role="alert">
+          <div v-else-if="hasError" class="empty-state empty-error" role="alert" data-mascot-tip="這裡可以重新載入公益夥伴列表。">
             <p>{{ errorMessage }}</p>
             <button type="button" class="btn-retry transition-general" @click="LoadCollaborators">重新載入</button>
           </div>
           <!-- 正常資料 -->
           <div class="card-list" v-else>
-            <div class="card-partner transition-general" v-for="_coll in filteredList" :key="_coll.id">
+            <div class="card-partner transition-general" v-for="_coll in filteredList" :key="_coll.id" :data-mascot-tip="`這裡可以查看 ${_coll.title} 的服務內容與網站。`">
               <div class="card-title">
                 <img width="56" height="52" :src="_coll.imageFile" :alt="`${_coll.title} logo`" loading="lazy" />
                 <h4 class="partner-title">{{ _coll.title }}</h4>
@@ -98,7 +98,7 @@
               </ul>
             </div>
           </div>
-          <div v-if="!isLoading && !hasError && hasFilter && filteredList.length === 0" class="empty-state">
+          <div v-if="!isLoading && !hasError && hasFilter && filteredList.length === 0" class="empty-state" data-mascot-tip="這裡可以清掉篩選條件，重新查看全部公益夥伴。">
             <p>找不到符合條件的公益夥伴</p>
             <button type="button" class="btn-reset-filter" @click="resetFilter">清空篩選</button>
           </div>

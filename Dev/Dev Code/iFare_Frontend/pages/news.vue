@@ -37,7 +37,7 @@
                             >
                                 <span class="badge-new" v-if="isNewItem(_news.releaseTime)">NEW</span>
                                 <span class="badge-read" v-else-if="readMarks.isRead(_news.id)">已讀</span>
-                                <NuxtLink class="item-page-link" :to="{path: '/news/info', query: {id: _news.id}}">
+                                <NuxtLink class="item-page-link" :to="{path: '/news/info', query: {id: _news.id}}" :data-mascot-tip="`點這裡會打開「${_news.title}」的最新消息全文。`">
                                     <div class="item-title">
                                         <h2 class="article-title">{{ _news.title }}</h2>
                                         <span class="item-date">{{ formatDisplayDate(_news.releaseTime) }}</span>

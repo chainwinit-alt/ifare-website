@@ -112,6 +112,7 @@ let animationFrame = 0;
 let returnFrame = 0;
 let limbSwingFrame = 0;
 let mediaQuery: MediaQueryList | null = null;
+let activePointerId: number | null = null;
 
 const syncReducedMotion = () => {
   if (!mediaQuery) {
@@ -262,19 +263,31 @@ function updateHoverTipFromTarget(target: EventTarget | null) {
   hoverTip.value = tipSource?.dataset.mascotTip?.trim() || '';
 }
 
-function handlePointerMove(event: MouseEvent) {
+function handlePointerMove(event: MouseEvent | PointerEvent) {
+  if (event instanceof PointerEvent && activePointerId !== null && event.pointerId !== activePointerId) {
+    return;
+  }
+
+  const previousX = pointerX.value;
+  const previousY = pointerY.value;
   pointerActive.value = true;
   pointerX.value = event.clientX;
   pointerY.value = event.clientY;
 
   if (isDragging.value) {
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+
     const nextX = dragOriginX.value + (event.clientX - dragStartX.value);
     const nextY = dragOriginY.value + (event.clientY - dragStartY.value);
     const clamped = clampDragOffset(nextX, nextY);
+    const movementX = 'movementX' in event ? event.movementX : event.clientX - previousX;
+    const movementY = 'movementY' in event ? event.movementY : event.clientY - previousY;
 
-    dragSwingX.value = clamp(event.movementX * 1.15, -16, 16);
-    dragSwingY.value = clamp(event.movementY * 0.95, -12, 12);
-    dragLift.value = clamp(Math.max(-clamped.y, 0) * 0.08 + Math.abs(event.movementY) * 0.35, 0, 22);
+    dragSwingX.value = clamp(movementX * 1.15, -16, 16);
+    dragSwingY.value = clamp(movementY * 0.95, -12, 12);
+    dragLift.value = clamp(Math.max(-clamped.y, 0) * 0.08 + Math.abs(movementY) * 0.35, 0, 22);
     dragOffsetX.value = clamped.x;
     dragOffsetY.value = clamped.y;
   }
@@ -312,6 +325,8 @@ function handleDragStart(event: PointerEvent) {
     return;
   }
 
+  event.preventDefault();
+  activePointerId = event.pointerId;
   isDragging.value = true;
   pointerActive.value = true;
   pointerX.value = event.clientX;
@@ -326,6 +341,7 @@ function handleDragStart(event: PointerEvent) {
   }
   startLimbSwing();
   stopPatrol();
+  mascotRef.value?.setPointerCapture?.(event.pointerId);
   window.getSelection()?.removeAllRanges();
   queueGazeUpdate();
 }
@@ -368,11 +384,20 @@ function animateReturnToHome() {
   returnFrame = window.requestAnimationFrame(step);
 }
 
-function handleDragEnd() {
+function handleDragEnd(event?: PointerEvent | MouseEvent) {
+  if (event instanceof PointerEvent && activePointerId !== null && event.pointerId !== activePointerId) {
+    return;
+  }
+
   if (!isDragging.value) {
     return;
   }
 
+  if (event instanceof PointerEvent && mascotRef.value?.hasPointerCapture?.(event.pointerId)) {
+    mascotRef.value.releasePointerCapture(event.pointerId);
+  }
+
+  activePointerId = null;
   isDragging.value = false;
   pointerActive.value = false;
   animateReturnToHome();
@@ -439,9 +464,12 @@ onMounted(() => {
   syncReducedMotion();
   startBubbleLoop();
 
+  window.addEventListener('pointermove', handlePointerMove, { passive: false });
   window.addEventListener('mousemove', handlePointerMove, { passive: true });
   window.addEventListener('mouseout', handlePointerOut);
   window.addEventListener('blur', handlePointerLeave);
+  window.addEventListener('pointerup', handleDragEnd);
+  window.addEventListener('pointercancel', handleDragEnd);
   window.addEventListener('mouseup', handleDragEnd);
   document.addEventListener('mouseover', handleDocumentMouseOver);
   document.addEventListener('focusin', handleDocumentFocusIn);
@@ -451,9 +479,12 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   mediaQuery?.removeEventListener('change', syncReducedMotion);
+  window.removeEventListener('pointermove', handlePointerMove);
   window.removeEventListener('mousemove', handlePointerMove);
   window.removeEventListener('mouseout', handlePointerOut);
   window.removeEventListener('blur', handlePointerLeave);
+  window.removeEventListener('pointerup', handleDragEnd);
+  window.removeEventListener('pointercancel', handleDragEnd);
   window.removeEventListener('mouseup', handleDragEnd);
   document.removeEventListener('mouseover', handleDocumentMouseOver);
   document.removeEventListener('focusin', handleDocumentFocusIn);
@@ -1016,6 +1047,26 @@ onBeforeUnmount(() => {
   }
 }
 
+@keyframes mascot-leg-left-mobile {
+  0%, 100% {
+    transform: rotate(12deg);
+  }
+
+  50% {
+    transform: rotate(-8deg);
+  }
+}
+
+@keyframes mascot-leg-right-mobile {
+  0%, 100% {
+    transform: rotate(-12deg);
+  }
+
+  50% {
+    transform: rotate(8deg);
+  }
+}
+
 @keyframes mascot-seat-leg-left {
   0%, 100% {
     transform: rotate(96deg);
@@ -1095,17 +1146,17 @@ onBeforeUnmount(() => {
   }
 
   .mascot-bubble {
-    left: 36px;
-    top: -48px;
-    width: 112px;
+    left: 8px;
+    top: -50px;
+    width: min(112px, calc(100vw - 88px));
     min-height: 44px;
     padding: 8px 10px;
     border-radius: 14px;
   }
 
   .chatbot-mascot.is-open .mascot-bubble {
-    left: -94px;
-    top: -56px;
+    left: -84px;
+    top: -62px;
   }
 
   .chatbot-mascot.is-open .mascot-bubble::before {
@@ -1209,14 +1260,37 @@ onBeforeUnmount(() => {
     width: 26px;
   }
 
+  .mascot-arm-left {
+    left: 6px;
+  }
+
+  .mascot-arm-right {
+    right: 6px;
+  }
+
   .chatbot-mascot.is-open .mascot-arm-left {
     top: 55px;
-    left: 14px;
+    left: 8px;
   }
 
   .chatbot-mascot.is-open .mascot-arm-right {
     top: 54px;
-    right: 14px;
+    right: 8px;
+  }
+
+  .mascot-leg {
+    bottom: 1px;
+    width: 18px;
+  }
+
+  .mascot-leg-left {
+    left: 20px;
+    animation: mascot-leg-left-mobile 0.95s ease-in-out infinite;
+  }
+
+  .mascot-leg-right {
+    right: 20px;
+    animation: mascot-leg-right-mobile 0.95s ease-in-out infinite;
   }
 }
 
