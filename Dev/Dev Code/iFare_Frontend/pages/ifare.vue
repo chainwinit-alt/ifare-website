@@ -45,6 +45,7 @@
               :key="event.key"
               class="life-event-card transition-general"
               type="button"
+              :data-mascot-tip="`點這個會直接用「${event.name}」幫你找相關福利。`"
               @click="SearchByLifeEvent(event)"
             >
               <span class="life-event-card__name">{{ event.name }}</span>
@@ -63,6 +64,7 @@
               select-type="policy"
               :select-list="policySelectList"
               aria-labelledby="label-policy"
+              data-mascot-tip="這裡先選受助者情況，我會幫你縮小福利範圍。"
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
             />
@@ -80,6 +82,7 @@
                 @keydown.enter.prevent="SwitchRecipient(_recipient.val)"
                 @keydown.space.prevent="SwitchRecipient(_recipient.val)"
                 :name="_recipient.name"
+                :data-mascot-tip="`點這個會把年齡區間切換成${_recipient.name}。`"
                 v-for="_recipient in recipientSelectList"
                 :key="_recipient.val"
                 >{{ _recipient.name }}</span
@@ -95,6 +98,7 @@
               select-type="area"
               :select-list="areaSelectList"
               aria-labelledby="label-area"
+              data-mascot-tip="這裡選戶籍地，我會用所在地區幫你找對應福利。"
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
             />
@@ -107,12 +111,14 @@
                   v-model="searchQuery"
                   :filters="autocompleteFilters"
                   placeholder="輸入關鍵字"
+                  :data-mascot-tip="keywordSuggestionTip"
                   @submit="Search"
                 />
               </div>
               <button
                 class="btn-filter transition-general btn-query-submit"
                 type="submit"
+                :data-mascot-tip="canSearch ? '點這裡會用目前條件開始搜尋福利。' : '你要先選一個條件或輸入關鍵字，才能搜尋。'"
                 @click="Search"
                 :disabled="!canSearch"
                 :aria-disabled="!canSearch"
@@ -142,6 +148,7 @@
               <button
                 type="button"
                 class="hot-search-chip transition-general"
+                :data-mascot-tip="`點這個會直接搜尋熱門關鍵字「${kw}」。`"
                 @click="applyHotKeyword(kw)"
               >{{ kw }}</button>
             </li>
@@ -158,6 +165,7 @@
             <button
               type="button"
               class="recent-searches__clear"
+              data-mascot-tip="這裡會清除最近搜尋紀錄。"
               @click="recentSearches.clear"
             >清除全部</button>
           </div>
@@ -170,6 +178,7 @@
               <button
                 type="button"
                 class="recent-search-chip transition-general"
+                :data-mascot-tip="`點這個會再次套用「${item.label}」這筆搜尋。`"
                 @click="applyRecentSearch(item)"
                 :title="`再次搜尋:${item.label}`"
               >
@@ -178,6 +187,7 @@
               <button
                 type="button"
                 class="recent-search-remove"
+                :data-mascot-tip="`這裡會把「${item.label}」從最近搜尋移除。`"
                 @click="recentSearches.remove(idx)"
                 :aria-label="`移除「${item.label}」`"
               >×</button>
@@ -213,6 +223,7 @@
                 <NuxtLink
                     :to="{ path: '/ifare/contact', query: { id: _office.id } }"
                     class="item-page-link"
+                    :data-mascot-tip="`點這裡會打開「${_office.title}」的聯絡資訊。`"
                   >
                   <span class="agency-name">{{ _office.title }}</span>
                   <i class="ic-open link-url"
@@ -249,6 +260,7 @@
               <li
                 class="faq-item transition-general"
                 :class="{ active: item.isActive }"
+                :data-mascot-tip="item.isActive ? '點這裡會收起這則常見問題。' : `點這裡會展開「${item.question}」的解答。`"
                 @click="ToggleQA(item)"
                 @keydown.enter.prevent="ToggleQA(item)"
                 @keydown.space.prevent="ToggleQA(item)"
@@ -405,6 +417,50 @@ const autocompleteFilters = computed(() => ({
   CodeRecipient: codeSelectRecipient.value || undefined,
   CodeDomicile: codeSelect_area.value && codeSelect_area.value !== ALL_AREA_VALUE ? codeSelect_area.value : undefined,
 }));
+
+const KEYWORD_FALLBACK_SUGGESTIONS = ['補助', '津貼', '照顧', '就學', '就業'];
+
+const keywordSuggestionList = computed(() => {
+  const suggestions = new Set<string>();
+  const policyName = policySelectList.find((item) => item.val === codeSelect_policy.value)?.name || '';
+  const recipientName = recipientSelectList.find((item) => item.val === codeSelectRecipient.value)?.name || '';
+  const lifeEventName = welfareLifeEvents.find((item) => item.key === selectedLifeEvent.value)?.name || '';
+
+  [policyName, recipientName, lifeEventName]
+    .filter((item) => item && item !== '全部' && item !== '全國')
+    .forEach((item) => suggestions.add(item));
+
+  if (policyName.includes('育')) {
+    suggestions.add('育兒津貼');
+    suggestions.add('托育補助');
+  }
+
+  if (policyName.includes('老')) {
+    suggestions.add('老人福利');
+    suggestions.add('長照');
+  }
+
+  if (policyName.includes('障礙')) {
+    suggestions.add('身心障礙');
+    suggestions.add('輔具補助');
+  }
+
+  if (recipientName.includes('兒')) {
+    suggestions.add('兒童補助');
+  }
+
+  if (recipientName.includes('青') || recipientName.includes('學生')) {
+    suggestions.add('就學補助');
+  }
+
+  KEYWORD_FALLBACK_SUGGESTIONS.forEach((item) => suggestions.add(item));
+
+  return Array.from(suggestions).slice(0, 5);
+});
+
+const keywordSuggestionTip = computed(() => {
+  return `這裡可以直接搜關鍵字，我建議你試試：${keywordSuggestionList.value.join('、')}。`;
+});
 
 // #1 — 篩選不完整時錯誤訊息。使用者點過搜尋且 canSearch 仍為 false 時顯示
 const hasAttemptedSearch = ref(false);

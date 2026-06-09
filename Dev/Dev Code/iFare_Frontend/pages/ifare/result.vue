@@ -12,6 +12,7 @@
                 select-type="policy"
                 :select-list="policySelectList"
                 :select-default="codeSelect_policy"
+                data-mascot-tip="這裡可以重新切換受助者情況，縮小結果範圍。"
                 @update:select-value="getSelectValue"
               />
             </div>
@@ -24,6 +25,7 @@
                   :name="_recipient.name"
                   v-for="_recipient in recipientSelectList"
                   :key="_recipient.val"
+                  :data-mascot-tip="`點這個會把年齡區間切換成${_recipient.name}。`"
                   @click="SwitchRecipient(_recipient.val)"
                   >{{ _recipient.name }}</span
                 >
@@ -37,6 +39,7 @@
                 select-type="area"
                 :select-list="areaSelectList"
                 :select-default="codeSelect_area"
+                data-mascot-tip="這裡可以重新切換戶籍地，查看不同地區福利。"
                 @update:select-value="getSelectValue"
               />
             </div>
@@ -47,10 +50,11 @@
                   <IfareSearchAutocomplete
                     v-model="searchQuery"
                     :filters="autocompleteFilters"
+                    :data-mascot-tip="keywordSuggestionTip"
                     @submit="Search"
                   />
                 </div>
-                <button class="btn btn-filter btn-query-submit" @click="Search" :disabled="!isClientReady || !canSearch || isLoading">
+                <button class="btn btn-filter btn-query-submit" :data-mascot-tip="!isClientReady || isLoading ? '資料還在準備中，請稍等一下。' : canSearch ? '點這裡會用目前條件重新搜尋。' : '你要先選條件或輸入關鍵字，才能重新搜尋。'" @click="Search" :disabled="!isClientReady || !canSearch || isLoading">
                   <span>搜尋</span>
                   <i class="icon ic-search"></i>
                 </button>
@@ -66,6 +70,7 @@
                   :class="{ active: _income.isActive }"
                   v-for="_income in incomeSelectList"
                   :key="_income.val"
+                  :data-mascot-tip="`點這個會把經濟條件切換成${_income.name}。`"
                   @click="SwitchIncome(_income.val)"
                   >{{ _income.name }}</span
                 >
@@ -79,6 +84,7 @@
                   :class="{ active: _identity.isActive }"
                   v-for="_identity in identitySelectList"
                   :key="_identity.val"
+                  :data-mascot-tip="`點這個會把特殊身分切換成${_identity.name}。`"
                   @click="SwitchIdentity(_identity.val)"
                   >{{ _identity.name }}</span
                 >
@@ -89,6 +95,7 @@
             <button
               class="btn btn-advance"
               :class="{ active: isOpts }"
+              :data-mascot-tip="isOpts ? '點這裡會收起進階篩選。' : '點這裡會展開經濟條件和特殊身分的進階篩選。'"
               @click="isOpts = !isOpts"
             >
               <i
@@ -98,7 +105,7 @@
             </button>
           </div>
           <div class="part-reset">
-            <button class="btn btn-reset" :class="{ 'is-clearing': showResetFeedback }" @click="ResetParam">清空</button>
+            <button class="btn btn-reset" :class="{ 'is-clearing': showResetFeedback }" data-mascot-tip="這裡會把目前所有搜尋條件清空。" @click="ResetParam">清空</button>
             <span class="reset-feedback" :class="{ 'is-visible': showResetFeedback }" aria-live="polite">已清空篩選條件</span>
           </div>
         </div>
@@ -111,6 +118,7 @@
                 select-type="policy"
                 :select-list="policySelectList"
                 :select-default="codeSelect_policy"
+                data-mascot-tip="這裡可以切換受助者情況。"
                 @is-opened="isSelectOpen"
                 @update:select-value="getSelectValue"
               />
@@ -123,6 +131,7 @@
                 select-type="recipient"
                 :select-list="recipientSelectList"
                 :select-default="codeSelectRecipient"
+                data-mascot-tip="這裡可以切換受助者年齡區間。"
                 @is-opened="isSelectOpen"
                 @update:select-value="getSelectValue"
             />
@@ -132,6 +141,7 @@
                 select-type="area"
                 :select-list="areaSelectList"
                 :select-default="codeSelect_area"
+                data-mascot-tip="這裡可以切換受助者戶籍地。"
                 @is-opened="isSelectOpen"
                 @update:select-value="getSelectValue"
               />
@@ -142,6 +152,7 @@
                     :filters="autocompleteFilters"
                     placeholder="關鍵字搜尋"
                     :show-count="false"
+                    :data-mascot-tip="keywordSuggestionTip"
                     @submit="Search"
                   />
                 </div>
@@ -153,10 +164,11 @@
                 select-type="else"
                 :select-list-income="incomeSelectList"
                 :select-list-identity="identitySelectList"
+                data-mascot-tip="這裡會打開更多篩選，像經濟條件和特殊身分。"
                 @is-opened="isSelectOpen"
                 @update:select-items="getSelectItems"
                 />
-              <button class="btn-filter" @click="Search" :disabled="!isClientReady || !canSearch || isLoading">
+              <button class="btn-filter" :data-mascot-tip="!isClientReady || isLoading ? '資料還在準備中，請稍等一下。' : canSearch ? '點這裡會用目前條件重新搜尋。' : '你要先選條件或輸入關鍵字，才能重新搜尋。'" @click="Search" :disabled="!isClientReady || !canSearch || isLoading">
                 <span></span>
                 <i class="icon ic-search"></i>
               </button>
@@ -164,7 +176,7 @@
           </div>
         </div>
         <div class="card-filter-reset">
-          <button class="btn btn-reset" :class="{ 'is-clearing': showResetFeedback }" @click="ResetParam">清空</button>
+          <button class="btn btn-reset" :class="{ 'is-clearing': showResetFeedback }" data-mascot-tip="這裡會把目前所有搜尋條件清空。" @click="ResetParam">清空</button>
           <span class="reset-feedback" :class="{ 'is-visible': showResetFeedback }" aria-live="polite">已清空篩選條件</span>
         </div>
       </section>
@@ -189,13 +201,13 @@
             <div class="compare-toolbar" v-if="compareCount > 0">
               <span>已收藏 {{ compareCount }} 個福利</span>
               <NuxtLink class="btn btn-filter compare-toolbar__link" to="/ifare/compare">
-                <span>查看比較</span>
+                <span data-mascot-tip="這裡會帶你去查看已收藏的福利比較。">查看比較</span>
               </NuxtLink>
             </div>
             <div class="result-loading" v-if="isLoading">載入中...</div>
             <div class="result-loading result-error" v-else-if="hasError">
               <p>{{ errorMessage }}</p>
-              <button class="btn btn-filter" type="button" @click="RetryLoad">重新載入</button>
+              <button class="btn btn-filter" type="button" data-mascot-tip="這裡會重新載入目前搜尋結果。" @click="RetryLoad">重新載入</button>
             </div>
             <div class="result-loading result-empty" v-else-if="!isLoading && iFarePolicyList.length === 0" role="status">
               <div class="empty-illustration" aria-hidden="true">
@@ -207,10 +219,10 @@
                 <li v-for="item in emptyDiagnosis" :key="item">{{ item }}</li>
               </ul>
               <div class="empty-actions">
-                <button class="btn btn-filter" type="button" @click="ScrollToFilter">
+                <button class="btn btn-filter" type="button" data-mascot-tip="這裡會捲回上方，讓你修改搜尋條件。" @click="ScrollToFilter">
                   <span>修改搜尋條件</span>
                 </button>
-                <button class="btn btn-reset" type="button" @click="ResetParam">
+                <button class="btn btn-reset" type="button" data-mascot-tip="這裡會清空限制，改看全部福利。" @click="ResetParam">
                   <span>看全部福利</span>
                 </button>
               </div>
@@ -226,11 +238,12 @@
                   :class="{ 'is-saved': isPolicySaved(_item.id) }"
                   type="button"
                   :aria-pressed="isPolicySaved(_item.id)"
+                  :data-mascot-tip="isPolicySaved(_item.id) ? `這裡會把「${_item.title}」從比較清單移除。` : `這裡會把「${_item.title}」加入福利比較。`"
                   @click.stop="ToggleCompare(_item)"
                 >
                   {{ isPolicySaved(_item.id) ? '已收藏' : '收藏比較' }}
                 </button>
-                <NuxtLink :to="{ path: '/ifare/info', query: { id: _item.id } }">
+                <NuxtLink :to="{ path: '/ifare/info', query: { id: _item.id } }" :data-mascot-tip="`點這裡會打開「${_item.title}」的福利詳細內容。`">
                   <h4 class="result-title">{{ _item.title }}</h4>
                   <span
                     v-if="_item.deadlineInfo"
@@ -444,6 +457,52 @@ const autocompleteFilters = computed(() => ({
   CodeIncome: codeSelectIncome.value || undefined,
   CodeIdentities: codeSelectIdentity.value.length > 0 ? [...codeSelectIdentity.value] : undefined,
 }));
+
+const KEYWORD_FALLBACK_SUGGESTIONS = ['補助', '津貼', '照顧', '就學', '就業'];
+
+const keywordSuggestionList = computed(() => {
+  const suggestions = new Set<string>();
+  const policyName = getSelectLabel(policySelectList, codeSelect_policy.value, isAllPolicyValue);
+  const recipientName = getSelectLabel(recipientSelectList, codeSelectRecipient.value);
+  const areaName = getSelectLabel(areaSelectList, codeSelect_area.value, isAllAreaValue);
+  const lifeEventName = getLifeEventByKey(selectedLifeEvent.value)?.name || '';
+
+  [policyName, recipientName, areaName, lifeEventName]
+    .filter(Boolean)
+    .forEach((item) => suggestions.add(item));
+
+  if (policyName.includes('育')) {
+    suggestions.add('育兒津貼');
+    suggestions.add('托育補助');
+  }
+
+  if (policyName.includes('老')) {
+    suggestions.add('老人福利');
+    suggestions.add('長照');
+  }
+
+  if (policyName.includes('障礙')) {
+    suggestions.add('身心障礙');
+    suggestions.add('輔具補助');
+  }
+
+  if (recipientName.includes('兒')) {
+    suggestions.add('兒童補助');
+  }
+
+  if (recipientName.includes('青') || recipientName.includes('學生')) {
+    suggestions.add('就學補助');
+  }
+
+  KEYWORD_FALLBACK_SUGGESTIONS.forEach((item) => suggestions.add(item));
+
+  return Array.from(suggestions).slice(0, 5);
+});
+
+const keywordSuggestionTip = computed(() => {
+  return `這裡可以改搜更精準的詞，我建議你試試：${keywordSuggestionList.value.join('、')}。`;
+});
+
 function getSelectValue(type: string, val: string) {
   if (type == "policy") {
     codeSelect_policy.value = val;

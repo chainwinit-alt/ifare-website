@@ -1,5 +1,8 @@
 <template>
-  <div class="chatbot-entry">
+  <div class="chatbot-entry" :class="{ 'is-open': isOpen }">
+    <div class="chatbot-entry-mascot">
+      <CompChatbotMascot :is-open="isOpen" />
+    </div>
     <Transition name="tooltip">
       <span
         v-if="showTooltip && !isOpen"
@@ -17,6 +20,7 @@
       :aria-expanded="isOpen"
       data-island="智慧小幫手"
       data-island-style="button"
+      :data-mascot-tip="isOpen ? '點這裡會先收起智慧小幫手。' : '點這裡可以打開智慧小幫手，我會陪你一起找功能。'"
       @click="handleClick"
       @mouseenter="showTooltip = true"
       @mouseleave="showTooltip = false"
@@ -94,7 +98,21 @@ function handleClick() {
   z-index: 1003;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
+}
+
+.chatbot-entry-mascot {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  transition: transform 0.28s ease, opacity 0.28s ease;
+}
+
+.chatbot-entry.is-open .chatbot-entry-mascot {
+  position: absolute;
+  right: 248px;
+  bottom: -24px;
+  transform: none;
 }
 
 .chatbot-entry-tooltip {
@@ -188,6 +206,15 @@ function handleClick() {
   .chatbot-entry {
     right: 16px;
     bottom: calc(16px + env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+
+  .chatbot-entry.is-open .chatbot-entry-mascot {
+    position: absolute;
+    right: 104px;
+    bottom: -10px;
+    transform: scale(0.88);
+    transform-origin: right bottom;
   }
 
   .chatbot-entry-tooltip {
