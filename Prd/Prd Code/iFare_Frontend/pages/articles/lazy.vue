@@ -1,115 +1,277 @@
 <template>
   <div class="app-body-child" :name="$route.name">
-    <section class="section section-top">
-      <h2 class="article-title">{{ _lazyItem.title }}</h2>
-      <h6 class="article-date">{{ _lazyItem.releaseTime }}</h6>
-      <div class="article-tags">
-        <ul class="list-unstyled tags-list">
-          <li v-for="_keyword in _lazyItem.codeKeywords">{{ _keyword }}</li>
-        </ul>
-        <label class="article-num">{{ _lazyItem.id }}</label>
+    <div class="article-state" v-if="isLoading">
+      <div class="loading-hint">
+        <span class="loading-spinner"></span>
+        <span>懶人包載入中...</span>
       </div>
-    </section>
-    <section class="section section-info">
-      <div class="article-info">
-        <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
-        <div class="raw-html" v-html="_lazyItem.content"></div>
-      </div>
-    </section>
-    <section class="section section-bottom">
-      <div class="relation-links">
-        <h5 class="relation-title">相關懶人包</h5>
-        <ul class="list-unstyled relation-list">
-          <li class="relation-item transition-general" v-for="_lazy in _lazyRelation">
-            <NuxtLink class="item-page-link" :to="{path: '/articles/lazy', query: {id: _lazy.id, reload: ''}}">
-              <h6 class="link-title">
-                {{ _lazy.title }}
-                <span class="link-date">{{ _lazy.releaseTime }}</span>
-              </h6>
-              <div class="relation-item-bottom">
-                <ul class="list-unstyled tags-list">
-                  <li v-for="_key in _lazy.codeKeywords">{{ _key }}</li>
-                </ul>
-                <i class="ic-arrow-right link-url transition-general"></i>
-              </div>
-            </NuxtLink>
-          </li>
-        </ul>
-      </div>
-    </section>
+    </div>
+
+    <div class="part-empty part-error" v-else-if="hasError">
+      <p>{{ errorMessage }}</p>
+      <button class="btn-retry transition-general" @click="reloadLazyDetail">重新載入</button>
+    </div>
+
+    <template v-else-if="lazyItem.id">
+      <!-- 2026-05-25 UIUX #33 — 閱讀進度條 -->
+      <ReadingProgressBar />
+      <section class="section section-top">
+        <h2 class="article-title">{{ lazyItem.title }}</h2>
+        <h6 class="article-date">
+          {{ formatDisplayDate(lazyItem.releaseTime) }}
+        </h6>
+        <div class="article-tags">
+          <ul class="list-unstyled tags-list">
+            <li v-for="keyword in lazyItem.codeKeywords" :key="keyword">{{ keyword }}</li>
+          </ul>
+          <label class="article-num">{{ lazyItem.id }}</label>
+        </div>
+      </section>
+
+      <section class="section section-info">
+        <div class="article-info">
+          <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
+          <div class="raw-html lazy-images">
+            <img
+              v-for="(imageSrc, index) in lazyImages"
+              :key="`${lazyItem.id}-${index}`"
+              width="100%"
+              :src="imageSrc"
+              :alt="`${lazyItem.title} - ${index + 1}`"
+              loading="lazy"
+            />
+          </div>
+        </div>
+        <!-- 2026-05-25 UIUX #21 — LINE 訂閱主動推廣 -->
+        <LineSubscribeCallout />
+      </section>
+
+      <section class="section section-bottom" v-if="lazyRelation.length">
+        <div class="relation-links">
+          <h5 class="relation-title">相關懶人包</h5>
+          <ul class="list-unstyled relation-list">
+            <li class="relation-item transition-general" v-for="item in lazyRelation" :key="item.id">
+              <NuxtLink class="item-page-link" :to="{ path: '/articles/lazy', query: { id: item.id } }">
+                <h6 class="link-title">
+                  {{ item.title }}
+                  <span class="link-date">{{ formatDisplayDate(item.releaseTime) }}</span>
+                </h6>
+                <div class="relation-item-bottom">
+                  <ul class="list-unstyled tags-list">
+                    <li v-for="keyword in item.codeKeywords" :key="`${item.id}-${keyword}`">{{ keyword }}</li>
+                  </ul>
+                  <i class="ic-arrow-right link-url transition-general"></i>
+                </div>
+              </NuxtLink>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </template>
+
+    <div class="part-empty" v-else>
+      <p>目前沒有這篇懶人包</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({
-  title: '懶人包',
-  toLinkName: '福利專欄',
-  toLink: '/articles'
-})
-const { $WebApiGet } = useNuxtApp()
-const route = useRoute()
-const _lazyID = route.query.id
+  title: "懶人包",
+  toLinkName: "福利專欄",
+  toLink: "/articles"
+});
+
+const { $WebApiGetDetailed } = useNuxtApp();
+const { getApiResultValue, getApiResultItem } = useApiResult();
+const { formatDisplayDate } = useDateFormatter();
+const { getApiErrorMessage } = useApiErrorMessage();
+const route = useRoute();
+const requestUrl = useRequestURL();
 
 interface lazyItem {
-    id: number,
-    title: string,
-    releaseTime: string,
-    content: string,
-    codePolicy: string,
-    codeKeywords: Array<string>
+  id: number;
+  title: string;
+  releaseTime: string;
+  content: string;
+  codePolicy: string;
+  codeKeywords: Array<string>;
 }
 
-const _lazyItem = reactive<lazyItem>({
-content: "",
-title: '',
-releaseTime: '',
-codePolicy: '',
-codeKeywords: [],
-id: 0
+const lazyItem = reactive<lazyItem>({
+  content: "",
+  title: "",
+  releaseTime: "",
+  codePolicy: "",
+  codeKeywords: [],
+  id: 0
 });
-const lazyDetailGet = $WebApiGet('/ArticlesLazy/GetArticlesLazyDetail', { articlesLazyID: _lazyID})
-lazyDetailGet.then((res:any) => {
-    const _data = res?.result?.result
-    if (!_data) return
-    const _releaseTime = _data.releaseTime.indexOf('T') >= 0 ? _data.releaseTime.split('T')[0].replaceAll('-', '.') : _data.releaseTime
-    
-    _lazyItem.id = _data.id
-    _lazyItem.title = _data.title
-    _lazyItem.content = _data.imageList.map((_img:any, j: number) => { return `<img width='100%' src="${_img.imagePath}" />`}).join(' ')
-    _lazyItem.releaseTime = _releaseTime
-    _lazyItem.codePolicy = _data.codePolicy_LabelName
-    _lazyItem.codeKeywords = _data.codeKeywordList.map((_code:any, j:number) => { return _code.codeName})
-})
 
+const lazyRelation = reactive<Array<lazyItem>>([]);
+const lazyImages = shallowRef<Array<string>>([]);
+const isLoading = ref(true);
+const hasError = ref(false);
+const errorMessage = ref("載入懶人包時發生錯誤");
+const currentArticleId = computed(() => Number(route.query.id || 0));
 
-const _lazyRelation = reactive<Array<lazyItem>>([]);
-const lazyRelationGet = $WebApiGet('/ArticlesLazy/GetArticlesLazyRelation', { articlesLazyID: _lazyID})
-lazyRelationGet.then((res:any) => {
-    const _data = res?.result?.result
-    if (!Array.isArray(_data)) return
-    
-    let _list:Array<lazyItem> = _data.map((item:any, i:number) => {
-        return {
-            id: item.id,
-            title: item.title,
-            releaseTime: item.releaseTime,
-            content: item.detail,
-            codePolicy: item.codePolicy_LabelName,
-            codeKeywords: item.codeKeywordList.map((_code:any, j:number) => { return _code.codeName})
-        }
-    })
+function safeText(value: unknown) {
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
 
-    _lazyRelation.push(..._list)
-})
+function normalizeKeywords(list: unknown) {
+  if (!Array.isArray(list)) return [];
 
-const _url = useRequestURL()
+  return list
+    .map((item: any) => safeText(item?.codeName))
+    .filter(Boolean);
+}
+
+function normalizeImages(list: unknown) {
+  return Array.isArray(list) ? list : [];
+}
+
+function normalizeImageSrc(value: unknown) {
+  const src = safeText(value).trim();
+  if (/^(https?:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(src)) {
+    return src;
+  }
+  return "";
+}
+
+function resetLazyItem() {
+  lazyItem.id = 0;
+  lazyItem.title = "";
+  lazyItem.releaseTime = "";
+  lazyItem.content = "";
+  lazyItem.codePolicy = "";
+  lazyItem.codeKeywords = [];
+  lazyImages.value = [];
+}
+
+let detailRequestToken = 0;
+async function loadLazyDetail(articleId: number) {
+  const requestToken = ++detailRequestToken;
+  isLoading.value = true;
+  hasError.value = false;
+  errorMessage.value = "載入懶人包時發生錯誤";
+  resetLazyItem();
+
+  if (!articleId) {
+    hasError.value = true;
+    errorMessage.value = "找不到這篇懶人包。";
+    isLoading.value = false;
+    return;
+  }
+
+  try {
+    const { data: response, error } = await $WebApiGetDetailed("/ArticlesLazy/GetArticlesLazyDetail", {
+      articlesLazyID: articleId,
+    });
+    if (requestToken !== detailRequestToken) {
+      return;
+    }
+
+    if (error) {
+      hasError.value = true;
+      errorMessage.value = getApiErrorMessage(error, "載入懶人包時發生錯誤");
+      return;
+    }
+
+    const data = getApiResultItem<any>(response);
+    if (!data) {
+      throw new Error("目前沒有這篇懶人包。");
+    }
+
+    const images = normalizeImages(data.imageList)
+      .map((image: any) => normalizeImageSrc(image?.imagePath))
+      .filter(Boolean);
+    lazyItem.id = Number(data.id || 0);
+    lazyItem.title = safeText(data.title);
+    lazyItem.content = safeText(data.title);
+    lazyItem.releaseTime = safeText(data.releaseTime);
+    lazyImages.value = images;
+    lazyItem.codePolicy = safeText(data.codePolicy_LabelName);
+    lazyItem.codeKeywords = normalizeKeywords(data.codeKeywordList);
+  } catch (error: any) {
+    if (requestToken !== detailRequestToken) {
+      return;
+    }
+    hasError.value = true;
+    errorMessage.value = error?.message || getApiErrorMessage(error, "載入懶人包時發生錯誤");
+  } finally {
+    if (requestToken === detailRequestToken) {
+      isLoading.value = false;
+    }
+  }
+}
+
+let relationRequestToken = 0;
+async function loadLazyRelation(articleId: number) {
+  const requestToken = ++relationRequestToken;
+  lazyRelation.splice(0);
+
+  if (!articleId) {
+    return;
+  }
+
+  try {
+    const { data: response, error } = await $WebApiGetDetailed("/ArticlesLazy/GetArticlesLazyRelation", {
+      articlesLazyID: articleId,
+    });
+    if (error) {
+      console.warn("[articles/lazy][relation]", error);
+      return;
+    }
+
+    const data = getApiResultValue<any>(response);
+    if (!Array.isArray(data) || requestToken !== relationRequestToken) {
+      return;
+    }
+
+    lazyRelation.push(
+      ...data.map((item: any) => ({
+        id: Number(item.id || 0),
+        title: safeText(item.title),
+        releaseTime: safeText(item.releaseTime),
+        content: safeText(item.detail),
+        codePolicy: safeText(item.codePolicy_LabelName),
+        codeKeywords: normalizeKeywords(item.codeKeywordList),
+      }))
+    );
+  } catch (error) {
+    console.warn("[articles/lazy][relation]", error);
+  }
+}
+
+function reloadLazyDetail() {
+  loadLazyDetail(currentArticleId.value);
+  loadLazyRelation(currentArticleId.value);
+}
+
 async function ShareWebUrlToLine() {
-  const SHARETOLINE = 'https://social-plugins.line.me/lineit/share'
-  const urlShare = `${SHARETOLINE}?url=${encodeURIComponent(_url.href)}`
+  const shareToLine = "https://social-plugins.line.me/lineit/share";
+  const currentUrl = import.meta.client ? window.location.href : requestUrl.href;
+  const urlShare = `${shareToLine}?url=${encodeURIComponent(currentUrl)}`;
 
   await navigateTo(urlShare, {
-    external: true
-  })
+    external: true,
+  });
 }
 
+watch(
+  () => [Number(route.query.id || 0), String(route.query.reload ?? "")] as const,
+  async ([articleId]) => {
+    await loadLazyDetail(articleId);
+    await loadLazyRelation(articleId);
+  },
+  { immediate: true }
+);
 </script>
+
+<style scoped lang="scss">
+.article-state {
+  padding: 48px 24px;
+  text-align: center;
+}
+</style>

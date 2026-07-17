@@ -1,6 +1,16 @@
 <template>
   <div class="app-body-child" :name="$route.name">
-    <div class="section-list">
+    <div v-if="isLoading" class="part-loading" role="status" aria-live="polite">
+      <span class="skeleton-line skeleton-line-title"></span>
+      <span class="skeleton-line"></span>
+      <span class="skeleton-line"></span>
+      <span class="skeleton-line skeleton-line-info"></span>
+    </div>
+    <div v-else-if="hasError" class="part-error" role="alert">
+      <p>無法載入洽辦單位資訊，可能網路不穩或伺服器忙碌。</p>
+      <button class="btn-retry" @click="loadOfficeUnit">重新載入</button>
+    </div>
+    <div v-else class="section-list">
       <section class="section-top">
         <div class="title-component">
           <i class="ic-title-pattern"></i>
@@ -8,8 +18,8 @@
           <span class="comp-shadow">CONTACT</span>
         </div>
         <div class="date-group">
-          <label class="date-release">{{ releaseTime }}</label>
-          <label class="date-update">{{ updateTime }}</label>
+          <label class="date-release">{{ formatDisplayDate(releaseTime) }}</label>
+          <label class="date-update">{{ formatDisplayDate(updateTime) }}</label>
         </div>
       </section>
       <section class="section-body">
@@ -21,7 +31,7 @@
               v-for="(_area, i) in areaList"
               :key="_area.areaName"
             >
-              <a class="transition-general" :href="`#${_area.areaName}`" @click="jumpTo(_area.areaName)">{{
+              <a class="transition-general" :href="`#${_area.areaName}`" @click.prevent="jumpTo(_area.areaName)">{{
                 _area.areaName
               }}</a>
             </li>
@@ -104,6 +114,8 @@ definePageMeta({
   toLink: '/ifare'
 })
 const { $WebApiGet } = useNuxtApp();
+const { getApiResultArray } = useApiResult();
+const { formatDisplayDate } = useDateFormatter();
 const route = useRoute();
 const $router = useRouter();
 const _contactID = route.query.id;
@@ -150,18 +162,38 @@ const _contactItem = reactive<contactItem>({
   title: "",
   officeList: undefined,
 });
-const OfficeUnitListGet = $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
-OfficeUnitListGet.then((res: any) => {
-  let _data = res?.result?.result;
-  if (!Array.isArray(_data)) return;
-  _data = _data.find((item: any) => item.id == _contactID);
-  if (!_data) return;
 
-  _contactItem.title = _data.title;
-  releaseTime.value = _data.releaseTime
-  updateTime.value = _data.updateTime
-  (_data.officeList ?? []).forEach((_officeItem: any, k: number) => {
-    console.log(_officeItem)
+const isLoading = ref(true);
+const hasError = ref(false);
+
+async function loadOfficeUnit() {
+  isLoading.value = true;
+  hasError.value = false;
+  // 清空既有資料 (重試時)
+  areaList.splice(0);
+  areaSelectList.splice(0);
+  contactList.splice(0);
+  try {
+    const res: any = await $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
+    let _data = getApiResultArray<any>(res);
+    if (_data.length === 0) throw new Error("Empty response");
+    _data = _data.find((item: any) => item.id == _contactID);
+    if (!_data) throw new Error("Office unit not found");
+
+    _contactItem.title = _data.title;
+    releaseTime.value = _data.releaseTime;
+    updateTime.value = _data.updateTime;
+    populateOfficeData(_data);
+    isLoading.value = false;
+  } catch (e) {
+    console.warn('[ifare/contact] load failed:', e);
+    isLoading.value = false;
+    hasError.value = true;
+  }
+}
+
+function populateOfficeData(_data: any) {
+  _data.officeList.forEach((_officeItem: any, k: number) => {
     areaList.push({
       isActive: k == 0,
       areaName: _officeItem.codeDomicile_LabelName,
@@ -182,23 +214,28 @@ OfficeUnitListGet.then((res: any) => {
       }),
     });
   });
-});
+}
 
-function jumpTo(areaName: string) {
-  areaList.forEach((_area, i) => {
+// 開始載入 (page 進入時)
+loadOfficeUnit();
+
+function jumpTo(areaName: string, scroll = true) {
+  areaList.forEach((_area) => {
     _area.isActive = _area.areaName == areaName;
   });
+  // 2026-06-08 UIUX #187 — 統一用 scrollIntoView，避免中文 hash 編碼對不到 id / 原生跳轉與 router push 雙重跳動
+  if (scroll && import.meta.client) {
+    document.getElementById(areaName)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 function getSelectValue(type: string, val: string) {
-  console.log(`[${type}] val => ${val}`)
   let _area = areaSelectList.find((p:any) => p.val == val);
-  jumpTo(`${_area?.name}`)
+  jumpTo(`${_area?.name}`, false) // select 路徑由 router.push hash 負責捲動，jumpTo 只更新 active
   $router.push({ path: route.path, query: route.query, hash: `#${_area?.name}`})
 }
 
 function isSelectOpen(type: string, val: boolean) {
-  // console.log(`[${type}] val => ${val} || type ${typeof val}`)
   _isSelect.value = val
   // useHead({
   //   bodyAttrs: {

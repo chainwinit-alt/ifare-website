@@ -27,6 +27,9 @@ $bg-init: no-repeat center/contain;
 .ic-facebook-before::before {
   background: url("../img/Facebook-Logo.svg") $bg-init;
 }
+.ic-facebook {
+  background: url("../img/Facebook-Logo-color.svg") $bg-init;
+}
 .ic-line {
   background: url("../img/Line-Logo.svg") $bg-init;
 }
@@ -153,19 +156,19 @@ $bg-init: no-repeat center/contain;
 }
 
 .ic-index-img-0 {
-  background: url("../img/Index-Img-0.png") $bg-init;
+  background: url("../img/Index-Img-0.jpg") $bg-init;
 }
 .ic-index-img-1 {
-  background: url("../img/Index-Img-1.png") $bg-init;
+  background: url("../img/Index-Img-1.jpg") $bg-init;
 }
 .ic-index-img-2 {
-  background: url("../img/Index-Img-2.png") $bg-init;
+  background: url("../img/Index-Img-2.jpg") $bg-init;
 }
 .ic-index-img-3 {
-  background: url("../img/Index-Img-3.png") $bg-init;
+  background: url("../img/Index-Img-3.jpg") $bg-init;
 }
 .ic-index-img-4 {
-  background: url("../img/Index-Img-4.png") $bg-init;
+  background: url("../img/Index-Img-4.jpg") $bg-init;
 }
 
 .ic-select-arrow {

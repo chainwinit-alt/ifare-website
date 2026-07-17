@@ -1,3 +1,28 @@
-.transition-general{
-    @include transitionGeneral(.3s);
+// 統一 transition duration 變數（Round 13 #76）
+// 既有 scss 內 .1s / .22s / .25s / .28s / .3s / .32s / .5s 共 7 種雜亂值，
+// 統一規範為 4 個層級。新寫 scss 請使用本檔變數，舊 scss 後續批次替換。
+$transition-fast: 0.15s;       // 微互動、小型 hover (button hover, icon)
+$transition-base: 0.25s;       // 標準（連結、表單元件、Select）
+$transition-medium: 0.3s;      // 卡片 hover、modal toggle、抽屜
+$transition-slow: 0.5s;        // 頁面切換、靈動島、靈動效果
+
+// 統一 easing 曲線
+$ease-standard: cubic-bezier(0.32, 0.72, 0, 1);  // 自然平滑（Apple-like）
+$ease-out: ease-out;                              // 末段減速
+$ease-in-out: ease-in-out;                        // 兩端緩和
+
+.transition-general {
+    @include transitionGeneral($transition-medium);
+}
+
+.transition-fast {
+    transition: all $transition-fast $ease-out;
+}
+
+.transition-base {
+    transition: all $transition-base $ease-standard;
+}
+
+.transition-slow {
+    transition: all $transition-slow $ease-standard;
 }

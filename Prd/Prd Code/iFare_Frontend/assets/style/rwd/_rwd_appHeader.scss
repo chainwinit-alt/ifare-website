@@ -47,7 +47,7 @@
         }
 
         display: none;
-        flex-direction: row;
+        flex-direction: column;
         position: fixed;
         left: 0;
         top: 0;
@@ -56,14 +56,21 @@
         background: linear-gradient(0deg, rgba($color-orange, 0.05) 0%, rgba($color-orange, 0.05) 100%), rgba($color-white, 0.92);
         backdrop-filter: blur(10px);
         z-index: 9999;
-        align-items: center;
+        align-items: stretch;
+        justify-content: flex-start;
+        overflow: hidden;
+        box-sizing: border-box;
 
         .menu-list {
             width: 100%;
+            flex: 1 1 auto;
+            min-height: 0;
             display: flex;
             flex-direction: column;
-            padding: 0 40px;
+            padding: clamp(112px, 18vh, 148px) 40px 24px;
             gap: 30px;
+            overflow-y: auto;
+            box-sizing: border-box;
             z-index: 99;
 
             li {
@@ -83,15 +90,111 @@
                 }
 
                 &.active {
-                    &::before {
+                    position: relative;
+
+                    .mobileNav-link {
+                        color: $color-orange;
+                    }
+
+                    &::after {
                         display: inline-block;
                         content: '';
                         position: absolute;
-                        width: 22px;
-                        height: 37px;
                         left: 0;
-                        top: 4px;
-                        background: url("../img/Title-Pattern.png") $bg-init;
+                        right: 0;
+                        bottom: 0;
+                        height: 4px;
+                        background-color: $color-orange;
+                    }
+                }
+
+                // 福利專欄 accordion：父項點連結直接導航，旁邊 chevron 展開子頁
+                &.mobile-nav-item.has-submenu {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: stretch;
+                    height: auto;
+                    padding-left: 0;
+
+                    &::after {
+                        left: 30px;
+                    }
+
+                    .mobile-nav-row {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding-left: 30px;
+                        min-height: 48px;
+                    }
+
+                    .mobile-submenu-toggle {
+                        flex: 0 0 auto;
+                        width: 44px;
+                        height: 44px;
+                        margin-right: 4px;
+                        padding: 0;
+                        background: transparent;
+                        border: none;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+
+                        .mobile-submenu-chevron {
+                            display: inline-block;
+                            width: 10px;
+                            height: 10px;
+                            border-right: 2px solid rgba($color-black, .55);
+                            border-bottom: 2px solid rgba($color-black, .55);
+                            transform: rotate(45deg);
+                            transform-origin: center;
+                            transition: transform .2s ease;
+                        }
+
+                        &:focus-visible {
+                            outline: 2px solid $color-orange;
+                            outline-offset: 2px;
+                            border-radius: 6px;
+                        }
+                    }
+
+                    .mobile-submenu {
+                        list-style: none;
+                        margin: 0;
+                        padding: 0 0 0 50px;
+                        max-height: 0;
+                        overflow: hidden;
+                        transition: max-height .25s ease, padding-top .25s ease, padding-bottom .25s ease;
+
+                        li {
+                            display: flex;
+                            align-items: center;
+                            height: 40px;
+                            padding-left: 0;
+
+                            &::after {
+                                display: none;
+                            }
+
+                            .mobileNav-sublink {
+                                font-size: 16px;
+                                font-weight: 400;
+                                color: rgba($color-black, .65);
+                            }
+                        }
+                    }
+
+                    &.submenu-open {
+                        .mobile-submenu-chevron {
+                            transform: rotate(225deg);
+                        }
+
+                        .mobile-submenu {
+                            max-height: 400px;
+                            padding-top: 8px;
+                            padding-bottom: 12px;
+                        }
                     }
                 }
             }
@@ -99,20 +202,20 @@
 
         .section-menu-share {
             width: 100%;
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            flex: 0 0 auto;
+            position: relative;
             margin: 0;
-            padding: 0;
+            padding: 0 40px max(18px, env(safe-area-inset-bottom, 0px));
             display: flex;
             flex-direction: row;
             justify-content: center;
             align-items: center;
+            box-sizing: border-box;
+            z-index: 99;
             &::before, &::after{
                 content: '';
                 display: block;
-                width: 40px;
+                width: 0;
                 height: 1px;
             }
             
@@ -127,7 +230,8 @@
                 align-items: center;
                 justify-content: center;
                 gap: 28px;
-                padding: 35px 0;
+                width: 100%;
+                padding: 24px 0 0;
                 border-top: 1px solid rgba($color-black, .1);
             }
         }
@@ -135,7 +239,7 @@
         .section-right-top {
             position: absolute;
             right: 12px;
-            top: 4px;
+            top: calc(env(safe-area-inset-top, 0px) + 8px);
             z-index: 99;
         }
     }

@@ -20,32 +20,12 @@ body {
         font-weight: 400;
         line-height: 20px;
 
-        [name]::before{
-            font-family: Noto Sans TC;
-            color: rgba($color-white, .5);
-        }
         [name="tel"]{
             font-family: Roboto;
             color: $color-white;
             text-decoration: none;
-            &::before{
-                content: '聯絡電話';
-            }
-        }
-        [name="mail"]{
-            &::before{
-                content: '聯絡信箱';
-            }
-        }
-        [name="address"]{
-            &::before{
-                content: '地址';
-            }
         }
         [name="datetime"]{
-            &::before{
-                content: '服務時間';
-            }
             span {
                 &:nth-child(2), &:nth-child(3) {
                     font-family: Roboto;
@@ -131,7 +111,9 @@ body {
                 font-size: 12px;
             }
             .item-info {
-            color: rgba($color-black, 0.7);
+                font-size: 14px;
+                line-height: 22px;
+                color: rgba($color-black, 0.55);
             }
         }
     }
@@ -462,7 +444,7 @@ body {
 
     .comp-shadow {
         font-family: Noto Serif Display;
-        color: rgba($color-black, .05);
+        color: rgba($color-black, .10);
         font-size: 54px;
         font-weight: 700;
         line-height: 36px;
@@ -670,11 +652,11 @@ body {
     li {
         font-size: 12px;
         line-height: 20px;
-    
+
         &::after {
           content: "/";
         }
-    
+
         a {
           text-decoration: none;
           color: rgba($color-black, .7);
@@ -686,6 +668,25 @@ body {
           color: rgba($color-white, .7);
         }
     }
+}
+
+// 連結 hover 左滑底線動畫 — 排除按鈕、頁面導覽連結、麵包屑等已有視覺樣式者
+a:not(.btn):not(.item-page-link):not(.card-page-link):not(.mobileNav-link) {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size .25s ease;
+
+    &:hover,
+    &:focus-visible {
+        background-size: 100% 1px;
+    }
+}
+
+// 麵包屑不要 hover 底線(已有 / 分隔符)
+.page-navs a {
+    background-image: none;
 }
 
 .tags-list {

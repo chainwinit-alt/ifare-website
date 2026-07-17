@@ -4,64 +4,72 @@
       <section class="section-top">
         <h1 class="info-title">{{ _welfareItem.title }}</h1>
         <div class="date-group">
-          <label class="date-release">{{ _welfareItem.releaseTime }}</label>
-          <label class="date-update">{{ _welfareItem.updateTime }}</label>
+          <label class="date-release">{{ formatDisplayDate(_welfareItem.releaseTime) }}</label>
+          <label class="date-update">{{ formatDisplayDate(_welfareItem.updateTime) }}</label>
           <label class="article-num">{{ _welfareItem.id }}</label>
         </div>
       </section>
       <section class="section-body">
         <div class="card-info">
-          <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine">
-            <i class="ic-share"></i>
-          </button>
           <div class="part-info-list">
             <div class="part part-qualify">
               <div class="title-component">
                 <i class="ic-title-pattern"></i>
-                <h3 class="comp-title">申請資格</h3>
+                <h2 class="comp-title">申請資格</h2>
               </div>
-              <div class="info-content info-content--plain" v-html="renderPlainText(_welfareItem.qualification)"></div>
+              <div class="info-content info-content--plain" v-html="useSanitize(renderPlainText(_welfareItem.qualification))"></div>
             </div>
             <div class="part part-welfare">
               <div class="title-component">
                 <i class="ic-title-pattern"></i>
-                <h3 class="comp-title">福利內容</h3>
+                <h2 class="comp-title">福利內容</h2>
               </div>
               <div
                 class="raw-html info-content"
-                v-html="_welfareItem.welfareInfo"
+                v-html="useSanitize(_welfareItem.welfareInfo)"
               ></div>
             </div>
             <div class="part part-evidence">
               <div class="title-component">
                 <i class="ic-title-pattern"></i>
-                <h3 class="comp-title">應備證件資料</h3>
+                <h2 class="comp-title">應備證件資料</h2>
               </div>
-              <div class="info-content info-content--plain" v-html="renderPlainText(_welfareItem.evidence)"></div>
+              <div class="info-content info-content--plain" v-html="useSanitize(renderPlainText(_welfareItem.evidence))"></div>
             </div>
             <div class="part part-remark" v-if="_welfareItem.remark">
               <div class="title-component">
                 <i class="ic-title-pattern"></i>
-                <h3 class="comp-title">備註</h3>
+                <h2 class="comp-title">備註</h2>
               </div>
-              <div class="info-content info-content--plain" v-html="renderPlainText(_welfareItem.remark)"></div>
+              <div class="info-content info-content--plain" v-html="useSanitize(renderPlainText(_welfareItem.remark))"></div>
             </div>
             <div class="part part-office">
               <div class="bg-office"></div>
               <div class="title-component">
                 <i class="ic-title-pattern"></i>
-                <h3 class="comp-title">洽辦單位</h3>
+                <h2 class="comp-title">洽辦單位</h2>
               </div>
-              <div class="info-content" :class="{'cursor-pointer': _welfareItem.officeUnitID != 1}" @click="JumpTo(_welfareItem.officeUnitID)">
-                <label :class="{'cursor-pointer': _welfareItem.officeUnitID != 1, 'info-label-tel': _welfareItem.welfareTel}">
+              <div class="info-content">
+                <span class="info-label" :class="{ 'info-label-tel': _welfareItem.welfareTel }">
                   {{ displayOfficeUnitInfo }}
                   <a :href="'tel:'+_welfareItem.welfareTel" class="info-tel" v-if="_welfareItem.welfareTel">{{ _welfareItem.welfareTelStr }}</a>
-                </label>
-                <a :href="'tel:'+_welfareItem.welfareTel" class="btn-icon btn-go" v-if="_welfareItem.welfareTel">
-                  <i class="ic-phone"></i>
+                </span>
+                <a
+                  :href="'tel:'+_welfareItem.welfareTel"
+                  class="btn-icon btn-go"
+                  v-if="_welfareItem.welfareTel"
+                  :aria-label="`撥打電話 ${_welfareItem.welfareTelStr}`"
+                >
+                  <i class="ic-phone" aria-hidden="true"></i>
                 </a>
-                <button class="btn-icon btn-go" v-if="_welfareItem.officeUnitID != 1">
-                  <i class="ic-arrow-right-orange"></i>
+                <button
+                  class="btn-icon btn-go"
+                  type="button"
+                  v-if="_welfareItem.officeUnitID != 1"
+                  @click="JumpTo(_welfareItem.officeUnitID)"
+                  aria-label="查看洽辦單位詳情"
+                >
+                  <i class="ic-arrow-right-orange" aria-hidden="true"></i>
                 </button>
               </div>
             </div>
@@ -70,16 +78,16 @@
       </section>
       <section class="section-relation">
         <div class="relation-links">
-          <h5 class="relation-title">相關福利</h5>
+          <h2 class="relation-title">相關福利</h2>
           <ul class="list-unstyled relation-list">
-            <li class="relation-item transition-general" v-for="_welfare in iFarePolicyList">
+            <li class="relation-item transition-general" v-for="_welfare in iFarePolicyList" :key="_welfare.id">
               <NuxtLink
                   :to="{
                     path: '/ifare/info',
-                    query: { id: _welfare.id, reload: '' },
+                    query: { id: _welfare.id, reload: _welfare.id },
                   }"
                 >
-                <h6 class="link-title">{{ _welfare.title }}</h6>
+                <h3 class="link-title">{{ _welfare.title }}</h3>
                 <div class="relation-item-bottom">
                   <ul class="list-unstyled filter-list">
                     <li name="area">{{ _welfare.area }}</li>
@@ -89,13 +97,10 @@
                       <span :class="{remark: _welfare.hasIndentity}">{{ _welfare.hasIndentity ? '有' : '無' }}</span>特殊身分
                     </li>
                   </ul>
-                  <NuxtLink
-                    :to="{
-                      path: '/ifare/info',
-                      query: { id: _welfare.id, reload: '' },
-                    }"
+                  <span
                     class="ic-arrow-right link-url transition-general"
-                  ></NuxtLink>
+                    aria-hidden="true"
+                  ></span>
                 </div>
               </NuxtLink>
             </li>
@@ -112,7 +117,13 @@ definePageMeta({
   toLinkName: "i-Fare",
   toLink: "/ifare",
 });
+
+// 福利政策資格預覽截斷長度（字元數）
+const QUALIFICATION_PREVIEW_LENGTH = 50;
+
 const { $WebApiGet } = useNuxtApp();
+const { getApiResultValue } = useApiResult();
+const { formatDisplayDate } = useDateFormatter();
 const route = useRoute();
 const $router = useRouter();
 
@@ -124,6 +135,7 @@ function JumpTo(id: any) {
 interface infoItem {
   id: number;
   title: string;
+  area: string;
   qualification: string;
   evidence: string;
   remark: string;
@@ -131,14 +143,21 @@ interface infoItem {
   welfareTel: string;
   welfareTelStr: string;
   releaseTime: string;
+  discontinuedTime: string;
   updateTime: string;
   officeUnitInfo: string;
   officeUnitID: number;
+  codeDomicileID: number;
+  codePolicyID: number;
+  codeIdentityIDs: number[];
+  codeIncomeIDs: number[];
+  codeRecipientIDs: number[];
 }
 
 const _welfareItem = reactive<infoItem>({
   id: 0,
   title: "",
+  area: "",
   qualification: "",
   evidence: "",
   remark: "",
@@ -146,9 +165,15 @@ const _welfareItem = reactive<infoItem>({
   welfareTel: "",
   welfareTelStr: "",
   releaseTime: "",
+  discontinuedTime: "",
   updateTime: "",
   officeUnitInfo: "",
   officeUnitID: 0,
+  codeDomicileID: 0,
+  codePolicyID: 0,
+  codeIdentityIDs: [],
+  codeIncomeIDs: [],
+  codeRecipientIDs: [],
 });
 
 // Office Unit
@@ -167,7 +192,7 @@ const displayOfficeUnitInfo = computed(
 
 async function loadOfficeList() {
   const res: any = await $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
-  const _data = res?.result?.result;
+  const _data = getApiResultValue<any>(res);
   if (!Array.isArray(_data)) return;
 
   officeList.splice(
@@ -183,6 +208,7 @@ async function loadOfficeList() {
 function resetWelfareItem() {
   _welfareItem.id = 0;
   _welfareItem.title = "";
+  _welfareItem.area = "";
   _welfareItem.qualification = "";
   _welfareItem.evidence = "";
   _welfareItem.remark = "";
@@ -190,9 +216,15 @@ function resetWelfareItem() {
   _welfareItem.welfareTel = "";
   _welfareItem.welfareTelStr = "";
   _welfareItem.releaseTime = "";
+  _welfareItem.discontinuedTime = "";
   _welfareItem.updateTime = "";
   _welfareItem.officeUnitInfo = "";
   _welfareItem.officeUnitID = 0;
+  _welfareItem.codeDomicileID = 0;
+  _welfareItem.codePolicyID = 0;
+  _welfareItem.codeIdentityIDs = [];
+  _welfareItem.codeIncomeIDs = [];
+  _welfareItem.codeRecipientIDs = [];
 }
 
 function decodeWelfareHtml(value: string) {
@@ -219,17 +251,21 @@ function renderPlainText(value: string) {
     .replace(/\u00a0/g, " ")
     .replace(/\r\n?/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
+    .replace(/費用用/g, "費用")
     .trim();
 
   for (let i = 0; i < 8; i += 1) {
     const next = text
-      .replace(/\n([（(]?[一二三四五六七八九十\d]+[）)])\n/g, "\n$1 ")
-      .replace(/：\n(及(?:應備文件|額度))/g, "$1")
-      .replace(/([^\n]{1,240}[為以])\n([0-9,]+元)\n([。；，、])/g, "$1$2$3")
-      .replace(/([^\n]{1,240}(?:每案|每人|每月|每日))\n((?:全年|最高)[^\n]{1,120})/g, "$1$2")
-      .replace(/\n([0-9,]+元)\n([。；，、])/g, "\n$1$2")
-      .replace(/\n((?:每人|每案|全年|每日|每月|最高)[^\n]{1,80})\n(為限。?)/g, "\n$1$2")
-      .replace(/([^\n]{1,240})\n([，、][^\n]{1,120})/g, "$1$2");
+      .replace(/\n+([（(]?[一二三四五六七八九十\d]+[）)])\n+/g, "\n$1 ")
+      .replace(/：\n+(及(?:應備文件|額度))/g, "$1")
+      .replace(/([^\n]{1,240}[為以])\n+([0-9,]+元)\n+([。；，、])/g, "$1$2$3")
+      .replace(/([^\n]{1,240}(?:每案|每人|每月|每日))\n+((?:全年|最高)[^\n]{1,120})/g, "$1$2")
+      .replace(/([^\n]{1,240}[，、])\n+((?:每人|每案|全年|每日|每月|最高)[^\n]{1,120})/g, "$1$2")
+      .replace(/([^\n]{1,240}(?:[0-9,]+元|最高補助[^\n]{0,80}|最高以[^\n]{0,80}|補助金額[^\n]{0,80}|實支實付[^\n]{0,80}))\n+(為限。?|為準。?|為原則。?)/g, "$1$2")
+      .replace(/\n+([0-9,]+元)\n+([。；，、])/g, "\n$1$2")
+      .replace(/\n+((?:每人|每案|全年|每日|每月|最高)[^\n]{1,80})\n+(為限。?)/g, "\n$1$2")
+      .replace(/([^\n]{1,240})\n+([，、][^\n]{1,120})/g, "$1$2")
+      .replace(/([^\n。；：！？…]{4,240})\n+((?:補助|依|以|並|且|申請|檢據|核實|實支實付|實報實銷|得|應|可)[^\n]{1,160})/g, "$1$2");
 
     if (next === text) break;
     text = next;
@@ -255,8 +291,10 @@ function normalizeWelfareHtml(value: string) {
     [/<p>([^<]{1,240}[為以])<\/p>\s*<p>([0-9,]+元)<\/p>\s*<p>([。；，、])<\/p>/g, "<p>$1$2$3</p>"],
     [/<p>([^<]{1,240}(?:[0-9,]+元|最高補助[^<]{0,80}|最高以[^<]{0,80}|補助金額[^<]{0,80}|實支實付[^<]{0,80}))<\/p>\s*<p>(為限。?|為準。?|為原則。?)<\/p>/g, "<p>$1$2</p>"],
     [/<p>([^<]{1,240}(?:每案|每人|每月|每日))<\/p>\s*<p>((?:全年|最高)[^<]{1,120})<\/p>/g, "<p>$1$2</p>"],
+    [/<p>([^<]{1,240}[，、])<\/p>\s*<p>((?:每人|每案|全年|每日|每月|最高)[^<]{1,120})<\/p>/g, "<p>$1$2</p>"],
     [/<p>([^<]{1,240}[，、])<\/p>\s*<p>(每人[^<]{1,80}|每案[^<]{1,80}|全年[^<]{1,80}|每日[^<]{1,80}|每月[^<]{1,80})<\/p>\s*<p>(為限。?)<\/p>/g, "<p>$1$2$3</p>"],
     [/<p>([^<]{1,240})<\/p>\s*<p>([，、][^<]{1,120})<\/p>/g, "<p>$1$2</p>"],
+    [/<p>([^<。；：！？…]{4,240})<\/p>\s*<p>((?:補助|依|以|並|且|申請|檢據|核實|實支實付|實報實銷|得|應|可)[^<]{1,160})<\/p>/g, "<p>$1$2</p>"],
     [/<p>([^<]{1,240})<\/p>\s*<p>(及應備文件|及額度)<\/p>/g, "<p>$1$2</p>"],
     [/<\/p>\s*<p>([。；，、：])<\/p>/g, "$1</p>"],
     [/<p>([^<]{1,240}(?:附件下載|相關附件))：?<\/p>\s*((?:<li>.*?<\/li>\s*){1,50})(?=<p>|$)/gs, "<p>$1：</p><ul>$2</ul>"],
@@ -297,11 +335,12 @@ async function loadPolicyDetail(infoID: number) {
   const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyDetail", {
     farePolicyID: infoID,
   });
-  const _data = res?.result?.result;
+  const _data = getApiResultValue<any>(res);
   if (!_data || requestToken !== detailRequestToken) return;
 
   _welfareItem.id = _data.id;
   _welfareItem.title = _data.title;
+  _welfareItem.area = _data.codeDomicile_LabelName ?? "";
   _welfareItem.qualification = _data.qualification;
   _welfareItem.evidence = _data.evidence;
   _welfareItem.remark = _data.remark ?? "";
@@ -313,9 +352,37 @@ async function loadPolicyDetail(infoID: number) {
     : "";
   _welfareItem.welfareTelStr = _data.officeUnitTel ?? "";
   _welfareItem.releaseTime = _data.releaseTime;
+  _welfareItem.discontinuedTime = _data.discontinuedTime;
   _welfareItem.updateTime = _data.updateTime;
   _welfareItem.officeUnitInfo = _data.officeUnitInfo ?? "";
   _welfareItem.officeUnitID = _data.iFareOfficeUnitID ?? 0;
+  _welfareItem.codeDomicileID = _data.codeDomicile_ID ?? 0;
+  _welfareItem.codePolicyID = _data.codePolicy_ID ?? 0;
+  _welfareItem.codeIdentityIDs = Array.isArray(_data.codeIdentityList) ? _data.codeIdentityList.map((p: any) => Number(p.id)) : [];
+  _welfareItem.codeIncomeIDs = Array.isArray(_data.codeIncomeList) ? _data.codeIncomeList.map((p: any) => Number(p.id)) : [];
+  _welfareItem.codeRecipientIDs = Array.isArray(_data.codeRecipientList) ? _data.codeRecipientList.map((p: any) => Number(p.id)) : [];
+}
+
+function getPolicyId(item: any) {
+  const id = Number(
+    item?.id ??
+      item?.farePolicyID ??
+      item?.farePolicyId ??
+      item?.farePolicy_ID ??
+      item?.iFarePolicyID ??
+      item?.iFarePolicyId ??
+      0
+  );
+
+  return Number.isFinite(id) && id > 0 ? id : 0;
+}
+
+function getCodeList(value: any) {
+  return Array.isArray(value) ? value : [];
+}
+
+function hasSpecificCode(value: any) {
+  return getCodeList(value).findIndex((p: any) => Number(p?.id) === 1) < 0;
 }
 
 interface iFarePolicyItem {
@@ -326,6 +393,11 @@ interface iFarePolicyItem {
   hasIndentity: boolean;
   hasIncome: boolean;
   hasRecipient: boolean;
+  codeDomicileID: number;
+  codePolicyID: number;
+  codeIdentityIDs: number[];
+  codeIncomeIDs: number[];
+  codeRecipientIDs: number[];
 }
 
 const iFarePolicyList = reactive<Array<iFarePolicyItem>>([]);
@@ -339,39 +411,62 @@ async function loadRelationList(infoID: number) {
   const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyRelation", {
     farePolicyID: infoID,
   });
-  const _data = res?.result?.result;
+  const _data = getApiResultValue<any>(res);
   if (!Array.isArray(_data) || requestToken !== relationRequestToken) return;
 
-  iFarePolicyList.push(
-    ..._data.map((item: any) => ({
-      id: item.id,
+  const nextItems = _data
+    .map((item: any) => ({
+      id: getPolicyId(item),
       title: item.title,
-      qualification: `${(item.qualification ?? "").slice(0, 50)}...`,
-      area: item.codeDomicile_LabelName,
-      hasIndentity: item.codeIdentityList.findIndex((p: any) => p.id == 1) < 0,
-      hasIncome: item.codeIncomeList.findIndex((p: any) => p.id == 1) < 0,
-      hasRecipient: item.codeRecipientList.findIndex((p: any) => p.id == 1) < 0,
+      qualification: `${(item.qualification ?? "").slice(0, QUALIFICATION_PREVIEW_LENGTH)}...`,
+      area: item.codeDomicile_LabelName ?? "",
+      hasIndentity: hasSpecificCode(item.codeIdentityList),
+      hasIncome: hasSpecificCode(item.codeIncomeList),
+      hasRecipient: hasSpecificCode(item.codeRecipientList),
+      codeDomicileID: item.codeDomicile_ID ?? 0,
+      codePolicyID: item.codePolicy_ID ?? 0,
+      codeIdentityIDs: getCodeList(item.codeIdentityList).map((p: any) => Number(p.id)),
+      codeIncomeIDs: getCodeList(item.codeIncomeList).map((p: any) => Number(p.id)),
+      codeRecipientIDs: getCodeList(item.codeRecipientList).map((p: any) => Number(p.id)),
     }))
-  );
+    .filter((item: iFarePolicyItem) => item.id > 0 && item.title);
+
+  iFarePolicyList.push(...nextItems);
 }
 
 loadOfficeList();
 
 watch(
-  () => Number(route.query.id || 0),
-  async (infoID) => {
+  () => [Number(route.query.id || 0), String(route.query.reload ?? "")] as const,
+  async ([infoID]) => {
     await Promise.all([loadPolicyDetail(infoID), loadRelationList(infoID)]);
   },
   { immediate: true }
 );
 
-const _url = useRequestURL();
-async function ShareWebUrlToLine() {
-  const SHARETOLINE = "https://social-plugins.line.me/lineit/share";
-  const urlShare = `${SHARETOLINE}?url=${encodeURIComponent(_url.href)}`;
-
-  await navigateTo(urlShare, {
-    external: true,
-  });
-}
 </script>
+
+<style scoped>
+.info-content--plain {
+  line-height: 2;
+}
+
+.raw-html:deep(p) {
+  margin: 0 0 12px;
+  line-height: 2;
+}
+
+.raw-html:deep(ul) {
+  margin: 0 0 12px;
+  padding-left: 1.25rem;
+}
+
+.raw-html:deep(li) {
+  margin-bottom: 6px;
+}
+
+.raw-html:deep(a) {
+  word-break: break-word;
+}
+
+</style>

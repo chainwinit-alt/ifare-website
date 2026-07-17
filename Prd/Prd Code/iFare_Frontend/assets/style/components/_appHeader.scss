@@ -4,6 +4,16 @@
     left: 0;
     width: 100%;
     z-index: 999;
+    // #47: iPhone 瀏海 / 動態島安全區域 — viewport 上方留出 notch 高度
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+}
+
+// 行動選單也要避開瀏海
+.mobile-menu {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .app-header {
@@ -75,6 +85,12 @@
                         li:after {
                             background-color: $color-white;
                         }
+
+                        // 深色 nav mode — dropdown 用深色半透明 + blur
+                        li.has-dropdown .nav-dropdown {
+                            background-color: rgba($color-black, .65);
+                            backdrop-filter: blur(8px);
+                        }
                     }
 
                     &[name="other"]{
@@ -106,6 +122,12 @@
                                     height: 4px;
                                 }
                             }
+                        }
+
+                        // 白底 nav mode — dropdown 跟 header 同色 + blur
+                        li.has-dropdown .nav-dropdown {
+                            background-color: rgba($color-header, .94);
+                            backdrop-filter: blur(4px);
                         }
                     }
                 }
@@ -140,6 +162,74 @@
                     a {
                         font-weight: 400;
                         text-decoration: none;
+                    }
+
+                    // 福利專欄 hover dropdown — 走「nav 往下延伸」風格：
+                    // 無框無陰影、緊貼 nav、文字色繼承 nav，背景由 ul[name] mode 個別給
+                    &.has-dropdown {
+                        .nav-dropdown {
+                            // 防止繼承 .part-nav ul 的 flex-direction: row / gap：40px → 子項要直列
+                            display: block;
+                            flex-direction: column;
+                            gap: 0;
+                            position: absolute;
+                            top: 100%;
+                            left: 50%;
+                            transform: translateX(-50%) translateY(-2px);
+                            min-width: 220px;
+                            max-width: 340px;
+                            margin: 0;
+                            padding: 6px 0 12px;
+                            list-style: none;
+                            opacity: 0;
+                            visibility: hidden;
+                            pointer-events: none;
+                            @include transitionGeneral(.16s);
+                            z-index: 10;
+
+                            li {
+                                display: block;
+                                width: 100%;
+                                line-height: 1.5;
+                                height: auto;
+                                padding: 0;
+
+                                &::after {
+                                    display: none;
+                                }
+
+                                &:hover::after {
+                                    height: 0;
+                                }
+
+                                a {
+                                    display: block;
+                                    padding: 6px 22px;
+                                    color: inherit;
+                                    font-size: 14px;
+                                    font-weight: 400;
+                                    line-height: 1.6;
+                                    white-space: normal;
+                                    word-break: break-word;
+                                    opacity: .78;
+                                    @include transitionGeneral(.12s);
+
+                                    &:hover,
+                                    &:focus-visible {
+                                        color: $color-orange;
+                                        opacity: 1;
+                                        font-weight: 600;
+                                    }
+                                }
+                            }
+                        }
+
+                        &.dropdown-open .nav-dropdown {
+                            opacity: 1;
+                            visibility: visible;
+                            pointer-events: auto;
+                            transform: translateX(-50%) translateY(0);
+                        }
                     }
                 }
             }
