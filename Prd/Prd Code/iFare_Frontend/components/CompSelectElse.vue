@@ -1,5 +1,17 @@
 <template>
-    <div class="component-select else-mode no-userselect" :class="{ active: isShow}" @click="ToggleSelectDialog">
+    <div
+      class="component-select else-mode no-userselect"
+      :class="{ active: isShow}"
+      tabindex="0"
+      role="combobox"
+      :aria-expanded="isShow"
+      aria-haspopup="dialog"
+      :aria-label="props.selectTitle || props.placeholder"
+      @click="ToggleSelectDialog"
+      @keydown.enter.prevent="ToggleSelectDialog"
+      @keydown.space.prevent="ToggleSelectDialog"
+      @keydown.esc.prevent="CloseDialog"
+    >
       <div class="comp-group">
         <button
               class="btn btn-advance"
@@ -53,7 +65,7 @@
       </div>
     </div>
   </template>
-  
+
   <script setup lang="ts">
   import { computed } from "vue";
 
@@ -73,14 +85,19 @@
     isShow.value = !isShow.value;
     emits("isOpened", props.selectType, isShow.value)
   }
-  
+
+  function CloseDialog() {
+    if (isShow.value) {
+      isShow.value = false;
+      emits("isOpened", props.selectType, false);
+    }
+  }
+
   function PreventClick(e:any) {
     return false;
   }
-  
+
   function ClickSelectItem(name: string, val: string, type: string) {
-    console.log(`name: ${name} || val: ${val} || type: ${type}`)
-   
     let _data = {
         type: type,
         name: name,
@@ -118,18 +135,16 @@
           removeIndex.splice(0, 0, i)
         }
       })
-      console.log(JSON.parse(JSON.stringify(removeIndex)))
       removeIndex.forEach((_index:number, j:number) => {
         selectItems.splice(_index, 1)
       })
     }
 
-    emits("update:selectItems", props.selectType, selectItems);
+    emits("update:select-items", props.selectType, selectItems);
     // ToggleSelectDialog()
   }
 
   function Search() {
-    console.log(selectItems)
     ToggleSelectDialog()
   }
   
@@ -141,15 +156,14 @@
     "selectType",
     "selectTitle"
   ]);
-  const emits = defineEmits(["update:selectItems", "isOpened"]);
+  const emits = defineEmits(["update:select-items", "isOpened"]);
   
   const modelValue = computed({
     get() {
       return props.selectItems;
     },
-    set() {
-      emits("update:selectItems", selectItems);
+  set() {
+      emits("update:select-items", selectItems);
     },
   });
   </script>
-  

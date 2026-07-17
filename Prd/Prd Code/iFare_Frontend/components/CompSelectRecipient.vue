@@ -128,32 +128,36 @@
   ]);
   const emits = defineEmits(["update:selectValue", "isOpened"]);
 
-  watch(props.selectList, (newList, oldList) => {
-    if (!newList || !Array.isArray(newList)) return;  // 防呆: null/undefined/非陣列
+  watch(
+    () => props.selectList,
+    (newList) => {
+      if (!newList || !Array.isArray(newList)) return;  // 防呆: null/undefined/非陣列
 
-    if (props.selectDefault) {
-      const _defaultItem = newList.find((p:any) => p.val == props.selectDefault)
-      if (_defaultItem) {
-        selectName.value = _defaultItem.name
-        selectVal.value = _defaultItem.val
-      } else {
+      if (props.selectDefault) {
+        const _defaultItem = newList.find((p:any) => p.val == props.selectDefault)
+        if (_defaultItem) {
+          selectName.value = _defaultItem.name
+          selectVal.value = _defaultItem.val
+        } else {
+          selectName.value = ""
+          selectVal.value = ""
+        }
+      }
+
+      if (props.selectDefault == "") {
         selectName.value = ""
         selectVal.value = ""
       }
-    }
-
-    if (props.selectDefault == "") {
-      selectName.value = ""
-      selectVal.value = ""
-    }
-  })
+    },
+    { deep: true, immediate: true }
+  )
   
   const modelValue = computed({
     get() {
       return props.selectValue;
     },
-    set() {
-      emits("update:selectValue", selectVal);
+  set() {
+      emits("update:selectValue", selectVal.value);
     },
   });
   </script>

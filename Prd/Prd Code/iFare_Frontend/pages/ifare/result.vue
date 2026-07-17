@@ -40,9 +40,33 @@
                 @update:select-value="getSelectValue"
               />
             </div>
-            <div class="filter-group">
+            <div class="filter-group filter-group-query">
               <label class="filter-title">關鍵字</label>
-              <input v-model="searchQuery" class="input-query" type="text" placeholder="請輸入關鍵字" />
+              <div class="query-action-row">
+                <IfareSearchAutocomplete
+                  v-model="searchQuery"
+                  :filters="autocompleteFilters"
+                  placeholder="請輸入關鍵字"
+                  @submit="Search"
+                />
+                <div class="part-filter">
+                  <button
+                    class="btn btn-advance"
+                    :class="{ active: isOpts }"
+                    @click="isOpts = !isOpts"
+                  >
+                    <i
+                      :class="{ 'ic-options': !isOpts, 'ic-arrow-simple-up': isOpts }"
+                    ></i>
+                    <span>篩選</span>
+                  </button>
+                  <button class="btn btn-filter" @click="Search" :disabled="!canSearch || isLoading">
+                    <span v-if="isLoading" class="btn-loading-spinner" aria-hidden="true"></span>
+                    <span>{{ isLoading ? '搜尋中' : '搜尋' }}</span>
+                    <i v-if="!isLoading" class="icon ic-search"></i>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
           <div class="part-bottom" v-show="isOpts">
@@ -73,22 +97,6 @@
               </div>
             </div>
           </div>
-          <div class="part-filter">
-            <button
-              class="btn btn-advance"
-              :class="{ active: isOpts }"
-              @click="isOpts = !isOpts"
-            >
-              <i
-                :class="{ 'ic-options': !isOpts, 'ic-arrow-simple-up': isOpts }"
-              ></i>
-              <span>篩選</span>
-            </button>
-            <button class="btn btn-filter" @click="Search" :disabled="!canSearch || isLoading">
-              <span>搜尋</span>
-              <i class="icon ic-search"></i>
-            </button>
-          </div>
           <div class="part-reset">
             <button class="btn btn-reset" @click="ResetParam">清空</button>
           </div>
@@ -105,7 +113,7 @@
                 @is-opened="isSelectOpen"
                 @update:select-value="getSelectValue"
               />
-            <CompSelectRecipient 
+            <CompSelectRecipient
                 placeholder="受助者年齡區間"
                 select-title="受助者年齡區間"
                 select-type="recipient"
@@ -126,13 +134,12 @@
             </div>
             <div class="part-mobile-query">
               <label class="sr-only" for="ifare-result-mobile-query">關鍵字</label>
-              <input
-                id="ifare-result-mobile-query"
+              <IfareSearchAutocomplete
                 v-model="searchQuery"
-                class="input-query"
-                type="text"
+                :filters="autocompleteFilters"
                 placeholder="請輸入關鍵字"
-                @keydown.enter.prevent="Search"
+                :show-count="false"
+                @submit="Search"
               />
             </div>
             <div class="part-end">
@@ -145,8 +152,9 @@
                 @update:select-items="getSelectItems"
                 />
               <button class="btn-filter" @click="Search" :disabled="!canSearch || isLoading">
-                <span></span>
-                <i class="icon ic-search"></i>
+                <span v-if="isLoading" class="btn-loading-spinner" aria-hidden="true"></span>
+                <span v-if="isLoading">搜尋中</span>
+                <i v-if="!isLoading" class="icon ic-search"></i>
               </button>
             </div>
           </div>
@@ -155,9 +163,24 @@
           <button class="btn btn-reset" @click="ResetParam">清空</button>
         </div>
       </section>
+      <!-- AI 快速摘要暫時註解，後續需要恢復時可重新打開 IfareSummaryCard 掛載。 -->
+      <!--
+      <section class="section-summary">
+        <IfareSummaryCard
+          :query="summaryQuery"
+          :cases="storageiFarePolicyList"
+          :results-loading="isLoading"
+          :search-context="summarySearchContext"
+          :summary-trigger-key="summaryTriggerKey"
+          :summary-reset-key="summaryResetKey"
+          :summary-cache-key="summaryCacheKey"
+          @summary-complete="handleSummaryComplete"
+        />
+      </section>
+      -->
       <section class="section-result">
         <div class="part-list">
-          <span class="result-total">{{ storageiFarePolicyList.length }}</span>
+          <span v-if="!isLoading" class="result-total">{{ storageiFarePolicyList.length }}</span>
           <div class="result-loading" v-if="isLoading">政策資料搜尋中...</div>
           <ul class="list-unstyled result-list" v-else>
             <li
@@ -165,7 +188,7 @@
               v-for="_item in iFarePolicyList"
               :key="_item.id"
             >
-              <NuxtLink :to="{ path: '/ifare/info', query: { id: _item.id } }">
+              <NuxtLink :to="{ path: '/ifare/info', query: { id: _item.id, reload: _item.id } }">
                 <h4 class="result-title">{{ _item.title }}</h4>
                 <div class="result-item-bottom">
                   <div class="result-filter">
@@ -206,10 +229,12 @@ definePageMeta({
   toLink: "/ifare",
 });
 const { $WebApiGet } = useNuxtApp();
-import CompSelect from "../components/CompSelect.vue";
-import CompSelectRecipient from "../components/CompSelectRecipient.vue";
+import CompSelect from "~/components/CompSelect.vue";
+import CompSelectRecipient from "~/components/CompSelectRecipient.vue";
 import CompSelectElse from "~/components/CompSelectElse.vue";
-import CompPage from "../components/CompPage.vue"
+import CompPage from "~/components/CompPage.vue"
+// import IfareSummaryCard from "~/components/IfareSummaryCard.vue"; // AI 快速摘要暫時註解
+import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
 
 const isOpts = ref(false);
 
@@ -245,6 +270,17 @@ const codeSelectIncome = ref("");
 const identitySelectList = reactive<Array<selectItem>>([]);
 const codeSelectIdentity: any = ref([]);
 const isLoading = ref(false);
+const summaryTriggerKey = ref(0);
+const summaryResetKey = ref(0);
+const latestSummaryText = ref("");
+const activeSummaryState = reactive({
+  policy: ALL_POLICY_VALUE,
+  recipient: "",
+  area: ALL_AREA_VALUE,
+  income: "",
+  identities: [] as Array<string | number>,
+  query: "",
+});
 const canSearch = computed(() => {
   return Boolean(
     codeSelect_policy.value ||
@@ -285,6 +321,99 @@ function buildFarePolicyApiQuery() {
   if (codeSelectIdentity.value.length > 0) query.CodeIdentities = codeSelectIdentity.value;
   return query;
 }
+const autocompleteFilters = computed(() => ({
+  CodePolicy: codeSelect_policy.value && !isAllPolicyValue(codeSelect_policy.value) ? codeSelect_policy.value : undefined,
+  CodeRecipient: codeSelectRecipient.value || undefined,
+  CodeDomicile: codeSelect_area.value && !isAllAreaValue(codeSelect_area.value) ? codeSelect_area.value : undefined,
+  CodeIncome: codeSelectIncome.value || undefined,
+  CodeIdentities: codeSelectIdentity.value.length > 0 ? [...codeSelectIdentity.value] : undefined,
+}));
+
+function getSelectedLabel(list: Array<selectItem>, value: any, fallback = "") {
+  if (value === undefined || value === null || value === "") return fallback;
+  const item = list.find((entry) => String(entry.val) == String(value) || entry.name == value);
+  return item?.name || String(value || fallback);
+}
+
+const activePolicyLabel = computed(() =>
+  isAllPolicyValue(activeSummaryState.policy)
+    ? ALL_POLICY_VALUE
+    : getSelectedLabel(policySelectList, activeSummaryState.policy, ALL_POLICY_VALUE)
+);
+
+const activeRecipientLabel = computed(() =>
+  activeSummaryState.recipient
+    ? getSelectedLabel(recipientSelectList, activeSummaryState.recipient, "")
+    : ""
+);
+
+const activeAreaLabel = computed(() =>
+  isAllAreaValue(activeSummaryState.area)
+    ? ALL_AREA_VALUE
+    : getSelectedLabel(areaSelectList, activeSummaryState.area, ALL_AREA_VALUE)
+);
+
+const activeIncomeLabel = computed(() =>
+  activeSummaryState.income
+    ? getSelectedLabel(incomeSelectList, activeSummaryState.income, "")
+    : ""
+);
+
+const activeIdentityLabel = computed(() => {
+  const labels = activeSummaryState.identities
+    .map((value) => getSelectedLabel(identitySelectList, value, ""))
+    .filter(Boolean);
+  return labels.join("、");
+});
+
+const summaryQuery = computed(() => {
+  const keyword = activeSummaryState.query.trim();
+  if (keyword) return keyword;
+
+  return [
+    !isAllPolicyValue(activeSummaryState.policy) ? activePolicyLabel.value : "",
+    activeRecipientLabel.value,
+    !isAllAreaValue(activeSummaryState.area) ? activeAreaLabel.value : "",
+    activeIncomeLabel.value,
+    activeIdentityLabel.value,
+  ]
+    .filter(Boolean)
+    .join(" ");
+});
+
+const summarySearchContext = computed(() => ({
+  policy: activePolicyLabel.value,
+  recipient: activeRecipientLabel.value || "未指定",
+  area: activeAreaLabel.value,
+  income: activeIncomeLabel.value || "未指定",
+  identity: activeIdentityLabel.value || "未指定",
+  query: activeSummaryState.query.trim() || "未指定",
+}));
+
+const summaryCacheKey = computed(() =>
+  JSON.stringify({
+    policy: activeSummaryState.policy || ALL_POLICY_VALUE,
+    recipient: activeSummaryState.recipient || "",
+    area: activeSummaryState.area || ALL_AREA_VALUE,
+    income: activeSummaryState.income || "",
+    identities: activeSummaryState.identities,
+    query: activeSummaryState.query.trim(),
+    count: storageiFarePolicyList.length,
+  })
+);
+
+function updateActiveSummaryState() {
+  activeSummaryState.policy = codeSelect_policy.value || ALL_POLICY_VALUE;
+  activeSummaryState.recipient = codeSelectRecipient.value || "";
+  activeSummaryState.area = codeSelect_area.value || ALL_AREA_VALUE;
+  activeSummaryState.income = codeSelectIncome.value || "";
+  activeSummaryState.identities = [...codeSelectIdentity.value];
+  activeSummaryState.query = searchQuery.value.trim();
+}
+
+function handleSummaryComplete(payload: { summary: string }) {
+  latestSummaryText.value = payload.summary;
+}
 
 function getSelectValue(type: string, val: string) {
   if (type == "policy") {
@@ -319,10 +448,10 @@ const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
 codePolicy.then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
-let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
-      val: item.id,
+      val: String(item.id),
     };
   });
   policySelectList.push(..._list);
@@ -333,10 +462,10 @@ const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
 codeArea.then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
-let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
-      val: item.id,
+      val: String(item.id),
     };
   });
   areaSelectList.push(..._list);
@@ -350,7 +479,7 @@ codeRecipient.then((res: any) => {
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName,
-      val: item.id,
+      val: String(item.id),
       isActive: false,
     };
   });
@@ -392,7 +521,7 @@ codeIncome.then((res: any) => {
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName,
-      val: item.id,
+      val: String(item.id),
       isActive: false,
     };
   });
@@ -428,7 +557,7 @@ codeIdentity.then((res: any) => {
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName == '?券' ? '銝?' : item.codeName,
-      val: item.id,
+      val: String(item.id),
       isActive: false,
     };
   });
@@ -503,13 +632,15 @@ const pageNums = reactive<Array<pageNum>>([]);
 SetDataInit(buildFarePolicyApiQuery());
 
 function SetDataInit(_q: any) {
+  updateActiveSummaryState();
+  latestSummaryText.value = "";
+  summaryResetKey.value += 1;
+  storageiFarePolicyList.splice(0);
+  iFarePolicyList.splice(0);
+  pageNums.splice(0);
   isLoading.value = true;
   const listNews = $WebApiGet("/FarePolicy/GetIFarePolicyList", _q);
   listNews.then((res: any) => {
-    storageiFarePolicyList.splice(0);
-    iFarePolicyList.splice(0);
-    pageNums.splice(0);
-
     if (!res?.result?.result) return;
     const _data = res.result.result;
     let _newsList: Array<iFarePolicyItem> = _data.map(
@@ -517,7 +648,7 @@ function SetDataInit(_q: any) {
         return {
           id: item.id,
           title: item.title,
-          qualification: `${item.qualification.slice(0, 50)}...`,
+          qualification: item.qualification ?? "",
           area: item.codeDomicile_LabelName,
           hasIndentity: item.codeIdentityList.findIndex((p:any) => p.id == 1) < 0,
           hasIncome: item.codeIncomeList.findIndex((p:any) => p.id == 1) < 0,
@@ -546,6 +677,7 @@ function SetDataInit(_q: any) {
     }
   }).finally(() => {
     isLoading.value = false;
+    summaryTriggerKey.value += 1;
   });
 }
 

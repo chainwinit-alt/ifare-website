@@ -1,3 +1,4 @@
+// API 錯誤分類 — 給呼叫端 + 全域監聽用
 type ApiErrorCategory = 'timeout' | 'network' | 'client' | 'server' | 'unknown'
 
 interface ApiErrorInfo {
@@ -9,38 +10,24 @@ interface ApiErrorInfo {
     raw?: any
 }
 
-function categorizeError(error: any): ApiErrorCategory {
-    if (error?.name === 'AbortError' || error?.cause?.name === 'AbortError') return 'timeout'
+interface ApiResponseResult<T> {
+    data: T | null
+    error: ApiErrorInfo | null
+}
 
+function categorizeError(error: any): ApiErrorCategory {
+    // $fetch (ofetch) 對 timeout 拋的 error.cause 是 AbortError
+    if (error?.name === 'AbortError' || error?.cause?.name === 'AbortError') return 'timeout'
     const status = error?.statusCode ?? error?.response?.status
     if (typeof status === 'number') {
         if (status >= 500) return 'server'
         if (status >= 400) return 'client'
     }
-
     if (error?.message?.includes('fetch failed') || error?.message?.includes('Network')) return 'network'
     return 'unknown'
 }
 
-const API_TIMEOUT_MS = 60000
-
-function sanitizeQuery(path: string, query?: object) {
-    if (!query) return query
-
-    const nextQuery: Record<string, any> = { ...(query as Record<string, any>) }
-
-    if (path.includes('/FarePolicy/GetIFarePolicyList')) {
-        if (nextQuery.CodePolicy === '__all_policy' || nextQuery.CodePolicy === '全部') {
-            delete nextQuery.CodePolicy
-        }
-
-        if (nextQuery.CodeDomicile === '__all_area' || nextQuery.CodeDomicile === '全國') {
-            delete nextQuery.CodeDomicile
-        }
-    }
-
-    return nextQuery
-}
+const API_TIMEOUT_MS = 90000
 
 export default defineNuxtPlugin(() => {
     const config = useRuntimeConfig()
@@ -49,52 +36,58 @@ export default defineNuxtPlugin(() => {
         : config.public.frontendApiBase
 
     function logError(info: ApiErrorInfo) {
+        // 結構化 log，方便日後改成集中 reporter
+        // eslint-disable-next-line no-console
         console.warn(`[WebAPI][${info.method}][${info.category}]`, info.path, {
             status: info.status,
             message: info.message,
         })
     }
 
+    async function requestWithDetail<T>(
+        method: 'GET' | 'POST',
+        path: string,
+        query?: object,
+    ): Promise<ApiResponseResult<T>> {
+        try {
+            const data = await $fetch<T>(path, {
+                method,
+                baseURL,
+                query,
+                timeout: API_TIMEOUT_MS,
+            })
+
+            return { data, error: null }
+        } catch (error: any) {
+            const detail: ApiErrorInfo = {
+                category: categorizeError(error),
+                status: error?.statusCode ?? error?.response?.status,
+                message: error?.message ?? String(error),
+                path,
+                method,
+                raw: error?.data ?? error,
+            }
+
+            logError(detail)
+            return { data: null, error: detail }
+        }
+    }
+
     return {
         provide: {
             WebApiGet: async (path: string, query?: object) => {
-                try {
-                    return await $fetch(path, {
-                        baseURL,
-                        query: sanitizeQuery(path, query),
-                        timeout: API_TIMEOUT_MS,
-                    })
-                } catch (error: any) {
-                    logError({
-                        category: categorizeError(error),
-                        status: error?.statusCode ?? error?.response?.status,
-                        message: error?.message ?? String(error),
-                        path,
-                        method: 'GET',
-                        raw: error?.data ?? error,
-                    })
-                    return null
-                }
+                const { data } = await requestWithDetail('GET', path, query)
+                return data
             },
             WebApiPost: async (path: string, query?: object) => {
-                try {
-                    return await $fetch(path, {
-                        method: 'POST',
-                        baseURL,
-                        query: sanitizeQuery(path, query),
-                        timeout: API_TIMEOUT_MS,
-                    })
-                } catch (error: any) {
-                    logError({
-                        category: categorizeError(error),
-                        status: error?.statusCode ?? error?.response?.status,
-                        message: error?.message ?? String(error),
-                        path,
-                        method: 'POST',
-                        raw: error?.data ?? error,
-                    })
-                    return null
-                }
+                const { data } = await requestWithDetail('POST', path, query)
+                return data
+            },
+            WebApiGetDetailed: async (path: string, query?: object) => {
+                return requestWithDetail('GET', path, query)
+            },
+            WebApiPostDetailed: async (path: string, query?: object) => {
+                return requestWithDetail('POST', path, query)
             },
         },
     }
