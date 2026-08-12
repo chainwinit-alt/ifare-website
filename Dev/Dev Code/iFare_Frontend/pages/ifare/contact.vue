@@ -18,8 +18,8 @@
           <span class="comp-shadow">CONTACT</span>
         </div>
         <div class="date-group">
-          <label class="date-release">{{ releaseTime }}</label>
-          <label class="date-update">{{ updateTime }}</label>
+          <label class="date-release">{{ formatDisplayDate(releaseTime) }}</label>
+          <label class="date-update">{{ formatDisplayDate(updateTime) }}</label>
         </div>
       </section>
       <section class="section-body">
@@ -31,7 +31,7 @@
               v-for="(_area, i) in areaList"
               :key="_area.areaName"
             >
-              <a class="transition-general" :href="`#${_area.areaName}`" @click="jumpTo(_area.areaName)">{{
+              <a class="transition-general" :href="`#${_area.areaName}`" @click.prevent="jumpTo(_area.areaName)">{{
                 _area.areaName
               }}</a>
             </li>
@@ -114,6 +114,8 @@ definePageMeta({
   toLink: '/ifare'
 })
 const { $WebApiGet } = useNuxtApp();
+const { getApiResultArray } = useApiResult();
+const { formatDisplayDate } = useDateFormatter();
 const route = useRoute();
 const $router = useRouter();
 const _contactID = route.query.id;
@@ -173,8 +175,8 @@ async function loadOfficeUnit() {
   contactList.splice(0);
   try {
     const res: any = await $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
-    if (!res?.result?.result) throw new Error("Empty response");
-    let _data = res.result.result;
+    let _data = getApiResultArray<any>(res);
+    if (_data.length === 0) throw new Error("Empty response");
     _data = _data.find((item: any) => item.id == _contactID);
     if (!_data) throw new Error("Office unit not found");
 
@@ -217,20 +219,23 @@ function populateOfficeData(_data: any) {
 // 開始載入 (page 進入時)
 loadOfficeUnit();
 
-function jumpTo(areaName: string) {
-  areaList.forEach((_area, i) => {
+function jumpTo(areaName: string, scroll = true) {
+  areaList.forEach((_area) => {
     _area.isActive = _area.areaName == areaName;
   });
+  // 2026-06-08 UIUX #187 — 統一用 scrollIntoView，避免中文 hash 編碼對不到 id / 原生跳轉與 router push 雙重跳動
+  if (scroll && import.meta.client) {
+    document.getElementById(areaName)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 function getSelectValue(type: string, val: string) {
   let _area = areaSelectList.find((p:any) => p.val == val);
-  jumpTo(`${_area?.name}`)
+  jumpTo(`${_area?.name}`, false) // select 路徑由 router.push hash 負責捲動，jumpTo 只更新 active
   $router.push({ path: route.path, query: route.query, hash: `#${_area?.name}`})
 }
 
 function isSelectOpen(type: string, val: boolean) {
-  // console.log(`[${type}] val => ${val} || type ${typeof val}`)
   _isSelect.value = val
   // useHead({
   //   bodyAttrs: {

@@ -141,7 +141,7 @@ function SaveAction() {
 
   if (routeNameType.indexOf("add") >= 0) {
     console.log("[Add] Save action");
-    $WebAPI.InsertNews(userStore.token, _title, _detail, _releaseTime, _discontinuedTime, _state, (res: any) => {
+    $WebAPI.InsertNews(userStore.token, _title, _detail, _releaseTime, _discontinuedTime, _state,(res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {
           $Message({ message: `API res ${_resData}`, type: "error" })
@@ -164,7 +164,7 @@ function SaveAction() {
     console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
-    $WebAPI.UpdateNews(userStore.token, _id, _title, _detail, _releaseTime, _discontinuedTime, _state, (res: any) => {
+    $WebAPI.UpdateNews(userStore.token, _id, _title, _detail, _releaseTime, _discontinuedTime, _state,(res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {
           $Message({ message: `API res ${_resData}`, type: "error" })

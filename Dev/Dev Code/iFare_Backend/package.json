@@ -2,6 +2,9 @@
   "name": "ifare-backend",
   "version": "0.0.0",
   "private": true,
+  "engines": {
+    "node": "18.18.2"
+  },
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check build-only",
