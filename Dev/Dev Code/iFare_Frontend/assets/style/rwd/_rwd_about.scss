@@ -137,10 +137,15 @@
         .section-about-bottom {
             .card-advance {
                 flex-direction: column;
+                align-items: center;   // 堆疊後兩區塊水平置中（卡片仍維持與上方四宮格同寬，覆寫 scoped width:920px 造成的靠左）
                 gap: 48px;
 
                 & > * {
                     gap: 0;
+                }
+
+                .advance-info {
+                    min-height: 0;     // 桌機用來對齊兩欄連結的高度，堆疊後改為單行不再保留，消除第二段多餘空隙
                 }
             }
         }

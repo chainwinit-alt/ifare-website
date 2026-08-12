@@ -44,6 +44,7 @@
               select-title="受助情境"
               select-type="policy"
               :select-list="policySelectList"
+              :select-default="codeSelect_policy"
               aria-labelledby="label-policy"
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
@@ -76,6 +77,7 @@
               select-title="戶籍地"
               select-type="area"
               :select-list="areaSelectList"
+              :select-default="codeSelectArea"
               aria-labelledby="label-area"
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
@@ -83,19 +85,26 @@
           </div>
           <div class="item item-query">
             <label class="filter-name">關鍵字</label>
-            <input v-model="searchQuery" class="input-query" type="text" placeholder="請輸入關鍵字" />
-          </div>
-          <div class="item item-bottom">
-            <button
-              class="btn-filter transition-general"
-              type="submit"
-              @click="Search"
-              :disabled="!canSearch"
-              :aria-disabled="!canSearch"
-            >
-              <span>搜尋</span>
-              <i class="icon ic-search" aria-hidden="true"></i>
-            </button>
+            <div class="query-action-row">
+              <div class="query-field">
+                <IfareSearchAutocomplete
+                  v-model="searchQuery"
+                  :filters="autocompleteFilters"
+                  placeholder="請輸入關鍵字"
+                  @submit="Search"
+                />
+              </div>
+              <button
+                class="btn-filter transition-general btn-query-submit"
+                type="submit"
+                @click="Search"
+                :disabled="!canSearch"
+                :aria-disabled="!canSearch"
+              >
+                <span>搜尋</span>
+                <i class="icon ic-search" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -212,6 +221,7 @@ const $router = useRouter();
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue"
 import CompPageNum from "../components/CompPageNum.vue";
+import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
 
 interface selectItem {
   name: string;
@@ -219,8 +229,8 @@ interface selectItem {
   isActive: boolean;
 }
 
-const ALL_POLICY_VALUE = "__all_policy";
-const ALL_AREA_VALUE = "__all_area";
+const ALL_POLICY_VALUE = "全部";
+const ALL_AREA_VALUE = "全國";
 
 function isSelectOpen(type: string, val: boolean) {
   // console.log(`[${type}] val => ${val} || type ${typeof val}`)
@@ -235,10 +245,14 @@ function isSelectOpen(type: string, val: boolean) {
   // })
 }
 
-const policySelectList = reactive<Array<selectItem>>([]);
-const codeSelect_policy = ref("");
-const areaSelectList = reactive<Array<selectItem>>([]);
-const codeSelect_area = ref("");
+const policySelectList = reactive<Array<selectItem>>([
+  { name: ALL_POLICY_VALUE, val: ALL_POLICY_VALUE, isActive: false },
+]);
+const codeSelect_policy = ref(ALL_POLICY_VALUE);
+const areaSelectList = reactive<Array<selectItem>>([
+  { name: ALL_AREA_VALUE, val: ALL_AREA_VALUE, isActive: false },
+]);
+const codeSelectArea = ref(ALL_AREA_VALUE);
 const searchQuery = ref("");
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient = ref("");
@@ -247,10 +261,15 @@ const canSearch = computed(() => {
   return Boolean(
     codeSelect_policy.value ||
     codeSelectRecipient.value ||
-    codeSelect_area.value ||
+    codeSelectArea.value ||
     searchQuery.value.trim()
   );
 });
+const autocompleteFilters = computed(() => ({
+  CodePolicy: codeSelect_policy.value && codeSelect_policy.value !== ALL_POLICY_VALUE ? codeSelect_policy.value : undefined,
+  CodeRecipient: codeSelectRecipient.value || undefined,
+  CodeDomicile: codeSelectArea.value !== ALL_AREA_VALUE ? codeSelectArea.value : undefined,
+}));
 
 function getSelectValue(type: string, val: string) {
   // console.log(`[${type}] val => ${val}`)
@@ -258,9 +277,8 @@ function getSelectValue(type: string, val: string) {
     codeSelect_policy.value = val;
     // isVisibleRecipient.value = true
   }
-
   if (type == "area") {
-    codeSelect_area.value = val;
+    codeSelectArea.value = val || ALL_AREA_VALUE;
   }
 }
 
@@ -270,14 +288,14 @@ codePolicy.then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
 
-let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
-      val: item.id,
+      val: String(item.id),
     };
   });
 
-  policySelectList.push({ name: "全部", val: ALL_POLICY_VALUE, isActive: false }, ..._list);
+  policySelectList.push(..._list);
 });
 
 // Code area
@@ -286,14 +304,14 @@ codeArea.then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
 
-let _list: Array<selectItem> = _data.map((item: any, i: number) => {
+  let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
       name: item.codeName,
-      val: item.id,
+      val: String(item.id),
     };
   });
 
-  areaSelectList.push({ name: "全國", val: ALL_AREA_VALUE, isActive: false }, ..._list);
+  areaSelectList.push(..._list);
 });
 
 // Code recipient
@@ -305,7 +323,7 @@ codeRecipient.then((res: any) => {
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
       name: item.codeName,
-      val: item.id,
+      val: String(item.id),
       isActive: false,
     };
   });
@@ -331,19 +349,20 @@ function SwitchRecipient(codeVal: any) {
 
 function Search() {
   if (!canSearch.value) return false;
-  let query: any = {};
-  if (codeSelect_policy.value) query.policy = codeSelect_policy.value;
+  let query: any = {
+    policy: codeSelect_policy.value || ALL_POLICY_VALUE,
+    area: codeSelectArea.value || ALL_AREA_VALUE,
+  };
   if (codeSelectRecipient.value) query.recipient = codeSelectRecipient.value;
-  if (codeSelect_area.value) query.area = codeSelect_area.value;
   if (searchQuery.value.trim()) query.query = searchQuery.value.trim();
   $router.push({ path: "/ifare/result", query: query });
   // Init value.
-  codeSelect_policy.value = ""
+  codeSelect_policy.value = ALL_POLICY_VALUE
   codeSelectRecipient.value = ""
   recipientSelectList.forEach((item, i) => {
     item.isActive = false;
   });
-  codeSelect_area.value = ""
+  codeSelectArea.value = ALL_AREA_VALUE
   searchQuery.value = ""
 }
 

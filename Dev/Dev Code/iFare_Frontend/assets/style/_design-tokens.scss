@@ -1,0 +1,146 @@
+// ─── Design Tokens（UIUX #67 / #68） ─────────────────────────────────
+// 目的：把散落各檔的 border-radius / box-shadow 等魔術數字集中收斂，
+// 提供語意化變數讓新 code 直接用；既有 code 不全站 replace（避免設計細節打架），
+// 待設計系統正式整理時再個別替換。
+//
+// 用法：
+//   border-radius: $radius-sm;
+//   box-shadow: $shadow-card;
+
+// ─── Radius（語意：xs=小元件 / sm=按鈕 / md=卡片 / lg=容器 / xl=大區塊） ───
+$radius-xs:     4px;     // skeleton-line / icon button 小圓角
+$radius-sm:     8px;     // 一般按鈕、輸入框
+$radius-md:     12px;    // 卡片、彈出視窗
+$radius-lg:     16px;    // chatbot 視窗、大型卡片
+$radius-xl:     24px;    // 圓潤按鈕（btn-tag / btn-ic-share）
+$radius-2xl:    32px;    // 大型 CTA 按鈕
+$radius-pill:   999px;   // 膠囊形（tag / chip / 圖示按鈕）
+$radius-circle: 50%;     // 正圓
+$radius-bg-l:   880px;   // 背景大圓漸層（既有特殊用途，命名保留）
+$radius-bg-m:   750px;
+$radius-bg-s:   656px;
+$radius-bg-xs:  377px;
+
+// ─── Shadow（語意：rest=靜態卡片 / hover=互動上升 / cta=主按鈕投影 / focus=焦點環） ───
+// 既有 color 變數需要在使用端可用（這裡用 @if 包裝避免 _color 未 import 時報錯）
+@function _shadow-color($alpha) {
+  // 用 black 透明色作為通用，呼叫端可覆寫
+  @return rgba(23, 24, 24, $alpha);
+}
+
+$shadow-rest:   0px 11px 30px -8px #{_shadow-color(0.12)};
+$shadow-card:   0px 8px 22px -8px #{_shadow-color(0.10)};
+$shadow-hover:  0px 18px 36px -10px #{_shadow-color(0.18)};
+$shadow-lift:   0px 24px 44px -18px #{_shadow-color(0.10)};
+$shadow-cta:    0px 11px 30px -8px rgba(234, 85, 4, 0.50);  // orange 主按鈕
+$shadow-focus:  0 0 0 6px rgba(234, 85, 4, 0.18);            // 焦點環
+
+// ─── 2026-05-25 UIUX #66 — Spacing scale(4px base) ──────────────────
+// 統一間距尺度,避免散落各檔的 5px/6px/9px/13px 等非標準值。
+// 用法:padding: $space-md; margin: $space-lg 0;
+//
+// 對應建議:
+//   xs(4)   — icon 與文字間距、tag 內 padding
+//   sm(8)   — input padding、small gap
+//   md(12)  — 行內 spacing、卡片內 component gap
+//   lg(16)  — 卡片 padding、section 內 gap
+//   xl(24)  — section 之間
+//   2xl(32) — 大區塊垂直間距
+//   3xl(48) — section padding top/bottom(桌機)
+//   4xl(64) — hero / 大區塊 padding
+$space-xs:   4px;
+$space-sm:   8px;
+$space-md:   12px;
+$space-lg:   16px;
+$space-xl:   24px;
+$space-2xl:  32px;
+$space-3xl:  48px;
+$space-4xl:  64px;
+
+// ─── 2026-05-25 UIUX #65 — Font-size + line-height pair(Type Scale) ──
+// 統一字級階梯;line-height 採 1.4-1.55 範圍給中文閱讀適度呼吸。
+// 用法:font-size: $fs-md; line-height: $lh-md;
+//
+// 對應建議:
+//   xs(12)    — 提示文字 / tag label / 編號
+//   sm(14)    — 次要說明 / 日期 / 麵包屑
+//   md(16)    — body 預設(全站基準)
+//   lg(18)    — 重點段落 / 列表標題
+//   xl(20)    — h5 / 卡片標題
+//   2xl(22)   — h4 / 文章列表標題
+//   3xl(24)   — h3 / hero 副標
+//   4xl(28)   — 大型卡片標題
+//   5xl(32)   — section 主標(h2)
+//   6xl(48)   — hero 主標(h1 大型)
+//   display(54) — 背景大字陰影(comp-shadow)
+$fs-xs:   12px; $lh-xs:  20px;
+$fs-sm:   14px; $lh-sm:  20px;
+$fs-md:   16px; $lh-md:  28px;
+$fs-lg:   18px; $lh-lg:  28px;
+$fs-xl:   20px; $lh-xl:  32px;
+$fs-2xl:  22px; $lh-2xl: 34px;
+$fs-3xl:  24px; $lh-3xl: 36px;
+$fs-4xl:  28px; $lh-4xl: 40px;
+$fs-5xl:  32px; $lh-5xl: 44px;
+$fs-6xl:  48px; $lh-6xl: 68px;
+$fs-display: 54px; $lh-display: 60px;
+
+// 字重(Font weight)— 維持 Noto Sans TC / Serif TC 可用範圍
+$fw-regular:  400;
+$fw-medium:   500;
+$fw-semibold: 600;
+$fw-bold:     700;
+$fw-extrabold: 800;
+
+// ─── 2026-05-25 UIUX #69 — RWD breakpoints(mobile-first) ────────────
+// 統一 @media 斷點,避免散落各檔的 320 / 540 / 640 / 720 / 768 / 1024 / 1280 等魔術數字。
+// 用法:
+//   @media (max-width: $bp-md) { ... }   // 平板以下
+//   @media (min-width: $bp-lg) { ... }   // 小筆電以上
+$bp-xs:  360px;   // 小型手機
+$bp-sm:  480px;   // 一般手機
+$bp-md:  768px;   // 平板直
+$bp-lg:  1024px;  // 平板橫 / 小筆電
+$bp-xl:  1280px;  // 桌機
+$bp-2xl: 1440px;  // 大桌機
+$bp-3xl: 1920px;  // 超大螢幕
+
+@mixin bp-up($size)   { @media (min-width: $size) { @content; } }
+@mixin bp-down($size) { @media (max-width: #{$size - 1px}) { @content; } }
+
+// ─── 2026-05-25 UIUX #76 — Transition duration tokens ─────────────────
+// 統一互動 transition 時長,避免散落各檔的 .15s / .18s / .22s / .25s / .3s
+// 用法:transition: all $duration-normal ease;
+//
+//   $duration-fast    — 微互動(hover icon、tag 反白)
+//   $duration-normal  — 一般 hover、color/opacity 變化
+//   $duration-slow    — 卡片浮起、模態彈出
+//   $duration-page    — 頁面切換
+$duration-fast:    0.15s;
+$duration-normal:  0.25s;
+$duration-slow:    0.35s;
+$duration-page:    0.45s;
+
+// 常用 easing(配合 $ease-island 已在 _mixin.scss)
+$ease-out:  cubic-bezier(0.16, 1, 0.3, 1);    // 快進慢出,適合彈出
+$ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);   // Material 標準
+
+// ─── 2026-05-25 UIUX #67 — 圓角值補完整 ──────────────────────────────
+// 既有已有 $radius-xs/sm/md/lg/xl/2xl/pill/circle(line 11-18)
+// 補上常用變體:
+$radius-input:  6px;     // input / select / 小型 button(介於 xs 4 與 sm 8 之間)
+$radius-tag:    $radius-pill;  // tag / chip — alias
+
+// ─── 2026-05-25 UIUX #68 — 陰影深度補完整 ────────────────────────────
+// 既有 $shadow-rest / card / hover / lift / cta / focus(line 31-36)
+// 補:
+$shadow-subtle: 0px 2px 8px -4px #{_shadow-color(0.08)};  // 平面卡微浮(skeleton 之類)
+$shadow-inset:  inset 0 1px 2px rgba(23, 24, 24, 0.08);    // 凹陷(input focus)
+$shadow-popup:  0px 24px 60px -12px #{_shadow-color(0.22)}; // dropdown / modal
+
+// ─── Notes ──────────────────────────────────────────────────────────
+// - 看到既有 code 用 `5px` / `6px` 之類非標準值,多半屬於早期遺留 — 之後修整時建議
+//   挑接近的 token 替換(5px → 4px / 6px → 8px),同時 review 視覺差異。
+// - shadow 含 color 的因 SCSS 變數中 rgba 編譯時就 lock,若要 dynamic theme 需改 mixin。
+// - 既有 _font.scss 內硬編碼字級(32px / 22px / 14px 等)請逐步替換為 $fs-*,
+//   但**不全站 replace** — 避免設計細節打架;新 component / 大改版時優先用 token。

@@ -14,6 +14,19 @@
         background: $color-white;
         box-shadow: 0px 11px 30px -8px rgba($color-black, 0.50);
         text-decoration: none;
+        color: $color-primary;
+
+        &:link,
+        &:visited,
+        &:hover,
+        &:active,
+        &:focus-visible {
+            color: $color-primary;
+        }
+
+        span {
+            color: inherit;
+        }
 
         .icon {
             display: inline-block;

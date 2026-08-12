@@ -65,22 +65,22 @@
       </div>
     </div>
   </template>
-  
+
   <script setup lang="ts">
-  import { computed } from "vue";
+  import { computed, watch } from "vue";
 
   interface switchItem {
     type: string,
     name: string,
     value: string
   }
-  
+
   const selectVal = ref("");
   const selectName = ref("");
   const isShow = ref(false);
   const isOpts = ref(false)
   const selectItems = reactive<Array<switchItem>>([])
-  
+
   function ToggleSelectDialog() {
     isShow.value = !isShow.value;
     emits("isOpened", props.selectType, isShow.value)
@@ -116,19 +116,9 @@
       selectItems.push(_data)
     }
 
-    if (type == 'Income') {
-      let removeIncomeIndex:Array<number> = []
-      selectItems.forEach((_item:any, i:number) => {
-        if (_item.type == type && _item.value != val) {
-          removeIncomeIndex.splice(0, 0, i)
-        }
-      })
-      removeIncomeIndex.forEach((_index:number, j:number) => {
-        selectItems.splice(_index, 1)
-      })
-    }
-
-    if (type == 'Identity' && val == "1") {
+    const noIdentityValue = props.selectListIdentity
+      ?.find((item: any) => String(item.name || "").trim() === "無")?.val;
+    if (type == "Identity" && val == noIdentityValue && existIndex < 0) {
       let removeIndex:Array<number> = []
       selectItems.forEach((_item:any, i:number) => {
         if (_item.type == type && _item.value != val) {
@@ -139,32 +129,63 @@
         selectItems.splice(_index, 1)
       })
     }
+    if (type == "Identity" && val != noIdentityValue && existIndex < 0) {
+      const noIdentityIndex = selectItems.findIndex(
+        (item: any) => item.type == type && item.value == noIdentityValue
+      );
+      if (noIdentityIndex >= 0) selectItems.splice(noIdentityIndex, 1);
+    }
 
-    emits("update:selectItems", props.selectType, selectItems);
+    emits("update:select-items", props.selectType, selectItems);
     // ToggleSelectDialog()
   }
 
   function Search() {
     ToggleSelectDialog()
   }
-  
+
   const props = defineProps([
     "placeholder",
     "selectListIncome",
     "selectListIdentity",
     "selectItems",
+    "selectedIncomes",
+    "selectedIdentities",
     "selectType",
     "selectTitle"
   ]);
-  const emits = defineEmits(["update:selectItems", "isOpened"]);
-  
+  const emits = defineEmits(["update:select-items", "isOpened"]);
+
+  function syncSelectedItems() {
+    const nextItems: switchItem[] = [];
+    const selectedIncomes = Array.isArray(props.selectedIncomes) ? props.selectedIncomes : [];
+    const selectedIdentities = Array.isArray(props.selectedIdentities) ? props.selectedIdentities : [];
+
+    selectedIncomes.forEach((value: any) => {
+      const item = props.selectListIncome?.find((entry: any) => String(entry.val) === String(value));
+      if (item) nextItems.push({ type: "Income", name: item.name, value: String(item.val) });
+    });
+    selectedIdentities.forEach((value: any) => {
+      const item = props.selectListIdentity?.find((entry: any) => String(entry.val) === String(value));
+      if (item) nextItems.push({ type: "Identity", name: item.name, value: String(item.val) });
+    });
+
+    selectItems.splice(0, selectItems.length, ...nextItems);
+  }
+
+  watch(
+    () => [props.selectedIncomes, props.selectedIdentities, props.selectListIncome, props.selectListIdentity],
+    syncSelectedItems,
+    { deep: true, immediate: true }
+  );
+
   const modelValue = computed({
     get() {
       return props.selectItems;
     },
-    set() {
-      emits("update:selectItems", selectItems);
+  set() {
+      emits("update:select-items", selectItems);
     },
   });
   </script>
-  
+

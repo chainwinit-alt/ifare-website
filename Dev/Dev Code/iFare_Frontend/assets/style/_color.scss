@@ -1,3 +1,4 @@
+// ─── 視覺命名(原有,保留向後相容;不要刪除避免 break 既有 style) ──
 $color-primary: #00ADB2;
 $color-primary-dark: #007D81;
 $color-pink: #E5006E;
@@ -12,3 +13,38 @@ $color-bg-ifare: #1A6466;
 $color-bg-mask: #002728;
 $color-bg-mask-index: #231815;
 $color-header: #fff4ef;
+
+// ─── 2026-05-25 UIUX #64 — 語意命名 alias(新 code 優先用,可讀性更高) ──
+// 用 @use 不切換,既有 code 不動。新增 component 時請優先用語意名稱。
+//
+// 色票語意對照:
+//   brand-primary   = 基金會主視覺(橘)— 主要 CTA / 強調文字 / hover 焦點
+//   brand-secondary = ifare 服務識別(藍綠)— ifare 頁面 / 政策連結
+//   brand-accent    = 警示重點(粉紅)— 必填星號 / 特殊提示
+
+$color-brand-primary: $color-orange;
+$color-brand-primary-dark: #C84804;
+$color-brand-secondary: $color-primary;
+$color-brand-secondary-dark: $color-primary-dark;
+$color-brand-accent: $color-pink;
+
+// 文字
+$color-text-primary: $color-black;
+$color-text-muted: rgba($color-black, 0.7);
+$color-text-secondary: rgba($color-black, 0.55);
+$color-text-disabled: rgba($color-black, 0.3);
+$color-text-inverse: $color-white;
+$color-text-inverse-muted: rgba($color-white, 0.7);
+
+// 狀態(Element Plus 對齊,易於跨後台/前台用法一致)
+$color-state-success: #67c23a;
+$color-state-warning: #e6a23c;
+$color-state-danger:  #f56c6c;
+$color-state-info:    $color-solid-500;
+
+// 表面(Surface) / 邊框
+$color-surface-default: $color-white;
+$color-surface-muted: $color-solid-50;
+$color-surface-card: $color-white;
+$color-border-default: $color-solid-200;
+$color-border-muted: rgba($color-black, 0.08);

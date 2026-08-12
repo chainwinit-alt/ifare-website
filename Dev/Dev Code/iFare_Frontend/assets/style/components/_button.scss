@@ -1,3 +1,25 @@
+// ===========================================================================
+// Button system overview (2026-05-25 盤點 — #74 部分修正)
+// ---------------------------------------------------------------------------
+// 全站共 18 個 .btn-* class，分散三個檔案：
+//   • _button.scss        — 結構、形狀、邊框、背景（這個檔案）
+//   • _font.scss          — 字色、字級、letter-spacing (.btn-ifare/.btn-ifare-start/.btn-line/.btn-tag 字型部分)
+//   • rwd/_rwd_button.scss — 響應式覆寫 (mobile .btn-ifare-start / .btn-reset)
+//
+// 按鈕清單（含 vue 使用次數，2026-05-25 grep）：
+//   高頻 (>10 uses): .btn (81) / .btn-tag (20) / .btn-icon (17)
+//   中頻 (3-10):     .btn-ic-share (7) / .btn-filter (7) / .btn-reset (4) / .btn-page-next (3) / .btn-page-prev (3) / .btn-select-close (3)
+//   低頻 (1-2):      .btn-more (2) / .btn-advance (2) / .btn-ifare (2) / .btn-empty-oval (1) / .btn-search (1) / .btn-menu (1) / .btn-close (1) / .btn-ifare-start (1) / .btn-line (1)
+//
+// 未來統一規範方向（需先設計討論，對應主表 #74 + 設計系統 #64-66）：
+//   1. 抽 .btn-base mixin (display/padding/cursor/disabled)
+//   2. 拆 variant: .btn-primary (orange) / .btn-secondary (outlined) / .btn-ghost / .btn-icon
+//   3. size 統一: sm 32 / md 40 / lg 48
+//   4. 把 _font.scss 的 .btn-* 字型規則歸併回 _button.scss（消除跨檔耦合）
+//
+// 修改既有 class 前先 grep 確認影響範圍。
+// ===========================================================================
+
 // Generic disabled state (avoid mistaking disabled buttons for clickable)
 button:disabled,
 .btn:disabled,
@@ -263,7 +285,7 @@ button:disabled,
 }
 
 .btn-reset {
-  height: 32px;
+  height: 44px;
   padding: 0px 12px;
   flex-shrink: 0;
   border-radius: 0px 8px;

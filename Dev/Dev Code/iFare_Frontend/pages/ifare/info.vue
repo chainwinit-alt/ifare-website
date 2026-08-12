@@ -4,16 +4,13 @@
       <section class="section-top">
         <h1 class="info-title">{{ _welfareItem.title }}</h1>
         <div class="date-group">
-          <label class="date-release">{{ _welfareItem.releaseTime }}</label>
-          <label class="date-update">{{ _welfareItem.updateTime }}</label>
+          <label class="date-release">{{ formatDisplayDate(_welfareItem.releaseTime) }}</label>
+          <label class="date-update">{{ formatDisplayDate(_welfareItem.updateTime) }}</label>
           <label class="article-num">{{ _welfareItem.id }}</label>
         </div>
       </section>
       <section class="section-body">
         <div class="card-info">
-          <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine">
-            <i class="ic-share"></i>
-          </button>
           <div class="part-info-list">
             <div class="part part-qualify">
               <div class="title-component">
@@ -52,16 +49,27 @@
                 <i class="ic-title-pattern"></i>
                 <h2 class="comp-title">洽辦單位</h2>
               </div>
-              <div class="info-content" :class="{'cursor-pointer': _welfareItem.officeUnitID != 1}" @click="JumpTo(_welfareItem.officeUnitID)">
-                <label :class="{'cursor-pointer': _welfareItem.officeUnitID != 1, 'info-label-tel': _welfareItem.welfareTel}">
+              <div class="info-content">
+                <span class="info-label" :class="{ 'info-label-tel': _welfareItem.welfareTel }">
                   {{ displayOfficeUnitInfo }}
                   <a :href="'tel:'+_welfareItem.welfareTel" class="info-tel" v-if="_welfareItem.welfareTel">{{ _welfareItem.welfareTelStr }}</a>
-                </label>
-                <a :href="'tel:'+_welfareItem.welfareTel" class="btn-icon btn-go" v-if="_welfareItem.welfareTel">
-                  <i class="ic-phone"></i>
+                </span>
+                <a
+                  :href="'tel:'+_welfareItem.welfareTel"
+                  class="btn-icon btn-go"
+                  v-if="_welfareItem.welfareTel"
+                  :aria-label="`撥打電話 ${_welfareItem.welfareTelStr}`"
+                >
+                  <i class="ic-phone" aria-hidden="true"></i>
                 </a>
-                <button class="btn-icon btn-go" v-if="_welfareItem.officeUnitID != 1">
-                  <i class="ic-arrow-right-orange"></i>
+                <button
+                  class="btn-icon btn-go"
+                  type="button"
+                  v-if="_welfareItem.officeUnitID != 1"
+                  @click="JumpTo(_welfareItem.officeUnitID)"
+                  aria-label="查看洽辦單位詳情"
+                >
+                  <i class="ic-arrow-right-orange" aria-hidden="true"></i>
                 </button>
               </div>
             </div>
@@ -72,11 +80,11 @@
         <div class="relation-links">
           <h2 class="relation-title">相關福利</h2>
           <ul class="list-unstyled relation-list">
-            <li class="relation-item transition-general" v-for="_welfare in iFarePolicyList">
+            <li class="relation-item transition-general" v-for="_welfare in iFarePolicyList" :key="_welfare.id">
               <NuxtLink
                   :to="{
                     path: '/ifare/info',
-                    query: { id: _welfare.id, reload: '' },
+                    query: { id: _welfare.id, reload: _welfare.id },
                   }"
                 >
                 <h3 class="link-title">{{ _welfare.title }}</h3>
@@ -89,13 +97,10 @@
                       <span :class="{remark: _welfare.hasIndentity}">{{ _welfare.hasIndentity ? '有' : '無' }}</span>特殊身分
                     </li>
                   </ul>
-                  <NuxtLink
-                    :to="{
-                      path: '/ifare/info',
-                      query: { id: _welfare.id, reload: '' },
-                    }"
+                  <span
                     class="ic-arrow-right link-url transition-general"
-                  ></NuxtLink>
+                    aria-hidden="true"
+                  ></span>
                 </div>
               </NuxtLink>
             </li>
@@ -112,7 +117,13 @@ definePageMeta({
   toLinkName: "i-Fare",
   toLink: "/ifare",
 });
+
+// 福利政策資格預覽截斷長度（字元數）
+const QUALIFICATION_PREVIEW_LENGTH = 50;
+
 const { $WebApiGet } = useNuxtApp();
+const { getApiResultValue } = useApiResult();
+const { formatDisplayDate } = useDateFormatter();
 const route = useRoute();
 const $router = useRouter();
 
@@ -124,6 +135,7 @@ function JumpTo(id: any) {
 interface infoItem {
   id: number;
   title: string;
+  area: string;
   qualification: string;
   evidence: string;
   remark: string;
@@ -131,14 +143,21 @@ interface infoItem {
   welfareTel: string;
   welfareTelStr: string;
   releaseTime: string;
+  discontinuedTime: string;
   updateTime: string;
   officeUnitInfo: string;
   officeUnitID: number;
+  codeDomicileID: number;
+  codePolicyID: number;
+  codeIdentityIDs: number[];
+  codeIncomeIDs: number[];
+  codeRecipientIDs: number[];
 }
 
 const _welfareItem = reactive<infoItem>({
   id: 0,
   title: "",
+  area: "",
   qualification: "",
   evidence: "",
   remark: "",
@@ -146,9 +165,15 @@ const _welfareItem = reactive<infoItem>({
   welfareTel: "",
   welfareTelStr: "",
   releaseTime: "",
+  discontinuedTime: "",
   updateTime: "",
   officeUnitInfo: "",
   officeUnitID: 0,
+  codeDomicileID: 0,
+  codePolicyID: 0,
+  codeIdentityIDs: [],
+  codeIncomeIDs: [],
+  codeRecipientIDs: [],
 });
 
 // Office Unit
@@ -167,7 +192,7 @@ const displayOfficeUnitInfo = computed(
 
 async function loadOfficeList() {
   const res: any = await $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
-  const _data = res?.result?.result;
+  const _data = getApiResultValue<any>(res);
   if (!Array.isArray(_data)) return;
 
   officeList.splice(
@@ -183,6 +208,7 @@ async function loadOfficeList() {
 function resetWelfareItem() {
   _welfareItem.id = 0;
   _welfareItem.title = "";
+  _welfareItem.area = "";
   _welfareItem.qualification = "";
   _welfareItem.evidence = "";
   _welfareItem.remark = "";
@@ -190,9 +216,15 @@ function resetWelfareItem() {
   _welfareItem.welfareTel = "";
   _welfareItem.welfareTelStr = "";
   _welfareItem.releaseTime = "";
+  _welfareItem.discontinuedTime = "";
   _welfareItem.updateTime = "";
   _welfareItem.officeUnitInfo = "";
   _welfareItem.officeUnitID = 0;
+  _welfareItem.codeDomicileID = 0;
+  _welfareItem.codePolicyID = 0;
+  _welfareItem.codeIdentityIDs = [];
+  _welfareItem.codeIncomeIDs = [];
+  _welfareItem.codeRecipientIDs = [];
 }
 
 function decodeWelfareHtml(value: string) {
@@ -303,11 +335,12 @@ async function loadPolicyDetail(infoID: number) {
   const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyDetail", {
     farePolicyID: infoID,
   });
-  const _data = res?.result?.result;
+  const _data = getApiResultValue<any>(res);
   if (!_data || requestToken !== detailRequestToken) return;
 
   _welfareItem.id = _data.id;
   _welfareItem.title = _data.title;
+  _welfareItem.area = _data.codeDomicile_LabelName ?? "";
   _welfareItem.qualification = _data.qualification;
   _welfareItem.evidence = _data.evidence;
   _welfareItem.remark = _data.remark ?? "";
@@ -319,9 +352,37 @@ async function loadPolicyDetail(infoID: number) {
     : "";
   _welfareItem.welfareTelStr = _data.officeUnitTel ?? "";
   _welfareItem.releaseTime = _data.releaseTime;
+  _welfareItem.discontinuedTime = _data.discontinuedTime;
   _welfareItem.updateTime = _data.updateTime;
   _welfareItem.officeUnitInfo = _data.officeUnitInfo ?? "";
   _welfareItem.officeUnitID = _data.iFareOfficeUnitID ?? 0;
+  _welfareItem.codeDomicileID = _data.codeDomicile_ID ?? 0;
+  _welfareItem.codePolicyID = _data.codePolicy_ID ?? 0;
+  _welfareItem.codeIdentityIDs = Array.isArray(_data.codeIdentityList) ? _data.codeIdentityList.map((p: any) => Number(p.id)) : [];
+  _welfareItem.codeIncomeIDs = Array.isArray(_data.codeIncomeList) ? _data.codeIncomeList.map((p: any) => Number(p.id)) : [];
+  _welfareItem.codeRecipientIDs = Array.isArray(_data.codeRecipientList) ? _data.codeRecipientList.map((p: any) => Number(p.id)) : [];
+}
+
+function getPolicyId(item: any) {
+  const id = Number(
+    item?.id ??
+      item?.farePolicyID ??
+      item?.farePolicyId ??
+      item?.farePolicy_ID ??
+      item?.iFarePolicyID ??
+      item?.iFarePolicyId ??
+      0
+  );
+
+  return Number.isFinite(id) && id > 0 ? id : 0;
+}
+
+function getCodeList(value: any) {
+  return Array.isArray(value) ? value : [];
+}
+
+function hasSpecificCode(value: any) {
+  return getCodeList(value).findIndex((p: any) => Number(p?.id) === 1) < 0;
 }
 
 interface iFarePolicyItem {
@@ -332,6 +393,11 @@ interface iFarePolicyItem {
   hasIndentity: boolean;
   hasIncome: boolean;
   hasRecipient: boolean;
+  codeDomicileID: number;
+  codePolicyID: number;
+  codeIdentityIDs: number[];
+  codeIncomeIDs: number[];
+  codeRecipientIDs: number[];
 }
 
 const iFarePolicyList = reactive<Array<iFarePolicyItem>>([]);
@@ -345,41 +411,39 @@ async function loadRelationList(infoID: number) {
   const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyRelation", {
     farePolicyID: infoID,
   });
-  const _data = res?.result?.result;
+  const _data = getApiResultValue<any>(res);
   if (!Array.isArray(_data) || requestToken !== relationRequestToken) return;
 
-  iFarePolicyList.push(
-    ..._data.map((item: any) => ({
-      id: item.id,
+  const nextItems = _data
+    .map((item: any) => ({
+      id: getPolicyId(item),
       title: item.title,
-      qualification: `${(item.qualification ?? "").slice(0, 50)}...`,
-      area: item.codeDomicile_LabelName,
-      hasIndentity: item.codeIdentityList.findIndex((p: any) => p.id == 1) < 0,
-      hasIncome: item.codeIncomeList.findIndex((p: any) => p.id == 1) < 0,
-      hasRecipient: item.codeRecipientList.findIndex((p: any) => p.id == 1) < 0,
+      qualification: `${(item.qualification ?? "").slice(0, QUALIFICATION_PREVIEW_LENGTH)}...`,
+      area: item.codeDomicile_LabelName ?? "",
+      hasIndentity: hasSpecificCode(item.codeIdentityList),
+      hasIncome: hasSpecificCode(item.codeIncomeList),
+      hasRecipient: hasSpecificCode(item.codeRecipientList),
+      codeDomicileID: item.codeDomicile_ID ?? 0,
+      codePolicyID: item.codePolicy_ID ?? 0,
+      codeIdentityIDs: getCodeList(item.codeIdentityList).map((p: any) => Number(p.id)),
+      codeIncomeIDs: getCodeList(item.codeIncomeList).map((p: any) => Number(p.id)),
+      codeRecipientIDs: getCodeList(item.codeRecipientList).map((p: any) => Number(p.id)),
     }))
-  );
+    .filter((item: iFarePolicyItem) => item.id > 0 && item.title);
+
+  iFarePolicyList.push(...nextItems);
 }
 
 loadOfficeList();
 
 watch(
-  () => Number(route.query.id || 0),
-  async (infoID) => {
+  () => [Number(route.query.id || 0), String(route.query.reload ?? "")] as const,
+  async ([infoID]) => {
     await Promise.all([loadPolicyDetail(infoID), loadRelationList(infoID)]);
   },
   { immediate: true }
 );
 
-const _url = useRequestURL();
-async function ShareWebUrlToLine() {
-  const SHARETOLINE = "https://social-plugins.line.me/lineit/share";
-  const urlShare = `${SHARETOLINE}?url=${encodeURIComponent(_url.href)}`;
-
-  await navigateTo(urlShare, {
-    external: true,
-  });
-}
 </script>
 
 <style scoped>
@@ -404,4 +468,5 @@ async function ShareWebUrlToLine() {
 .raw-html:deep(a) {
   word-break: break-word;
 }
+
 </style>

@@ -5,7 +5,7 @@
     align-items: center;
     border-radius: 5px;
     border: 1px solid rgba($color-black, 0.20);
-    max-height: 40px;
+    min-height: 44px;
     cursor: pointer;
     z-index: 99;
 
@@ -26,6 +26,7 @@
 
     .comp-group {
         width: 100%;
+        min-width: 0;
         display: flex;
         flex-direction: row;
         align-items: center;
@@ -36,16 +37,25 @@
         min-width: 112px;
     }
 
+    .comp-name {
+        min-width: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
     .icon {
         display: inline-block;
         width: 20px;
         height: 20px;
+        flex: 0 0 20px;
     }
 
     .select-content-bg {
         position: absolute;
         left: 0;
-        top: 40px;
+        top: calc(100% + 4px);
         width: 100%;
         padding: 20px 0px;
         border-radius: 8px;
@@ -64,12 +74,18 @@
             display: flex;
             flex-direction: column;
             max-height: 36vh;
-            overflow: auto;
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding-right: 10px;
+            margin-right: 4px;
+            scrollbar-gutter: stable;
 
             .select-item {
                 display: inline-flex;
                 align-items: center;
-                padding: 8px 32px;
+                box-sizing: border-box;
+                width: 100%;
+                padding: 8px 48px 8px 32px;
             }
         }
     }

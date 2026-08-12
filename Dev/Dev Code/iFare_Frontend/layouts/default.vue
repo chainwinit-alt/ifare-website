@@ -9,12 +9,17 @@
         - 其他頁面使用 "other"
     -->
     <div class="app" :name="!$route.name?.toString().includes('ifare')?'other':'indexIFare'">
+        <!-- 全站路由轉場進度條 — 跳轉時頂部 3px 橘條，避免使用者空等 -->
+        <NuxtLoadingIndicator color="#EA5504" :height="3" :throttle="200" :duration="3000" />
         <!-- 頁首元件：監聽 is-opened 事件以判斷行動選單是否開啟 -->
         <AppHeader @is-opened="isMenuOpen"/>
         <!-- 頁面主體內容由各路由頁面填入 -->
         <slot />
         <!-- 頁尾元件 -->
         <AppFooter />
+        <!-- 芒寶吉祥物與智慧客服入口 -->
+        <CompChatbotEntry v-model:open="isChatbotOpen" />
+        <CompChatbotWelcome v-model:open="isChatbotOpen" />
     </div>
 </template>
 
@@ -22,9 +27,13 @@
 import { getCurrentInstance } from 'vue';
 import AppHeader from '../components/AppHeader.vue'
 import AppFooter from '../components/AppFooter.vue';
+import CompChatbotEntry from '../components/CompChatbotEntry.vue';
+import CompChatbotWelcome from '../components/CompChatbotWelcome.vue';
 
 // 追蹤行動選單開啟狀態，用於控制 body overflow
 const _isMenuOpen = ref(false)
+
+const isChatbotOpen = ref(false)
 
 // 當選單開啟時，在 body 加上 overflow-disabled class，防止背景頁面捲動
 useHead({
