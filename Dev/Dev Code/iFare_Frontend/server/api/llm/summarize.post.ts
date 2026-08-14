@@ -9,6 +9,7 @@ import { enrichSummaryCases } from "../../utils/llm/enrich";
 import type {
   LlmSummaryCaseItem,
   LlmSummaryConversationMessage,
+  LlmSummaryMode,
   LlmSummarySearchContext,
 } from "../../utils/llm/types";
 
@@ -51,6 +52,22 @@ export default defineEventHandler(async (event) => {
     3
   );
 
+  // 與 stream 版一致：首次摘要有政策 → overview；查無政策 → overview_general；追問 → guidance
+  const generalFallbackEnabled = !["0", "false", "off"].includes(
+    String(
+      llmConfig.summaryGeneralFallback
+        ?? process.env.NUXT_LLM_SUMMARY_GENERAL_FALLBACK
+        ?? "true"
+    ).toLowerCase()
+  );
+  const mode: LlmSummaryMode = conversation.length > 0
+    ? "guidance"
+    : enrichedCases.length > 0
+      ? "overview"
+      : generalFallbackEnabled
+        ? "overview_general"
+        : "guidance";
+
   try {
     const result = await summarizeWithFreeTier(
       {
@@ -58,6 +75,7 @@ export default defineEventHandler(async (event) => {
         context: body.context,
         cases: enrichedCases,
         conversation,
+        mode,
       },
       {
         geminiApiKey: llmConfig.geminiApiKey || "",
@@ -82,6 +100,7 @@ export default defineEventHandler(async (event) => {
   return {
     provider: resolvedProvider,
     model,
+    mode,
     cached,
     summary,
     errorMessage,

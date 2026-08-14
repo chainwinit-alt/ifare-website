@@ -38,6 +38,7 @@ namespace IFare_API.Context
         public virtual DbSet<IfarePolicyCodeIncome> IfarePolicyCodeIncomes { get; set; }
         public virtual DbSet<IfarePolicyCodeKeyword> IfarePolicyCodeKeywords { get; set; }
         public virtual DbSet<IfarePolicyCodeRecipient> IfarePolicyCodeRecipients { get; set; }
+        public virtual DbSet<ChatbotCard> ChatbotCards { get; set; }
         public virtual DbSet<IfareQa> IfareQas { get; set; }
         public virtual DbSet<Image> Images { get; set; }
         public virtual DbSet<ImgManage> ImgManages { get; set; }
@@ -785,6 +786,33 @@ namespace IFare_API.Context
                     .WithMany(p => p.IfarePolicyCodeRecipients)
                     .HasForeignKey(d => d.IfarePolicyId)
                     .HasConstraintName("FK_IFarePolicy_CodeRecipient_IFarePolicy");
+            });
+
+            modelBuilder.Entity<ChatbotCard>(entity =>
+            {
+                entity.ToTable("ChatbotCard");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.CardKey)
+                    .IsRequired()
+                    .HasMaxLength(64);
+
+                entity.Property(e => e.Title)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.Keywords).IsRequired();
+
+                entity.Property(e => e.Answer).IsRequired();
+
+                entity.Property(e => e.LinkKeys).HasMaxLength(200);
+
+                entity.Property(e => e.Priority).HasColumnType("decimal(3, 2)");
+
+                entity.Property(e => e.State)
+                    .IsRequired()
+                    .HasMaxLength(20);
             });
 
             modelBuilder.Entity<IfareQa>(entity =>

@@ -80,7 +80,7 @@
 
     <div v-if="actualReferenceCases.length" class="summary-references">
       <div class="reference-head">
-        <span class="reference-label">推薦政策如下</span>
+        <span class="reference-label">摘要引用政策</span>
       </div>
       <div class="reference-card-list">
         <NuxtLink
@@ -230,7 +230,7 @@ const canContinueConversation = computed(
 const canSubmitFollowUp = computed(
   () => Boolean(followUpInput.value.trim()) && !isFollowUpLoading.value
 );
-const SUMMARY_CACHE_VERSION = "v38-progressive-policy-search";
+const SUMMARY_CACHE_VERSION = "v39-ai-overview";
 const SUMMARY_CACHE_KEY_PREFIX = "ifare-summary-cache:";
 const SUMMARY_CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -527,6 +527,18 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;");
 }
 
+/** 追問對話的種子訊息要用純文字：把總覽的 Markdown 標記與引用符號拆掉 */
+function toPlainSummaryText(value: string) {
+  return (value || "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\[參考\s*[\d\s,，、]*\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 400);
+}
+
 function buildCaseLink(id: number) {
   return {
     path: "/ifare/info",
@@ -554,10 +566,11 @@ function applyInlineMarkdown(text: string) {
   const withReferences = escaped.replace(referenceTokenPattern, (_token, refNoText) => {
     const referenceNo = Number(refNoText);
     const item = referenceCaseByNo.value.get(referenceNo);
-    if (!item) return `[參考 ${referenceNo}]`;
+    // 模型標到不存在的編號時整顆引用移除，不留 [參考 N] 原文干擾閱讀
+    if (!item) return "";
 
     const href = `/ifare/info?id=${encodeURIComponent(String(item.id))}&reload=${encodeURIComponent(String(item.id))}`;
-    return `<a class="summary-inline-reference" href="${href}">[參考 ${item.referenceNo}]</a>`;
+    return `<a class="summary-inline-reference" href="${href}" title="${escapeHtml(item.title)}">參考 ${item.referenceNo}</a>`;
   });
 
   const withLinks = withReferences.replace(
@@ -623,11 +636,11 @@ function renderMarkdown(text: string) {
       continue;
     }
 
-    const heading = line.match(/^#{1,3}\s+(.*)$/);
+    const heading = line.match(/^#{1,6}\s+(.*)$/);
     if (heading) {
       flushParagraph();
       flushList();
-      blocks.push(`<p><strong>${applyInlineMarkdown(heading[1])}</strong></p>`);
+      blocks.push(`<h4 class="summary-section-title">${applyInlineMarkdown(heading[1])}</h4>`);
       continue;
     }
 
@@ -670,8 +683,10 @@ const actualReferenceCases = computed(() => {
   return referenceCases.value;
 });
 
+// [參考 N] 的 N 對應送給後端 prompt 的「政策 N」編號，
+// 也就是 referenceCases 的排列順序（referenceNo），不是全清單的名次。
 const referenceCaseByNo = computed(() => {
-  return new Map(referenceCases.value.map((item) => [item.originalReferenceNo, item]));
+  return new Map(referenceCases.value.map((item) => [item.referenceNo, item]));
 });
 
 const summaryHtml = computed(() => {
@@ -830,7 +845,7 @@ async function submitFollowUp() {
   isFollowUpLoading.value = true;
 
   const conversation: SummaryConversationMessage[] = [
-    { role: "assistant", content: summaryDisplayText.value },
+    { role: "assistant", content: toPlainSummaryText(summaryDisplayText.value) },
     ...conversationMessages.value.slice(-7),
   ];
 
@@ -1198,7 +1213,68 @@ onBeforeUnmount(() => {
   font-weight: 800;
 }
 
-.summary-markdown :deep(.summary-inline-reference),
+.summary-markdown :deep(h4.summary-section-title) {
+  margin: 10px 0 0;
+  padding-top: 4px;
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 800;
+  color: #1d160f;
+}
+
+/* 摘要各區塊依序淡入，模擬搜尋引擎 AI 摘要逐段浮現的效果 */
+.summary-markdown :deep(> *) {
+  animation: summary-block-in 0.5s ease both;
+}
+
+.summary-markdown :deep(> *:nth-child(2)) { animation-delay: 0.1s; }
+.summary-markdown :deep(> *:nth-child(3)) { animation-delay: 0.2s; }
+.summary-markdown :deep(> *:nth-child(4)) { animation-delay: 0.3s; }
+.summary-markdown :deep(> *:nth-child(5)) { animation-delay: 0.4s; }
+.summary-markdown :deep(> *:nth-child(6)) { animation-delay: 0.5s; }
+.summary-markdown :deep(> *:nth-child(n + 7)) { animation-delay: 0.6s; }
+
+@keyframes summary-block-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .summary-markdown :deep(> *) {
+    animation: none;
+  }
+}
+
+/* [參考 N] 引用膠囊：仿搜尋引擎 AI 摘要的來源標記，點了直接進政策內頁 */
+.summary-markdown :deep(.summary-inline-reference) {
+  display: inline-block;
+  margin: 0 3px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: rgba(194, 111, 12, 0.1);
+  border: 1px solid rgba(194, 111, 12, 0.24);
+  color: #8d4b00;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.6;
+  text-decoration: none;
+  vertical-align: 1px;
+  white-space: nowrap;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.summary-markdown :deep(.summary-inline-reference:hover) {
+  background: rgba(194, 111, 12, 0.18);
+  border-color: rgba(141, 75, 0, 0.4);
+  color: #6d3a00;
+}
+
 .summary-markdown :deep(.summary-inline-link) {
   color: #b26000;
   font-weight: 800;
@@ -1206,7 +1282,6 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid rgba(178, 96, 0, 0.28);
 }
 
-.summary-markdown :deep(.summary-inline-reference:hover),
 .summary-markdown :deep(.summary-inline-link:hover) {
   color: #8d4b00;
   border-bottom-color: rgba(141, 75, 0, 0.5);
@@ -1502,6 +1577,10 @@ onBeforeUnmount(() => {
 
   .summary-title {
     font-size: 20px;
+  }
+
+  .summary-markdown :deep(h4.summary-section-title) {
+    font-size: 16px;
   }
 
   .top-case-card {

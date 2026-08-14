@@ -20,6 +20,7 @@
     ], 
     "permission": "All"
   },
+  { "indexKey": "Chatbot_Card", "title": "芒寶回答維護", "url": {"name": "Chatbot_Card_DataList"}, "permission": "Editor" },
   { "indexKey": "Collaborator", "title": "公益夥伴維護", "url": {"name": "Collaborator_DataList"}, "permission": "Editor" },
   {
     "indexKey": "Code", 

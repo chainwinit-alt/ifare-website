@@ -35,6 +35,10 @@ import IFareQA_IndexViewVue from '@/views/IFare/QA/IFareQA_IndexView.vue'
 import IFareQA_DataListViewVue from '@/views/IFare/QA/IFareQA_DataListView.vue'
 import IFareQA_AddEditViewVue from '@/views/IFare/QA/IFareQA_AddEditView.vue'
 import IFareQA_ItemDetailViewVue from '@/views/IFare/QA/IFareQA_ItemDetailView.vue'
+import ChatbotCard_IndexViewVue from '@/views/Chatbot/Card/ChatbotCard_IndexView.vue'
+import ChatbotCard_DataListViewVue from '@/views/Chatbot/Card/ChatbotCard_DataListView.vue'
+import ChatbotCard_AddEditViewVue from '@/views/Chatbot/Card/ChatbotCard_AddEditView.vue'
+import ChatbotCard_ItemDetailViewVue from '@/views/Chatbot/Card/ChatbotCard_ItemDetailView.vue'
 //#endregion
 //#region [View.vue] IFare_OfficeUnit
 import IFareOfficeUnit_IndexViewVue from '@/views/IFare/OfficeUnit/IFareOfficeUnit_IndexView.vue'
@@ -375,6 +379,58 @@ const router = createRouter({
           meta: {
             requiresAuth: true,
             title: '常見問題瀏覽',
+            isTitleHide: true
+          }
+        }
+      ]
+      //#endregion
+    },
+    {
+      //#region Chatbot-Card
+      path: '/Chatbot-Card',
+      name: 'Chatbot_Card_Index',
+      component: ChatbotCard_IndexViewVue,
+      meta: {
+        indexKey: 'Chatbot_Card',
+        requiresAuth: true,
+        title_parent: '芒寶回答維護',
+        urlName_parent: 'Chatbot_Card_DataList'
+      },
+      children: [
+        {
+          path: '',
+          name: 'Chatbot_Card_DataList',
+          component: ChatbotCard_DataListViewVue,
+          meta: {
+            requiresAuth: true,
+            title: '芒寶回答維護'
+          }
+        },
+        {
+          path: 'Add',
+          name: 'Chatbot_Card_Add',
+          component: ChatbotCard_AddEditViewVue,
+          meta: {
+            requiresAuth: true,
+            title: '新增芒寶回答'
+          }
+        },
+        {
+          path: 'Edit',
+          name: 'Chatbot_Card_Edit',
+          component: ChatbotCard_AddEditViewVue,
+          meta: {
+            requiresAuth: true,
+            title: '編輯芒寶回答'
+          }
+        },
+        {
+          path: 'Detail',
+          name: 'Chatbot_Card_Detail',
+          component: ChatbotCard_ItemDetailViewVue,
+          meta: {
+            requiresAuth: true,
+            title: '芒寶回答瀏覽',
             isTitleHide: true
           }
         }

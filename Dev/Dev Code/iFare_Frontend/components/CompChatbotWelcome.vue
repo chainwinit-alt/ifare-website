@@ -265,7 +265,7 @@ import mascotSmileOpen from '~/IP/smile.png';
 
 type ChatRole = 'user' | 'bot';
 type ChatbotRunMode = 'script' | 'ai' | 'hybrid';
-type ChatbotApiMode = Exclude<ChatbotRunMode, 'script'>;
+type ChatbotApiMode = ChatbotRunMode;
 type ActionVariant = 'button' | 'link' | 'card';
 type FollowUpActionType = 'message' | 'route' | 'link';
 
@@ -316,207 +316,29 @@ interface FollowUpGroup {
   actions: FollowUpAction[];
 }
 
-interface SearchIntent {
-  key: string;
-  keywords: RegExp;
-  reply: string;
-  actions: FollowUpAction[];
-}
-
-// Default runtime mode.
-// - 'script': pure script, only local rules, no API call.
-// - 'ai': pure AI, call API directly and skip local scripted replies.
-// - 'hybrid': script first, then API fallback.
+// Default runtime mode（三種模式都由後端 /api/chatbot 處理）。
+// - 'script': 只用答案卡，完全不呼叫 LLM
+// - 'ai'    : 答案卡 → LLM 選卡 → LLM 生成
+// - 'hybrid': 同 'ai'
 const CHATBOT_DEFAULT_MODE = 'ai' as ChatbotRunMode;
 const CHATBOT_MODE_STORAGE_KEY = 'ifare-chatbot-mode';
-const CHATBOT_THINKING_DELAY_MS = 3000;
+
+// 「正在輸入」的最短顯示時間。
+// 答案卡命中時後端約 15ms 就回覆了，硬等 3 秒會讓人以為當掉；
+// 但完全不等又會讓泡泡瞬間閃過，所以保留一小段。
+// LLM 路徑本來就要花 1 秒以上，這個下限通常不會生效。
+const CHATBOT_THINKING_DELAY_MS = 1200;
+const CHATBOT_CARD_THINKING_DELAY_MS = 450;
+/** 由基金會事先撰寫、100% 固定語氣的回覆來源 */
+const FIXED_ANSWER_SOURCES = new Set(['card', 'card_llm']);
+
+const REQUEST_FAILED_REPLY =
+  '芒寶這邊連線不太順，請稍等一下再問一次，或直接使用上方選單找找看。';
 
 const chatbotModeOptions: Array<{ value: ChatbotRunMode; label: string; description: string }> = [
   { value: 'script', label: '快速導覽', description: '優先提供站內入口與常見問題方向' },
   { value: 'ai', label: '智能回覆', description: '協助整理開放式問題與站內資訊' },
   { value: 'hybrid', label: '綜合協助', description: '常見問題快速引導，進階問題再整理回覆' },
-];
-
-const OUT_OF_SCOPE_REPLY =
-  '芒寶是網站介紹導覽員，主要協助說明本站頁面、按鈕與操作方式。這個問題不在導覽範圍內，你可以改問我「搜尋按鈕怎麼用」、「如何篩選福利政策」或「最新消息在哪裡」。';
-
-const searchIntents: SearchIntent[] = [
-  {
-    key: 'greeting',
-    keywords: /^(嗨|你好|哈囉|哈囉芒寶|hello|hi)[！!。.]?$/i,
-    reply:
-      '嗨，我是芒寶！我可以介紹本站各頁面的用途，也能說明搜尋、篩選、清空、選單與分頁等按鈕怎麼使用。',
-    actions: [],
-  },
-  {
-    key: 'clear-filter',
-    keywords: /清空|清除|重設|取消篩選|清掉條件/,
-    reply:
-      '在 i-Fare 搜尋區按「清空」，就能一次清除受助者情況、年齡、戶籍地、關鍵字與進階篩選條件，再重新選擇需要的項目。',
-    actions: [
-      { label: '前往 i-Fare', type: 'route', to: '/ifare', variant: 'button' },
-    ],
-  },
-  {
-    key: 'filter',
-    keywords: /篩選|受助者情況|年齡區間|戶籍地|經濟條件|特殊身分|下拉|選項/,
-    reply:
-      '在 i-Fare 搜尋區可以先選「受助者情況」、「年齡區間」與「戶籍地」；需要更多條件時按「篩選」，再選經濟條件或特殊身分，最後按「搜尋」查看結果。',
-    actions: [
-      { label: '前往 i-Fare', type: 'route', to: '/ifare', variant: 'button' },
-    ],
-  },
-  {
-    key: 'search',
-    keywords: /搜尋按鈕|怎麼搜尋|如何搜尋|政策搜尋|搜尋福利|找福利|找補助|福利政策|補助|申請資格|關鍵字/,
-    reply:
-      '要找福利政策，請到 i-Fare 搜尋頁：先選需要的條件或輸入關鍵字，再按右側的「搜尋」按鈕。沒有關鍵字也可以搜尋，系統會依你選擇的條件整理站內政策。',
-    actions: [
-      { label: '前往 i-Fare', type: 'route', to: '/ifare', variant: 'button' },
-    ],
-  },
-  {
-    key: 'result',
-    keywords: /搜尋結果|結果頁|政策列表|找到.*筆|第一筆|政策內容|政策詳情|詳細內容/,
-    reply:
-      '搜尋完成後，下方會列出符合條件的政策。每筆會顯示政策名稱、適用地區與資格限制；點政策名稱即可查看完整內容。若結果太多，可以回到上方增加篩選條件。',
-    actions: [
-      { label: '前往 i-Fare', type: 'route', to: '/ifare', variant: 'button' },
-    ],
-  },
-  {
-    key: 'pagination',
-    keywords: /分頁|下一頁|上一頁|頁碼|換頁/,
-    reply:
-      '資料超過一頁時，列表下方會顯示頁碼與上一頁、下一頁按鈕。點選後會切換資料頁面，原本的搜尋條件會保留。',
-    actions: [],
-  },
-  {
-    key: 'menu',
-    keywords: /主選單|選單|導覽列|頁籤|手機選單|漢堡選單|導覽按鈕/,
-    reply:
-      '電腦版的主要頁面選單在畫面上方；手機版請按右上角的選單按鈕展開。你可以從選單前往關於長穩、最新消息、福利專欄、公益夥伴與 i-Fare。',
-    actions: [
-      { label: '回到首頁', type: 'route', to: '/', variant: 'button' },
-    ],
-  },
-  {
-    key: 'foundation-establishment',
-    keywords: /基金會.*(成立|創辦)|成立.*基金會|何時成立|什麼時候成立|哪一年成立|成立日期|創辦人|誰創辦/,
-    reply:
-      '長穩社福慈善基金會成立於 2017 年 7 月 19 日，由穩懋半導體董事長陳進財先生創辦；全穩生技農業科技集團副董事長鄔筠軒女士擔任第一任董事長迄今。基金會成立的主要目的是整合社會福利資訊，透過 i-Fare 福利好幫手提供資源，並推動教育平權、永續環境與社會關懷等公益計畫。可前往「關於長穩」頁面查看更多內容。',
-    actions: [{ label: '關於長穩', type: 'route', to: '/about', variant: 'button' }],
-  },
-  {
-    key: 'foundation-mission',
-    keywords: /基金會.*使命|使命是什麼|長穩.*使命/,
-    reply:
-      '長穩社福慈善基金會以推動「環境保育、人才培育、社會關懷」三大核心行動為使命。基金會以文化、教育與科技公益為基礎，透過永續環境行動、教育支持及社福資源整合，努力減少社會落差，為台灣下一代打造更具韌性的未來。可前往「關於長穩」頁面查看更多內容。',
-    actions: [{ label: '關於長穩', type: 'route', to: '/about', variant: 'button' }],
-  },
-  {
-    key: 'core-environment',
-    keywords: /環境保育|油芒|永續糧食|生態教育|文化復振/,
-    reply:
-      '在「環境保育」行動中，長穩面對極端氣候與環境變遷，以油芒復耕為起點，推動永續糧食研究、生態教育與在地文化復振，並透過跨域合作提升土地與社會的永續韌性。可前往「關於長穩」頁面查看更多內容。',
-    actions: [{ label: '關於長穩', type: 'route', to: '/about', variant: 'button' }],
-  },
-  {
-    key: 'core-talent',
-    keywords: /人才培育|芒望未來|兒少心理|土地教育|青年志工|教師支持|志工培訓/,
-    reply:
-      '在「人才培育」行動中，長穩以教育為核心，涵蓋兒少心理健康、土地教育、青年志工與教師支持。基金會推動「芒望未來」教育計畫、兒少心理教育、志工培訓及跨校合作，強化孩子、青年與教育者的文化力、永續力與心理韌性。可前往「關於長穩」頁面查看更多內容。',
-    actions: [{ label: '關於長穩', type: 'route', to: '/about', variant: 'button' }],
-  },
-  {
-    key: 'core-care',
-    keywords: /社會關懷|社福資源|資訊落差|資源透明|社會安全網/,
-    reply:
-      '在「社會關懷」行動中，長穩以 i-Fare 社福資源平台為核心，整合全台公部門與民間補助資訊，減少資訊落差，讓需要的人更快找到協助；並透過宣導、志工支援與跨機構合作，提升社會安全網的可近性與效能。可前往「關於長穩」頁面查看更多內容。',
-    actions: [{ label: '前往 i-Fare', type: 'route', to: '/ifare', variant: 'button' }],
-  },
-  {
-    key: 'foundation-core',
-    keywords: /三大核心|核心介紹|核心行動|基金會.*核心|長穩.*核心/,
-    reply:
-      '基金會的三大核心是「環境保育、人才培育、社會關懷」。環境保育聚焦油芒復耕與永續教育；人才培育涵蓋兒少心理、土地教育、青年志工與教師支持；社會關懷則透過 i-Fare 整合社福資源，減少資訊落差。可前往「關於長穩」頁面查看更多內容。',
-    actions: [{ label: '關於長穩', type: 'route', to: '/about', variant: 'button' }],
-  },
-  {
-    key: 'members-purpose',
-    keywords: /成員與宗旨|成員.*宗旨|團隊.*宗旨/,
-    reply:
-      '基金會由陳進財先生創辦，鄔筠軒女士擔任第一任董事長迄今，執行長為顏杏蓉女士。基金會相信每一份投入都能為孩子、家庭與土地帶來改變，並邀請大家透過加入行動、擔任志工、成為合作夥伴或提供支持，一起推動永續、教育與文化的善循環。可前往「關於長穩」頁面查看更多內容。',
-    actions: [{ label: '關於長穩', type: 'route', to: '/about', variant: 'button' }],
-  },
-  {
-    key: 'foundation-members',
-    keywords: /基金會.*(成員|團隊)|主要成員|有哪些成員|董事長|副董事長|執行長|陳進財|鄔筠軒|顏杏蓉/,
-    reply:
-      '基金會創辦人是陳進財先生，現任穩懋半導體董事長暨總裁；鄔筠軒女士為全穩生技農業科技集團副董事長，並擔任基金會第一任董事長迄今；基金會執行長為顏杏蓉女士。可前往「關於長穩」頁面查看更多內容。',
-    actions: [{ label: '關於長穩', type: 'route', to: '/about', variant: 'button' }],
-  },
-  {
-    key: 'foundation-purpose',
-    keywords: /基金會.*宗旨|宗旨是什麼|如何參與|加入行動|成為志工|支持基金會|支持我們|合作夥伴/,
-    reply:
-      '長穩相信每一份投入都能為孩子、家庭與土地帶來改變，並推動永續、教育與文化的善循環。你可以透過參與教育活動與志工服務、成為合作夥伴共同推動教育支持與社福資源整合，或提供支持來擴大公益能量。可前往「關於長穩」頁面查看更多內容。',
-    actions: [{ label: '關於長穩', type: 'route', to: '/about', variant: 'button' }],
-  },
-  {
-    key: 'about',
-    keywords: /認識長穩|關於長穩|基金會介紹|長穩在做什麼|團隊介紹/,
-    reply:
-      '長穩社福慈善基金會成立於 2017 年 7 月 19 日，由陳進財先生創辦，鄔筠軒女士擔任第一任董事長迄今。基金會以環境保育、人才培育、社會關懷為三大核心，整合福利資訊、推動教育支持與永續行動；你也可以前往「關於長穩」頁面查看成員、宗旨及參與方式。',
-    actions: [
-      { label: '關於長穩', type: 'route', to: '/about', variant: 'button' },
-    ],
-  },
-  {
-    key: 'news',
-    keywords: /最新消息|公告|近期消息|新聞|活動消息/,
-    reply:
-      '「最新消息」頁會顯示基金會公告、活動與近期更新。從上方選單點「最新消息」進入列表，再點文章標題查看完整內容。',
-    actions: [{ label: '最新消息', type: 'route', to: '/news', variant: 'button' }],
-  },
-  {
-    key: 'articles',
-    keywords: /福利專欄|專欄頁|懶人包|政策文章|文章列表/,
-    reply:
-      '「福利專欄」會整理福利資訊、政策文章與懶人包。從上方選單點「福利專欄」，再選擇文章標題閱讀完整內容。',
-    actions: [{ label: '福利專欄', type: 'route', to: '/articles', variant: 'button' }],
-  },
-  {
-    key: 'partners',
-    keywords: /公益夥伴|夥伴頁|合作單位|服務分類|核心議題/,
-    reply:
-      '「公益夥伴」頁可以依兒少、老人、身心障礙等服務分類，或環境保育、人才培育、社會關懷等核心議題查看合作單位。點分類頁籤即可切換內容。',
-    actions: [{ label: '公益夥伴', type: 'route', to: '/collaborator', variant: 'button' }],
-  },
-  {
-    key: 'contact',
-    keywords: /聯絡|電話|email|facebook|fb|社群連結|客服資訊/,
-    reply:
-      '基金會聯絡資訊與社群連結放在網站頁面下方。你可以查看聯絡電話，或點 Facebook 圖示前往粉絲團。',
-    actions: [],
-  },
-  {
-    key: 'ifare',
-    keywords: /i-?fare平台|介紹.*i-?fare|i-?fare.*(功能|怎麼用|是什麼)|福利好幫手/,
-    reply:
-      '「i-Fare」是本站的福利政策搜尋平台。你可以用受助者情況、年齡區間、戶籍地與關鍵字查找政策，需要更多條件時再按「篩選」。',
-    actions: [{ label: '前往 i-Fare', type: 'route', to: '/ifare', variant: 'button' }],
-  },
-  {
-    key: 'site',
-    keywords: /網站|網頁|導覽|介紹|首頁|長穩基金會|能做什麼|可以問什麼|怎麼用|使用方式/,
-    reply:
-      '本站主要包含「關於長穩」、「最新消息」、「福利專欄」、「公益夥伴」與「i-Fare」五個區域。你可以問我某個頁面在哪裡，或搜尋、篩選、清空等按鈕怎麼使用。',
-    actions: [
-      { label: '關於長穩', type: 'route', to: '/about', variant: 'button' },
-      { label: 'i-Fare 福利政策', type: 'route', to: '/ifare', variant: 'button' },
-    ],
-  },
 ];
 
 // 2026-06-08 UIUX #192 — icon 以 v-html 渲染，務必維持「寫死的可信 SVG 常數」；切勿改成使用者/CMS 可控來源（否則 XSS）
@@ -560,8 +382,6 @@ const suggestionChips = [
   '我要找福利政策',
   '如何聯絡基金會？',
 ];
-
-const SCRIPT_MODE_FALLBACK_REPLY = OUT_OF_SCOPE_REPLY;
 
 const isOpen = defineModel<boolean>('open', { default: false });
 const inputText = ref('');
@@ -665,8 +485,11 @@ async function scrollToMessage(messageId: number) {
   body.scrollTop += targetRect.top - bodyRect.top - 8;
 }
 
-async function waitForThinkingDelay(startedAt: number) {
-  const remaining = CHATBOT_THINKING_DELAY_MS - (Date.now() - startedAt);
+async function waitForThinkingDelay(startedAt: number, source?: string) {
+  const minimumDelay = source && FIXED_ANSWER_SOURCES.has(source)
+    ? CHATBOT_CARD_THINKING_DELAY_MS
+    : CHATBOT_THINKING_DELAY_MS;
+  const remaining = minimumDelay - (Date.now() - startedAt);
   if (remaining <= 0) return;
   await new Promise((resolve) => window.setTimeout(resolve, remaining));
 }
@@ -675,21 +498,14 @@ function normalizePrompt(prompt: string) {
   return prompt.trim().slice(0, 200);
 }
 
+// 2026-08-12：移除前端的 50 字二次截斷。
+// 回覆長度已由後端統一把關（LLM 生成限 65 字；答案卡是人撰寫的完整句子，不裁切）。
+// 前端再截一次會把答案卡從句子中間切掉，例如 i-Fare 搜尋說明只會顯示到一半。
 function normalizeDisplayedReply(reply: string) {
-  const normalized = String(reply || '')
+  return String(reply || '')
     .replace(/^(?:好呀|好啊|好的|沒問題)[！!，,。\s]*/u, '')
     .replace(/\s+/g, ' ')
     .trim();
-  const characters = Array.from(normalized);
-  if (characters.length <= 50) return normalized;
-
-  let sentenceEnd = -1;
-  for (let index = 29; index < 50; index += 1) {
-    if (/[。！？!?]/u.test(characters[index] || '')) sentenceEnd = index;
-  }
-  if (sentenceEnd >= 29) return characters.slice(0, sentenceEnd + 1).join('');
-
-  return `${characters.slice(0, 49).join('').replace(/[，、；：,;:\s]+$/u, '')}。`;
 }
 
 function isChatbotRunMode(value: unknown): value is ChatbotRunMode {
@@ -713,15 +529,6 @@ function setChatbotMode(mode: ChatbotRunMode) {
   resetConversation({ focus: false });
 }
 
-function matchSearchIntent(prompt: string) {
-  const text = prompt.toLowerCase();
-  return searchIntents.find((intent) => intent.keywords.test(text));
-}
-
-function isWebsiteGuidePrompt(prompt: string) {
-  return /網站|網頁|頁面|首頁|導覽|選單|按鈕|欄位|輸入框|下拉|選項|篩選|清空|清除|重設|頁籤|搜尋|結果|政策|福利|補助|申請|關鍵字|分頁|上一頁|下一頁|關於長穩|認識長穩|長穩基金會|成立|創辦|使命|宗旨|三大核心|核心行動|環境保育|人才培育|社會關懷|油芒|芒望未來|成員|團隊|董事長|副董事長|執行長|陳進財|鄔筠軒|顏杏蓉|志工|參與|加入行動|合作夥伴|支持基金會|i-?fare|最新消息|福利專欄|公益夥伴|公告|活動|文章|懶人包|合作單位|聯絡|電話|email|facebook|fb/i.test(prompt);
-}
-
 function uniqueActions(actions: FollowUpAction[]) {
   const seen = new Set<string>();
 
@@ -731,81 +538,6 @@ function uniqueActions(actions: FollowUpAction[]) {
     seen.add(key);
     return true;
   });
-}
-
-function buildKeywordActions(prompt: string): FollowUpAction[] {
-  const text = prompt.toLowerCase();
-  const actions: FollowUpAction[] = [];
-  const matchedIntent = matchSearchIntent(prompt);
-
-  if (matchedIntent) {
-    actions.push(...matchedIntent.actions);
-  }
-
-  if (/福利|政策|補助|資格|申請|ifare/.test(text)) {
-    actions.push(
-      { label: '前往 i-Fare', type: 'route', to: '/ifare', variant: 'button' },
-      { label: '再問一次申請資格', type: 'message', prompt: '請幫我整理申請福利時要先看哪些資格條件', variant: 'link' },
-    );
-  }
-
-  if (/網站|導覽|介紹|長穩|基金會|關於/.test(text)) {
-    actions.push(
-      { label: '關於長穩', type: 'route', to: '/about', variant: 'button' },
-      { label: 'i-Fare 福利政策', type: 'route', to: '/ifare', variant: 'button' },
-      { label: '最新消息', type: 'route', to: '/news', variant: 'link' },
-      { label: '福利專欄', type: 'route', to: '/articles', variant: 'link' },
-    );
-  }
-
-  if (/公益|夥伴|合作/.test(text)) {
-    actions.push({ label: '公益夥伴頁', type: 'route', to: '/collaborator', variant: 'button' });
-  }
-
-  if (/新聞|最新|活動/.test(text)) {
-    actions.push({ label: '最新消息', type: 'route', to: '/news', variant: 'link' });
-  }
-
-  if (/文章|資源|懶人包/.test(text)) {
-    actions.push({ label: '福利專欄', type: 'route', to: '/articles', variant: 'link' });
-  }
-
-  if (/捐款|支持|donate|donation/.test(text)) {
-    actions.push(
-      { label: '前往關於長穩', type: 'route', to: '/about', variant: 'link' },
-      {
-        label: 'LINE 真人客服',
-        type: 'link',
-        href: 'https://lin.ee/eHw9VpL',
-        target: '_blank',
-        variant: 'button',
-      },
-    );
-  }
-
-  if (/聯絡|客服|電話|line|email/.test(text)) {
-    actions.push(
-      {
-        label: '撥打電話',
-        type: 'link',
-        href: 'tel:0227978383',
-        variant: 'button',
-      },
-      {
-        label: '寄送 Email',
-        type: 'link',
-        href: 'mailto:ifaretw@gmail.com',
-        variant: 'link',
-      },
-    );
-  }
-
-  return uniqueActions(actions).slice(0, 4);
-}
-
-function getLocalKnowledgeReply(prompt: string) {
-  const matchedIntent = matchSearchIntent(prompt);
-  return matchedIntent?.reply || '';
 }
 
 async function requestBotReply(prompt: string, userMessageId: number, startedAt: number) {
@@ -835,11 +567,11 @@ async function requestBotReply(prompt: string, userMessageId: number, startedAt:
   }
 }
 
+// 2026-08-12：三種模式一律走 API。
+// 原本 script 模式在前端另存一份 24 條規則，與後端知識庫重複維護；
+// 現在後端的 mode='script' 就是「只用答案卡、完全不呼叫 LLM」，語意一致且只有一份資料。
 async function requestScriptModeReply(prompt: string, sessionId: number, startedAt: number) {
-  const localReply = getLocalKnowledgeReply(prompt) || SCRIPT_MODE_FALLBACK_REPLY;
-  await waitForThinkingDelay(startedAt);
-  if (sessionId !== chatSessionId.value) return;
-  pushMessage('bot', normalizeDisplayedReply(localReply));
+  await requestApiReply(prompt, sessionId, 'script', startedAt);
 }
 
 async function requestAiModeReply(prompt: string, sessionId: number, startedAt: number) {
@@ -847,7 +579,6 @@ async function requestAiModeReply(prompt: string, sessionId: number, startedAt: 
 }
 
 async function requestHybridModeReply(prompt: string, sessionId: number, startedAt: number) {
-  // Hybrid mode now uses the API first. Local rules are kept only as request-failure fallback.
   await requestApiReply(prompt, sessionId, 'hybrid', startedAt);
 }
 
@@ -865,7 +596,7 @@ async function requestApiReply(prompt: string, sessionId: number, mode: ChatbotA
       },
     });
 
-    await waitForThinkingDelay(startedAt);
+    await waitForThinkingDelay(startedAt, response.source);
     if (sessionId !== chatSessionId.value) return;
     pushMessage('bot', normalizeDisplayedReply(response.reply), {
       stripHtml: true,
@@ -882,10 +613,7 @@ async function requestApiReply(prompt: string, sessionId: number, mode: ChatbotA
     if (sessionId !== chatSessionId.value) return;
     lastErrorCode.value = '';
     lastErrorRetryable.value = false;
-    pushMessage(
-      'bot',
-      normalizeDisplayedReply(getLocalKnowledgeReply(prompt) || SCRIPT_MODE_FALLBACK_REPLY),
-    );
+    pushMessage('bot', REQUEST_FAILED_REPLY);
   }
 }
 

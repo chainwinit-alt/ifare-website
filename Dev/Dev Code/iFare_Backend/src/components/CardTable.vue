@@ -209,6 +209,9 @@ const handleClick = (_data: any, _btnType: string) => {
     case "IFare_QA":
       handleClick_IFare_QA(_data, _btnType);
       break;
+    case "Chatbot_Card":
+      handleClick_Chatbot_Card(_data, _btnType);
+      break;
     case "IFare_OfficeUnit":
       handleClick_IFare_OfficeUnit(_data);
       break;
@@ -268,6 +271,15 @@ const handleClick_IFare_QA = (_data: any, _btnType: string) => {
   param.value = { id: _id}
   isDialogAlertVisible.value = true
   confirmApiName.value = 'DeleteFareQA'
+};
+
+const handleClick_Chatbot_Card = (_data: any, _btnType: string) => {
+  const _id = _data.row.id;
+  if (_btnType != "刪除") return _global?.$router.push({ name: "Chatbot_Card_Detail", query: {id: _id} });
+
+  param.value = { id: _id}
+  isDialogAlertVisible.value = true
+  confirmApiName.value = 'DeleteChatbotCard'
 };
 
 const handleClick_IFare_OfficeUnit = (_data: any) => {
@@ -370,6 +382,25 @@ const deleteConfirm = (callApiName:string, _param:any) => {
         let _res = _resData.result;
         if (_res.errCode != 0) {
           $Message({ message: '_res.errMsg', type: "error" })
+          return console.error(_res.errMsg);
+        }
+
+        let removeIndex = tbData.value.findIndex((item:any) => item.id == _id)
+        tbData.value.splice(removeIndex, 1)
+        $Message({ message: '刪除成功', type: "success" })
+      });
+      break;
+    case 'DeleteChatbotCard':
+      $WebAPI.DeleteChatbotCard(userStore.token, _id, (res: any) => {
+        let _resData = res.data || "error";
+        if (_resData == "error") {
+          $Message({ message: `API res ${_resData}`, type: "error" })
+          return console.error(`API res ${_resData}`);
+        }
+
+        let _res = _resData.result;
+        if (_res.errCode != 0) {
+          $Message({ message: _res.errMsg, type: "error" })
           return console.error(_res.errMsg);
         }
 

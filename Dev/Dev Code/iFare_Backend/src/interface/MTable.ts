@@ -41,6 +41,10 @@ export interface TbDataInfo_IFareOfficeUnit extends TbDataInfo_Basic {
 export interface TbDataInfo_IFareQA extends TbDataInfo_Basic {
 }
 
+export interface TbDataInfo_ChatbotCard extends TbDataInfo_Basic {
+    cardKey: string
+}
+
 export interface TbDataInfo_Collaborator extends TbDataInfo_Basic {
 }
 

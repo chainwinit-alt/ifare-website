@@ -34,6 +34,8 @@ namespace IFare_BDAPI
             IfarePolicyUpdateUsers = new HashSet<IfarePolicy>();
             IfareQaCreateUsers = new HashSet<IfareQa>();
             IfareQaUpdateUsers = new HashSet<IfareQa>();
+            ChatbotCardCreateUsers = new HashSet<ChatbotCard>();
+            ChatbotCardUpdateUsers = new HashSet<ChatbotCard>();
             Images = new HashSet<Image>();
             ImgManages = new HashSet<ImgManage>();
             InverseCreateUser = new HashSet<SysUser>();
@@ -82,6 +84,8 @@ namespace IFare_BDAPI
         public virtual ICollection<IfarePolicy> IfarePolicyUpdateUsers { get; set; }
         public virtual ICollection<IfareQa> IfareQaCreateUsers { get; set; }
         public virtual ICollection<IfareQa> IfareQaUpdateUsers { get; set; }
+        public virtual ICollection<ChatbotCard> ChatbotCardCreateUsers { get; set; }
+        public virtual ICollection<ChatbotCard> ChatbotCardUpdateUsers { get; set; }
         public virtual ICollection<Image> Images { get; set; }
         public virtual ICollection<ImgManage> ImgManages { get; set; }
         public virtual ICollection<SysUser> InverseCreateUser { get; set; }

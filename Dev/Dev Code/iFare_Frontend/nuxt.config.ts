@@ -36,11 +36,20 @@ const shouldDisableHmrByDefault =
   !readEnv("NUXT_HMR_HOST", "NUXT_HMR_CLIENT_PORT") &&
   !readEnv("NUXT_REMOTE_STABLE", "IFARE_REMOTE_STABLE");
 
-const RESOLVED_PUBLIC_FRONTEND_API_BASE =
+// 機器層級環境變數 NUXT_PUBLIC_FRONTEND_API_BASE="/ifare_api/..." 若從 git-bash 啟動，
+// 會被 MSYS 路徑轉換誤改成 "C:/Program Files/Git/ifare_api/..."，導致瀏覽器把 API 打到
+// file:// 而整站搜尋變 0 筆。這裡把被誤轉的值還原成站內相對路徑。
+const normalizePublicApiBase = (value: string) => {
+  const mangled = value.match(/^[A-Za-z]:[\\/].*?([\\/]ifare_api[\\/].*)$/i);
+  return mangled ? mangled[1].replace(/\\/g, "/") : value;
+};
+
+const RESOLVED_PUBLIC_FRONTEND_API_BASE = normalizePublicApiBase(
   process.env.NUXT_PUBLIC_FRONTEND_API_BASE ||
   (process.env.NODE_ENV === "development"
     ? DEFAULT_DEV_PUBLIC_FRONTEND_API_BASE
-    : DEFAULT_FRONTEND_API_BASE);
+    : DEFAULT_FRONTEND_API_BASE)
+);
 
 export default defineNuxtConfig({
   devtools: { enabled: false },
@@ -56,6 +65,11 @@ export default defineNuxtConfig({
   runtimeConfig: {
     frontendApiServerBase:
       process.env.NUXT_FRONTEND_API_SERVER_BASE || DEFAULT_FRONTEND_API_BASE,
+    // 芒寶自動知識庫：常見問題(FareQA)自動轉答案卡、最新消息/專欄標題進生成層。
+    // 預設開啟；設 NUXT_CHATBOT_RAG_ENABLED=0 可關閉。
+    chatbotRagEnabled: !["0", "false", "off"].includes(
+      (readEnv("NUXT_CHATBOT_RAG_ENABLED") || "true").toLowerCase()
+    ),
     dynamicApiToken: process.env.NUXT_DYNAMIC_API_TOKEN || "",
     dynamicApiAllowedOrigins: process.env.NUXT_DYNAMIC_API_ALLOWED_ORIGINS || "",
     geminiApiKey: readEnv(
@@ -81,14 +95,18 @@ export default defineNuxtConfig({
         "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash-lite",
       groqApiKey:
         readEnv("NUXT_LLM_GROQ_API_KEY", "GROQ_API_KEY") || DEFAULT_GROQ_API_KEY,
+      // 2026-08-12：qwen/qwen3.6-27b 是 Groq 的 Preview 模型，官方警告
+      // 「may be discontinued at short notice」，且價格為 gpt-oss-20b 的 8.3 倍、
+      // 繁體中文 tokenizer 支援較弱。改用 Production 的 gpt-oss 系列，
+      // 該系列另支援 prompt caching（快取輸入 5 折，自動生效且免費）。
       groqModel:
-        readEnv("NUXT_GROQ_MODEL", "GROQ_MODEL") || "qwen/qwen3.6-27b",
+        readEnv("NUXT_GROQ_MODEL", "GROQ_MODEL") || "openai/gpt-oss-20b",
       groqModels:
         readEnv("NUXT_LLM_GROQ_MODELS") ||
-        "qwen/qwen3.6-27b,openai/gpt-oss-120b",
+        "openai/gpt-oss-20b,openai/gpt-oss-120b",
       groqIntentModels:
         readEnv("NUXT_LLM_GROQ_INTENT_MODELS") ||
-        "qwen/qwen3.6-27b,openai/gpt-oss-120b",
+        "openai/gpt-oss-20b,openai/gpt-oss-120b",
       summaryCacheTtlMs: Number(readEnv("NUXT_LLM_SUMMARY_CACHE_TTL_MS")) || 86400000,
       ollamaBaseUrl: readEnv("NUXT_OLLAMA_BASE_URL") || "http://localhost:11434",
       ollamaModel: readEnv("NUXT_OLLAMA_MODEL") || "llama3.1",
@@ -104,7 +122,8 @@ export default defineNuxtConfig({
   nitro: {
     devProxy: {
       "/ifare_api/api/services/app": {
-        target: DEFAULT_FRONTEND_API_BASE,
+        // 2026-08-14：10.200.0.39 從開發機連線不穩，允許用環境變數改指本機 IIS 的 API
+        target: readEnv("NUXT_DEV_PROXY_TARGET") || DEFAULT_FRONTEND_API_BASE,
         changeOrigin: true,
         secure: false,
       },

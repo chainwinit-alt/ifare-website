@@ -226,6 +226,13 @@ function checkCompToShow(_compName: string) {
     );
   }
 
+  if (props.searchMode == "Chatbot_Card") {
+    return (
+      _compName == "daterangepicker_createDate" ||
+      _compName == "daterangepicker_updateDate"
+    );
+  }
+
   if (props.searchMode == "IFare_QA") {
     return (
       _compName == "daterangepicker_createDate" ||

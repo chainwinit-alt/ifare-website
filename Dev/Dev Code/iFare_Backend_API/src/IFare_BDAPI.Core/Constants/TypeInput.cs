@@ -16,5 +16,7 @@ namespace IFare_BDAPI.Constants
         public const string Tel = "電話";
         public const string Url = "連結";
         public const string ImgType = "圖片類別";
+        public const string CardKey = "卡片代號";
+        public const string Keywords = "問法關鍵字";
     }
 }

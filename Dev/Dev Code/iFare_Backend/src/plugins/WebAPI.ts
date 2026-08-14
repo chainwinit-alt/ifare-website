@@ -364,6 +364,59 @@ export default {
                 this.ajax(ajaxRef, callback)
             },
             //#endregion
+            //#region Chatbot_Card
+            GetChatbotCardList(token: string, createDate_start: string, createDate_end: string, updateDate_start: string, updateDate_end: string, ids: Array<number>, callback: any){
+                const ajaxRef = new AjaxRef('/ChatbotCard/GetDataList')
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                ajaxRef.setParams({
+                    CreateDateStart: createDate_start,
+                    CreateDateEnd: createDate_end,
+                    UpdateDateStart: updateDate_start,
+                    UpdateDateEnd: updateDate_end,
+                    IDs: ids
+                })
+                this.ajax(ajaxRef, callback)
+            },
+            InsertChatbotCard(token: string, cardKey: string, title: string, keywords: string, answer: string, linkKeys: string, priority: number, sort: number, state: boolean, callback: any){
+                const ajaxRef = new AjaxRef('/ChatbotCard/InsertChatbotCard', "post")
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                ajaxRef.setData({
+                    cardKey: cardKey,
+                    title: title,
+                    keywords: keywords,
+                    answer: answer,
+                    linkKeys: linkKeys,
+                    priority: priority,
+                    sort: sort,
+                    isEnabled: state
+                  })
+                this.ajax(ajaxRef, callback)
+            },
+            UpdateChatbotCard(token: string, id: number, cardKey: string, title: string, keywords: string, answer: string, linkKeys: string, priority: number, sort: number, state: boolean, callback: any){
+                const ajaxRef = new AjaxRef('/ChatbotCard/UpdateChatbotCard', "post")
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                ajaxRef.setData({
+                    id: id,
+                    cardKey: cardKey,
+                    title: title,
+                    keywords: keywords,
+                    answer: answer,
+                    linkKeys: linkKeys,
+                    priority: priority,
+                    sort: sort,
+                    isEnabled: state
+                  })
+                this.ajax(ajaxRef, callback)
+            },
+            DeleteChatbotCard(token: string, id: number, callback: any){
+                const ajaxRef = new AjaxRef('/ChatbotCard/DeleteChatbotCard', "post")
+                ajaxRef.setHeaders({ Authorization: "Bearer " + token})
+                ajaxRef.setData({
+                    id: id
+                  })
+                this.ajax(ajaxRef, callback)
+            },
+            //#endregion
             //#endregion
             //#region Collaborator
             GetCollaboratorList(token: string, state: string, updateDate_start: string, updateDate_end: string, searchName: string, ids: Array<number>, callback: any){

@@ -38,6 +38,7 @@ namespace IFare_BDAPI.Context
         public virtual DbSet<IfarePolicyCodeIncome> IfarePolicyCodeIncomes { get; set; }
         public virtual DbSet<IfarePolicyCodeKeyword> IfarePolicyCodeKeywords { get; set; }
         public virtual DbSet<IfarePolicyCodeRecipient> IfarePolicyCodeRecipients { get; set; }
+        public virtual DbSet<ChatbotCard> ChatbotCards { get; set; }
         public virtual DbSet<IfareQa> IfareQas { get; set; }
         public virtual DbSet<Image> Images { get; set; }
         public virtual DbSet<ImgManage> ImgManages { get; set; }
@@ -787,6 +788,60 @@ namespace IFare_BDAPI.Context
                     .WithMany(p => p.IfarePolicyCodeRecipients)
                     .HasForeignKey(d => d.IfarePolicyId)
                     .HasConstraintName("FK_IFarePolicy_CodeRecipient_IFarePolicy");
+            });
+
+            modelBuilder.Entity<ChatbotCard>(entity =>
+            {
+                entity.ToTable("ChatbotCard");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.HasIndex(e => e.CardKey).HasDatabaseName("IX_ChatbotCard_CardKey");
+
+                entity.Property(e => e.CardKey)
+                    .IsRequired()
+                    .HasMaxLength(64);
+
+                entity.Property(e => e.Title)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.Keywords).IsRequired();
+
+                entity.Property(e => e.Answer).IsRequired();
+
+                entity.Property(e => e.LinkKeys).HasMaxLength(200);
+
+                entity.Property(e => e.Priority)
+                    .HasColumnType("decimal(3, 2)")
+                    .HasDefaultValueSql("((1.00))");
+
+                entity.Property(e => e.Sort).HasDefaultValueSql("((0))");
+
+                entity.Property(e => e.State)
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasDefaultValueSql("(N'停用')");
+
+                entity.Property(e => e.CreateTime)
+                    .HasColumnType("datetime")
+                    .HasDefaultValueSql("(getdate())");
+
+                entity.Property(e => e.UpdateTime).HasColumnType("datetime");
+
+                entity.Property(e => e.CreateUserId).HasColumnName("CreateUser_ID");
+
+                entity.Property(e => e.UpdateUserId).HasColumnName("UpdateUser_ID");
+
+                entity.HasOne(d => d.CreateUser)
+                    .WithMany(p => p.ChatbotCardCreateUsers)
+                    .HasForeignKey(d => d.CreateUserId)
+                    .HasConstraintName("FK_ChatbotCard_SysUser");
+
+                entity.HasOne(d => d.UpdateUser)
+                    .WithMany(p => p.ChatbotCardUpdateUsers)
+                    .HasForeignKey(d => d.UpdateUserId)
+                    .HasConstraintName("FK_ChatbotCard_SysUser1");
             });
 
             modelBuilder.Entity<IfareQa>(entity =>

@@ -10,8 +10,10 @@ export const DEFAULT_GEMINI_MODELS = [
   "gemini-2.5-flash-lite",
 ];
 
+// 2026-08-12：qwen/qwen3.6-27b 為 Groq Preview 模型（官方警告可能隨時下架），
+// 改用 Production 的 gpt-oss 系列，成本較低且支援 prompt caching。
 export const DEFAULT_GROQ_MODELS = [
-  "qwen/qwen3.6-27b",
+  "openai/gpt-oss-20b",
   "openai/gpt-oss-120b",
 ];
 
@@ -51,6 +53,7 @@ export function parseModelList(
 
 function buildCacheKey(input: LlmSummaryInput) {
   return JSON.stringify({
+    mode: input.mode || "guidance",
     query: (input.query || input.context?.query || "").trim().toLowerCase(),
     context: input.context || {},
     cases: input.cases.map(item => ({ id: item.id, title: item.title })),
@@ -145,7 +148,12 @@ export async function summarizeWithFreeTier(
     if (isCoolingDown(candidateKey)) continue;
 
     try {
-      const summary = (await candidate.client.summarize(input)).replace(/\s+/g, " ").trim();
+      const rawSummary = await candidate.client.summarize(input);
+      // overview / overview_general 是多段 Markdown，換行就是版面結構，只能收斂行內空白；
+      // guidance 維持原本的單行輸出。
+      const summary = input.mode === "overview" || input.mode === "overview_general"
+        ? rawSummary.replace(/[ \t]+/g, " ").trim()
+        : rawSummary.replace(/\s+/g, " ").trim();
       if (!summary) throw new Error("LLM returned an empty summary.");
 
       const result: FreeTierSummaryResult = {

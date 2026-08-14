@@ -29,11 +29,23 @@ function categorizeError(error: any): ApiErrorCategory {
 
 const API_TIMEOUT_MS = 90000
 
+// 機器層級環境變數 NUXT_PUBLIC_FRONTEND_API_BASE="/ifare_api/..." 若 dev server 從
+// git-bash 啟動，MSYS 路徑轉換會把值誤改成 "C:/Program Files/Git/ifare_api/..."，
+// 導致瀏覽器把 API 打到 file:// 而整站資料變空。這裡在執行期把誤轉的值還原。
+// （Nuxt 的 NUXT_PUBLIC_* 執行期覆寫發生在 nuxt.config 之後，所以必須在這裡處理。）
+function normalizeApiBase(value: unknown) {
+    const base = String(value || '')
+    const mangled = base.match(/^[A-Za-z]:[\\/].*?([\\/]ifare_api[\\/].*)$/i)
+    return mangled ? mangled[1].replace(/\\/g, '/') : base
+}
+
 export default defineNuxtPlugin(() => {
     const config = useRuntimeConfig()
-    const baseURL = import.meta.server
-        ? config.frontendApiServerBase
-        : config.public.frontendApiBase
+    const baseURL = normalizeApiBase(
+        import.meta.server
+            ? config.frontendApiServerBase
+            : config.public.frontendApiBase
+    )
 
     function logError(info: ApiErrorInfo) {
         // 結構化 log，方便日後改成集中 reporter

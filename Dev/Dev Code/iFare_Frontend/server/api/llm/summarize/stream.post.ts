@@ -9,6 +9,7 @@ import { enrichSummaryCases } from "../../../utils/llm/enrich";
 import type {
   LlmSummaryCaseItem,
   LlmSummaryConversationMessage,
+  LlmSummaryMode,
   LlmSummarySearchContext,
 } from "../../../utils/llm/types";
 
@@ -91,11 +92,29 @@ export default defineEventHandler(async (event) => {
     ),
     3
   );
+  // 首次摘要且站內有相符政策 → 引用版結構化總覽（overview）；
+  // 首次摘要但查無政策 → 清楚標示的一般知識總覽（overview_general，可用環境變數關閉）；
+  // 追問對話 → 維持原本的一句話循序引導（guidance）。
+  const generalFallbackEnabled = !["0", "false", "off"].includes(
+    String(
+      llmConfig.summaryGeneralFallback
+        ?? process.env.NUXT_LLM_SUMMARY_GENERAL_FALLBACK
+        ?? "true"
+    ).toLowerCase()
+  );
+  const mode: LlmSummaryMode = conversation.length > 0
+    ? "guidance"
+    : enrichedCases.length > 0
+      ? "overview"
+      : generalFallbackEnabled
+        ? "overview_general"
+        : "guidance";
   const input = {
     query,
     context: body.context,
     cases: enrichedCases,
     conversation,
+    mode,
   };
 
   return createSseResponse(async (push) => {
@@ -104,6 +123,7 @@ export default defineEventHandler(async (event) => {
     push("meta", {
       provider: "auto",
       model: "",
+      mode,
       requestBytes,
       requestKilobytes: toKilobytes(requestBytes),
       streaming: false,
@@ -123,6 +143,7 @@ export default defineEventHandler(async (event) => {
       push("meta", {
         provider: result.provider,
         model: result.model,
+        mode,
         cached: result.cached,
         streaming: false,
       });
@@ -131,6 +152,7 @@ export default defineEventHandler(async (event) => {
         summary: result.summary,
         provider: result.provider,
         model: result.model,
+        mode,
         cached: result.cached,
         fallback: false,
         requestBytes,
@@ -159,6 +181,7 @@ export default defineEventHandler(async (event) => {
         summary,
         provider: isConversation ? "unavailable" : "fallback",
         model: isConversation ? "" : "script",
+        mode: "guidance",
         cached: false,
         fallback: !isConversation,
         requestBytes,
