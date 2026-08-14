@@ -17,6 +17,7 @@ import {
 import {
   rankCards,
   findDirectMatch,
+  requestsMissingDatum,
   MAX_CANDIDATES,
   FALLBACK_MATCH_THRESHOLD,
 } from '../utils/chatbot/matcher';
@@ -699,13 +700,17 @@ export default defineEventHandler(async (event) => {
       const routedId = parseRoutedCardId(raw, routeCards);
       if (routedId) {
         const card = routeCards.find(item => item.id === routedId)!;
-        return cardResponse(card, 'card_llm', {
-          mode: requestMode,
-          model: candidate.model,
-          router: candidate.provider,
-        });
+        // 與 Layer 1 同一道防線：問「最新、多少錢」等具體內容而卡片答案沒有時，
+        // 不採用選卡結果，放行到生成層（那裡有自動同步的最新標題等站內資料）
+        if (!requestsMissingDatum(message, card)) {
+          return cardResponse(card, 'card_llm', {
+            mode: requestMode,
+            model: candidate.model,
+            router: candidate.provider,
+          });
+        }
       }
-      // 模型判定沒有合適卡片：不再換供應商重問，直接進入生成層
+      // 模型判定沒有合適卡片（或選到答不出具體內容的卡）：直接進入生成層
       break;
     } catch (error: any) {
       // AbortError 是 DOMException，帶數字 code 20，必須先看名稱再退回字串 code

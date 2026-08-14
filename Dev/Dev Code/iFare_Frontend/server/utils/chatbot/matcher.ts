@@ -172,10 +172,13 @@ export function rankCards(query: string, cards: ChatbotCard[]): CardMatch[] {
  * 但後者網站根本沒有答案。這種情況必須擋下直接命中、交給 LLM 判斷，
  * 否則芒寶會用很肯定的語氣回一段答非所問的話。
  */
+// 「最新、最近、哪一篇」是在問實際內容清單（例如專欄最新一篇是什麼），
+// 導覽卡的固定答案沒有這些內容時不可直接命中，要放行給 LLM 層
+// （生成層帶著自動同步的最新標題，答得出實際內容）。
 const SPECIFIC_DATUM_PATTERN =
-  /幾號|幾個|幾位|幾人|幾間|幾點|幾歲|幾年|多少錢|多少元|多少人|多少|哪一天|名單|電話|地址|信箱|email|薪水|待遇|預算|費用|價格|金額/gi;
+  /幾號|幾個|幾位|幾人|幾間|幾點|幾歲|幾年|多少錢|多少元|多少人|多少|哪一天|名單|電話|地址|信箱|email|薪水|待遇|預算|費用|價格|金額|最新|最近|哪一篇|哪幾篇|哪一則/gi;
 
-function requestsMissingDatum(query: string, card: ChatbotCard) {
+export function requestsMissingDatum(query: string, card: ChatbotCard) {
   const normalizedQuery = normalizeText(query);
   const markers = normalizedQuery.match(SPECIFIC_DATUM_PATTERN);
   if (!markers?.length) return false;
