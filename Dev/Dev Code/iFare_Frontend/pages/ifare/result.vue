@@ -835,6 +835,9 @@ type SearchIntentResult = {
   searchQuery?: string;
   intent?: string;
   area?: string;
+  recipient?: string;
+  income?: string;
+  identities?: string[];
   source?: "groq" | "gemini" | "fallback" | "skipped";
   model?: string;
   errorMessage?: string;
@@ -1099,6 +1102,9 @@ onMounted(() => {
 type ResolvedPolicySearchIntent = {
   query: string;
   area: string;
+  recipient: string;
+  income: string;
+  identities: string[];
 };
 
 function normalizeAreaLabel(value: unknown) {
@@ -1125,12 +1131,21 @@ async function applyResolvedSearchArea(areaName: string) {
   return true;
 }
 
+const EMPTY_RESOLVED_INTENT_CONDITIONS = {
+  area: "",
+  recipient: "",
+  income: "",
+  identities: [] as string[],
+};
+
 async function resolvePolicySearchIntent(
   originalQuery: string,
   conversation: SummaryConversationMessage[] = [],
 ): Promise<ResolvedPolicySearchIntent> {
   const normalizedQuery = normalizeSummaryKeyword(originalQuery);
-  if (!normalizedQuery || !process.client) return { query: normalizedQuery, area: "" };
+  if (!normalizedQuery || !process.client) {
+    return { query: normalizedQuery, ...EMPTY_RESOLVED_INTENT_CONDITIONS };
+  }
 
   try {
     const result = await $fetch<SearchIntentResult>("/api/llm/search-intent", {
@@ -1144,11 +1159,99 @@ async function resolvePolicySearchIntent(
     return {
       query: normalizeSummaryKeyword(result?.searchQuery) || normalizedQuery,
       area: normalizeAreaLabel(result?.area),
+      recipient: String(result?.recipient || "").trim(),
+      income: String(result?.income || "").trim(),
+      identities: Array.isArray(result?.identities)
+        ? result.identities.map((item) => String(item || "").trim()).filter(Boolean)
+        : [],
     };
   } catch (error) {
     console.warn("[iFare][search-intent]", error);
-    return { query: normalizedQuery, area: "" };
+    return { query: normalizedQuery, ...EMPTY_RESOLVED_INTENT_CONDITIONS };
   }
+}
+
+/** 篩選選項標籤比對：容忍「＆、及、和」與繁簡寫差異 */
+function matchFilterLabel(optionName: string, target: string) {
+  const normalize = (value: string) =>
+    String(value || "")
+      .replace(/臺/gu, "台")
+      .replace(/[＆&及和\s　]/gu, "");
+  const option = normalize(optionName);
+  const wanted = normalize(target);
+  if (!option || !wanted) return false;
+  return option === wanted || option.includes(wanted) || wanted.includes(option);
+}
+
+/**
+ * 把意圖解析出的條件自動套進篩選器。
+ * 原則：戶籍地沿用既有行為（明確地名可切換）；年齡／經濟／身分只在
+ * 「使用者尚未自行選擇」時才自動帶入，絕不覆蓋使用者手動設定的條件。
+ */
+async function applyResolvedSearchFilters(intent: ResolvedPolicySearchIntent) {
+  let changed = await applyResolvedSearchArea(intent.area);
+
+  if (intent.recipient && !codeSelectRecipient.value) {
+    await codeRecipient.catch(() => undefined);
+    const item = recipientSelectList.find((entry) => matchFilterLabel(entry.name, intent.recipient));
+    if (item) {
+      SwitchRecipient(item.val);
+      activeSummaryState.recipient = codeSelectRecipient.value;
+      changed = true;
+    }
+  }
+
+  if (intent.income && codeSelectIncomes.value.length === 0) {
+    await codeIncome.catch(() => undefined);
+    const item = incomeSelectList.find((entry) => matchFilterLabel(entry.name, intent.income));
+    if (item) {
+      SwitchIncome(item.val);
+      activeSummaryState.incomes = [...codeSelectIncomes.value];
+      changed = true;
+    }
+  }
+
+  if (intent.identities.length > 0 && codeSelectIdentity.value.length === 0) {
+    await codeIdentity.catch(() => undefined);
+    let identityChanged = false;
+    for (const label of intent.identities) {
+      const item = identitySelectList.find((entry) => matchFilterLabel(entry.name, label));
+      if (item && !codeSelectIdentity.value.includes(item.val)) {
+        SwitchIdentity(item.val);
+        identityChanged = true;
+      }
+    }
+    if (identityChanged) {
+      activeSummaryState.identities = [...codeSelectIdentity.value];
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    const routeQuery: Record<string, any> = { ...$route.query };
+    if (codeSelectRecipient.value) routeQuery.recipient = codeSelectRecipient.value;
+    else delete routeQuery.recipient;
+    if (codeSelectIncomes.value.length > 0) routeQuery.income = codeSelectIncomes.value.join(",");
+    else delete routeQuery.income;
+    if (codeSelectIdentity.value.length > 0) routeQuery.identities = codeSelectIdentity.value.join(",");
+    else delete routeQuery.identities;
+    await $router.replace({ query: routeQuery });
+  }
+
+  return changed;
+}
+
+/**
+ * 複數關鍵字（「低收入戶 新北市老人津貼」）拆成分段，各自多打一次搜尋 API，
+ * 由 reciprocal-rank fusion 合併。單一關鍵字回空陣列、不多發請求。
+ */
+function splitQuerySegments(query: string) {
+  const segments = String(query || "")
+    .split(/[\s　,，、;；/／]+/u)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 2);
+  const unique = [...new Set(segments)].filter((item) => item !== query.trim());
+  return unique.length >= 2 ? unique : [];
 }
 
 function mapPolicySearchItems(items: any[]): iFarePolicyItem[] {
@@ -1201,7 +1304,7 @@ async function searchSummaryConversationPolicies(
   if (requestId !== policySearchRequestId) {
     return { query: resolvedQuery || originalQuery, cases: [...storageiFarePolicyList] };
   }
-  await applyResolvedSearchArea(resolvedIntent.area);
+  await applyResolvedSearchFilters(resolvedIntent);
   if (requestId !== policySearchRequestId) {
     return { query: resolvedQuery || originalQuery, cases: [...storageiFarePolicyList] };
   }
@@ -1256,12 +1359,12 @@ async function SetDataInit() {
   const resolvedIntent = await resolvePolicySearchIntent(originalQuery);
   const resolvedQuery = resolvedIntent.query;
   if (requestId !== policySearchRequestId) return;
-  const areaChanged = await applyResolvedSearchArea(resolvedIntent.area);
+  const filtersChanged = await applyResolvedSearchFilters(resolvedIntent);
   if (requestId !== policySearchRequestId) return;
-  const originalQueries = areaChanged
+  const originalQueries = filtersChanged
     ? buildFarePolicyApiQueries(originalQuery)
     : prefetchedOriginalQueries;
-  const originalResponsePromise = areaChanged
+  const originalResponsePromise = filtersChanged
     ? Promise.all(
         originalQueries.map((query) => $WebApiGet("/FarePolicy/GetIFarePolicyList", query))
       )
@@ -1281,18 +1384,27 @@ async function SetDataInit() {
         weight: 0.3,
       }))
     : [];
+  // 複數關鍵字：每個分段各自查一次，字面命中權重高於 AI 擴充
+  const segmentPlans: PolicySearchRequestPlan[] = splitQuerySegments(originalQuery)
+    .flatMap((segment) => buildFarePolicyApiQueries(segment))
+    .map((query) => ({
+      query,
+      source: "original" as const,
+      weight: 0.45,
+    }));
 
   try {
-    const [originalResponses, aiResponses] = await Promise.all([
+    const extraPlans = [...segmentPlans, ...aiPlans];
+    const [originalResponses, extraResponses] = await Promise.all([
       originalResponsePromise,
       Promise.all(
-        aiPlans.map((plan) => $WebApiGet("/FarePolicy/GetIFarePolicyList", plan.query))
+        extraPlans.map((plan) => $WebApiGet("/FarePolicy/GetIFarePolicyList", plan.query))
       ),
     ]);
     if (requestId !== policySearchRequestId) return;
 
-    const responses = [...originalResponses, ...aiResponses];
-    const plans = [...requestPlans, ...aiPlans];
+    const responses = [...originalResponses, ...extraResponses];
+    const plans = [...requestPlans, ...extraPlans];
     const responseItems = responses.flatMap(getPolicyResponseItems);
     const rawItems = originalQuery
       ? mergeRankedPolicySearchResults(plans, responses, originalQuery, resolvedQuery)

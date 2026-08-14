@@ -4,8 +4,11 @@ import {
   parseModelList,
 } from "../../utils/llm/freeTier";
 import {
+  extractExplicitSearchConditions,
+  fixCommonTypos,
   normalizeFallbackIntentTopic,
   normalizeRespectfulPolicyTerm,
+  type ExplicitSearchConditions,
 } from "../../../utils/ifareIntent";
 import {
   normalizeSummaryQuery,
@@ -26,10 +29,50 @@ interface SearchIntentResponse {
   searchQuery?: string;
   intent?: string;
   area?: string;
+  recipient?: string;
+  income?: string;
+  identities?: unknown;
 }
 
 const SEARCH_INTENT_SYSTEM_PROMPT =
-  "You convert a user's Traditional Chinese question into one concise core topic and explicit search conditions for welfare policies inside i-Fare. Preserve the user's concrete main need and meaning. If the input contains a concrete topic together with generic benefit or request words such as subsidy, allowance, welfare, policy, eligibility, apply, search, or what is available, omit those generic words from searchQuery and keep only the concrete topic. Convert colloquial, outdated, or stigmatizing expressions into respectful contemporary terminology commonly used in Taiwan welfare policies without diagnosing the user or inventing a narrower need. Resolve an explicitly supplied Taiwan county, city, township, town, city district, or district to its parent county or city in area. Never derive area from candidate policies or assistant messages. If no concrete topic exists, preserve the original query. Do not infer a narrower service, benefit, identity, medical condition, or life event that the user did not mention. Return JSON only.";
+  "You convert a user's Traditional Chinese input (a keyword, several keywords, or a full question sentence) into one concise core topic and explicit structured search conditions for welfare policies inside i-Fare. Preserve the user's concrete main need and meaning. Silently correct obvious typos and homophone slips first (for example 老任津貼 means 老人津貼). If the input contains a concrete topic together with generic benefit or request words such as subsidy, allowance, welfare, policy, eligibility, apply, search, or what is available, omit those generic words from searchQuery and keep only the concrete topic. Convert colloquial, outdated, or stigmatizing expressions into respectful contemporary terminology commonly used in Taiwan welfare policies without diagnosing the user or inventing a narrower need. Resolve an explicitly supplied Taiwan county, city, township, town, city district, or district to its parent county or city in area. Extract recipient, income, and identities ONLY when the wording explicitly states them; never guess from context. Never derive any condition from candidate policies or assistant messages. If no concrete topic exists, preserve the original query. Do not infer a narrower service, benefit, identity, medical condition, or life event that the user did not mention. Return JSON only.";
+
+// 站上篩選器的標準選項標籤；LLM 與本地抽取的結果都會收斂到這些值
+const RECIPIENT_LABELS = ["嬰幼兒", "兒童＆青少年", "成人", "老人"] as const;
+const INCOME_LABELS = ["低收入戶", "中低收入戶", "經濟弱勢"] as const;
+const IDENTITY_LABELS = ["身心障礙", "特殊境遇", "重大傷病", "原住民", "新住民"] as const;
+
+function normalizeOptionLabel(value: unknown) {
+  return String(value ?? "")
+    .replace(/臺/gu, "台")
+    .replace(/[＆&及和]/gu, "")
+    .replace(/[\s　]+/gu, "")
+    .trim();
+}
+
+function matchOptionLabel(value: unknown, labels: readonly string[]) {
+  const normalized = normalizeOptionLabel(value);
+  if (!normalized) return "";
+  return (
+    labels.find((label) => {
+      const normalizedLabel = normalizeOptionLabel(label);
+      return normalized === normalizedLabel
+        || normalized.includes(normalizedLabel)
+        || normalizedLabel.includes(normalized);
+    }) || ""
+  );
+}
+
+function normalizeResolvedIdentities(value: unknown): string[] {
+  const rawItems = Array.isArray(value)
+    ? value
+    : String(value ?? "").split(/[、,，/]/);
+  return [...new Set(
+    rawItems
+      .map((item) => matchOptionLabel(item, IDENTITY_LABELS))
+      .filter(Boolean)
+  )];
+}
 
 const TAIWAN_AREAS = [
   "台北市", "新北市", "桃園市", "台中市", "台南市", "高雄市", "基隆市",
@@ -121,9 +164,20 @@ const PRESERVED_INTENT_PATTERNS: RegExp[] = [
   /假牙|牙齒|口腔/u,
 ];
 
-function keepResolvedQueryOnTopic(originalQuery: string, resolvedQuery: string) {
+/**
+ * 確認 LLM 沒有把使用者明確提到的主題改掉。
+ * conditionsText：已被抽成結構化條件（地區／年齡／經濟／身分）的內容也算「有保留」，
+ * 例如「低收入戶」被放進 income 後，searchQuery 不需要再包含它。
+ */
+function keepResolvedQueryOnTopic(
+  originalQuery: string,
+  resolvedQuery: string,
+  conditionsText = ""
+) {
   const normalizedOriginal = normalizeRespectfulPolicyTerm(originalQuery);
-  const normalizedResolved = normalizeRespectfulPolicyTerm(resolvedQuery);
+  const normalizedResolved = normalizeRespectfulPolicyTerm(
+    `${resolvedQuery} ${conditionsText}`
+  );
   const requiredPatterns = PRESERVED_INTENT_PATTERNS.filter(pattern =>
     pattern.test(normalizedOriginal)
   );
@@ -165,8 +219,14 @@ function buildIntentPrompt(
     "若輸入含口語、過時或不合宜稱呼，請轉換成台灣福利政策常用且尊重的現代用語，不要原樣重複。",
     "例如「低能兒補助」應理解為兒童心智發展或智能障礙相關需求，searchQuery 請改用合宜且最適合本站政策檢索的詞，不要保留「低能兒」。",
     "若原文只有泛用詞、沒有可辨識的具體主題，才保留原始搜尋文字。",
+    "輸入可能是整句問句（例如「老人可以申請甚麼補助？」）或多個關鍵字併列（例如「低收入戶 新北市 老人津貼」）；請把問句詞與標點去掉、整併成一個核心搜尋詞，並把條件拆到對應欄位。",
+    "輸入若有明顯錯字或同音誤植（例如「老任津貼」應為「老人津貼」），請直接修正後再處理，不要保留錯字。",
+    `recipient：只有使用者字面明確提到年齡族群時才填，值必須是「${RECIPIENT_LABELS.join("、")}」其中之一（老人、長者、長輩都對應「老人」；嬰兒、新生兒對應「嬰幼兒」），否則回空字串。`,
+    `income：只有字面明確提到經濟條件時才填，值必須是「${INCOME_LABELS.join("、")}」其中之一，否則回空字串。`,
+    `identities：只有字面明確提到特殊身分時才填，值只能從「${IDENTITY_LABELS.join("、")}」挑選，可複數，否則回空陣列。`,
+    "已拆進 recipient、income、identities 的條件詞，searchQuery 不必重複；但若整個輸入只有那個條件詞（例如只輸入「低收入戶」），searchQuery 仍保留它。",
     "intent 請用一句簡短繁體中文描述判斷到的需求。",
-    '只輸出 JSON：{"searchQuery":"核心搜尋詞","intent":"需求描述","area":"標準縣市或空字串"}',
+    '只輸出 JSON：{"searchQuery":"核心搜尋詞","intent":"需求描述","area":"標準縣市或空字串","recipient":"年齡族群或空字串","income":"經濟條件或空字串","identities":["特殊身分"]}',
     `原始搜尋文字：${JSON.stringify(query)}`,
     selectedConditions.length
       ? `目前已選條件：\n${selectedConditions.join("\n")}`
@@ -228,7 +288,8 @@ async function requestGeminiIntent(apiKey: string, model: string, prompt: string
 
 export default defineEventHandler(async (event) => {
   const body = (await readBody<SearchIntentPayload>(event)) || {};
-  const query = normalizeSummaryQuery(body.query);
+  // 先修常見錯字（老任津貼→老人津貼），LLM 與本地抽取都吃修正後的字串
+  const query = fixCommonTypos(normalizeSummaryQuery(body.query)).trim();
   const conversation = sanitizeSummaryConversation(body.conversation);
 
   if (!query) {
@@ -237,11 +298,19 @@ export default defineEventHandler(async (event) => {
       searchQuery: "",
       intent: "",
       area: "",
+      recipient: "",
+      income: "",
+      identities: [] as string[],
       source: "skipped",
       model: "",
       errorMessage: "",
     };
   }
+
+  // 本地正則抽取：LLM 可用時補漏，LLM 全掛時作為完整兜底
+  const localConditions: ExplicitSearchConditions = extractExplicitSearchConditions(
+    [query, ...conversation.filter(item => item.role === "user").map(item => item.content)].join(" ")
+  );
 
   const cacheKey = JSON.stringify({ query, conversation, context: body.context || {} });
   const cached = searchIntentCache.get(cacheKey);
@@ -282,15 +351,27 @@ export default defineEventHandler(async (event) => {
           : await requestGeminiIntent(candidate.apiKey, candidate.model, prompt);
       const parsed = parseSearchIntent(text);
       const parsedSearchQuery = normalizeResolvedQuery(parsed.searchQuery);
-      const searchQuery = keepResolvedQueryOnTopic(query, parsedSearchQuery);
-      if (!searchQuery) throw new Error("LLM returned an empty search query.");
-      const area = normalizeResolvedArea(parsed.area) || resolveFallbackArea(conversation, body.context);
+      // LLM 優先、本地抽取補漏：條件欄位任一來源有值就採用
+      const recipient = matchOptionLabel(parsed.recipient, RECIPIENT_LABELS) || localConditions.recipient;
+      const income = matchOptionLabel(parsed.income, INCOME_LABELS) || localConditions.income;
+      const identities = [...new Set([
+        ...normalizeResolvedIdentities(parsed.identities),
+        ...localConditions.identities,
+      ])];
+      const conditionsText = [recipient, income, identities.join(" ")].filter(Boolean).join(" ");
+      const searchQuery = keepResolvedQueryOnTopic(query, parsedSearchQuery, conditionsText) || query;
+      const area = normalizeResolvedArea(parsed.area)
+        || localConditions.area
+        || resolveFallbackArea(conversation, body.context);
 
       const result = {
         originalQuery: query,
         searchQuery,
         intent: String(parsed.intent || "").replace(/\s+/g, " ").trim().slice(0, 100),
         area,
+        recipient,
+        income,
+        identities,
         source: candidate.provider,
         model: candidate.model,
         errorMessage: "",
@@ -313,7 +394,10 @@ export default defineEventHandler(async (event) => {
       [query, ...conversation.filter(item => item.role === "user").map(item => item.content)].join(" ")
     ),
     intent: "",
-    area: resolveFallbackArea(conversation, body.context),
+    area: localConditions.area || resolveFallbackArea(conversation, body.context),
+    recipient: localConditions.recipient,
+    income: localConditions.income,
+    identities: localConditions.identities,
     source: "fallback",
     model: "script",
     errorMessage: errors.join(" | ") || "No free-tier LLM provider is configured.",

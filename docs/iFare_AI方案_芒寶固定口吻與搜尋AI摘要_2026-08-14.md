@@ -104,7 +104,21 @@ pages/ifare/result.vue
   （版本 `v39-ai-overview`，升版即失效舊快取）。
 - Markdown 只支援受控子集（粗體、###、列點、編號），經自寫 renderer + DOMPurify 消毒。
 
-### 4. 常用調整位置
+### 4. 搜尋意圖解析（同日加強）
+
+關鍵字框接受整句問句、複數關鍵字與含錯字的複合詞，例如：
+「老人可以申請甚麼補助？」→ 搜尋詞「老人津貼」＋自動套用年齡「老人」；
+「低收入戶」→ 自動套用經濟條件篩選；
+「新北市老**任**津貼」→ 錯字自動修正＋自動套用「新北市」與「老人」。
+
+- **雙軌解析**：LLM 解析（`search-intent.post.ts`）輸出 searchQuery／area／recipient／income／identities，
+  並與本地正則抽取（`utils/ifareIntent.ts` 的 `extractExplicitSearchConditions`）合併——LLM 掛掉時本地兜底仍可用。
+- **條件自動套用**（`result.vue` 的 `applyResolvedSearchFilters`）：只在使用者**未自行選擇**該欄位時帶入，
+  絕不覆蓋手動設定；套用後同步網址參數。
+- **錯字修正**：`fixCommonTypos`（老任津貼→老人津貼等），LLM 提示詞也要求修正同音誤植。
+- **複數關鍵字**：以空白、頓號分隔的多關鍵字會拆段各查一次，由 reciprocal-rank fusion 合併，字面命中權重高於 AI 擴充詞。
+
+### 5. 常用調整位置
 
 | 想調整 | 位置 |
 |---|---|
