@@ -74,6 +74,30 @@ function normalizeResolvedIdentities(value: unknown): string[] {
   )];
 }
 
+// 使用者只寫實際歲數（「媽媽 80 歲」「6 個月大」）時，字面正則抽不出年齡區間，
+// 但歲數確實是使用者自己講的，這種情況才放行 LLM 的年齡判斷
+const EXPLICIT_AGE_PATTERN = /\d{1,3}\s*(?:歲|個月大)/u;
+
+function hasExplicitAgeWording(query: string, conversation: LlmSummaryConversationMessage[]) {
+  return [query, ...conversation.filter(item => item.role === "user").map(item => item.content)]
+    .some(text => EXPLICIT_AGE_PATTERN.test(text));
+}
+
+/**
+ * 字面白名單：LLM 抽到的條件，必須在使用者自己打過的字裡找得到依據才採用。
+ *
+ * 提示詞已經寫明「只有字面明確提到才填」，模型還是會從對話脈絡與已選條件推測——
+ * 實測追問「資格為低收」，回來的是「中低收入戶」，還自己補了一個沒人提過的「老人」。
+ * 這些欄位會被 applyResolvedSearchFilters 直接套進篩選器、當場改掉搜尋結果，
+ * 寧可少抓也不能錯抓，所以一律以 extractExplicitSearchConditions（純正則、只認字面）為準。
+ * 該抽取器已涵蓋常見同義詞（長輩→老人、身障→身心障礙、外籍配偶→新住民），
+ * 正常的同義對應不會被這道防線擋掉；擋掉的是模型自己補的條件。
+ */
+function keepLiteralCondition(resolved: string, literal: string, allowResolved = false) {
+  if (literal) return literal;
+  return allowResolved ? resolved : "";
+}
+
 const TAIWAN_AREAS = [
   "台北市", "新北市", "桃園市", "台中市", "台南市", "高雄市", "基隆市",
   "新竹市", "嘉義市", "新竹縣", "苗栗縣", "彰化縣", "南投縣", "雲林縣",
@@ -351,11 +375,21 @@ export default defineEventHandler(async (event) => {
           : await requestGeminiIntent(candidate.apiKey, candidate.model, prompt);
       const parsed = parseSearchIntent(text);
       const parsedSearchQuery = normalizeResolvedQuery(parsed.searchQuery);
-      // LLM 優先、本地抽取補漏：條件欄位任一來源有值就採用
-      const recipient = matchOptionLabel(parsed.recipient, RECIPIENT_LABELS) || localConditions.recipient;
-      const income = matchOptionLabel(parsed.income, INCOME_LABELS) || localConditions.income;
+      // 條件欄位一律過字面白名單：字面有依據就以字面為準（實測「低收」被 LLM 讀成中低收入戶），
+      // 字面完全沒依據就不採用，免得模型推測出來的條件被自動套成篩選器
+      const recipient = keepLiteralCondition(
+        matchOptionLabel(parsed.recipient, RECIPIENT_LABELS),
+        localConditions.recipient,
+        hasExplicitAgeWording(query, conversation)
+      );
+      const income = keepLiteralCondition(
+        matchOptionLabel(parsed.income, INCOME_LABELS),
+        localConditions.income
+      );
       const identities = [...new Set([
-        ...normalizeResolvedIdentities(parsed.identities),
+        // 身分不接受任何推論：模型會從病名或家庭狀況推出「重大傷病」「特殊境遇」，
+        // 那是使用者沒說過的標籤，必須有字面背書才留下
+        ...normalizeResolvedIdentities(parsed.identities).filter(item => localConditions.identities.includes(item)),
         ...localConditions.identities,
       ])];
       const conditionsText = [recipient, income, identities.join(" ")].filter(Boolean).join(" ");

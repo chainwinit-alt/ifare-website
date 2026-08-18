@@ -24,6 +24,26 @@
         </button> -->
       </div>
     </div>
+
+    <!-- 目前生效的限縮條件。上方搜尋區看摘要時已捲出畫面，這裡再列一次並可一鍵移除 -->
+    <div v-if="activeFilters.length" class="summary-active-filters">
+      <span class="summary-active-filters-label">目前條件</span>
+      <button
+        v-for="chip in activeFilters"
+        :key="chip.field"
+        type="button"
+        class="summary-active-chip"
+        :aria-label="`移除${chip.label}條件：${chip.value}`"
+        @click="emit('clearFilter', chip.field)"
+      >
+        <span class="summary-active-chip-key">{{ chip.label }}</span>
+        <span class="summary-active-chip-value">{{ chip.value }}</span>
+        <span class="summary-active-chip-x" aria-hidden="true">×</span>
+      </button>
+    </div>
+
+    <!-- 選了縣市時，說明結果裡有多少是全國性政策（那些縣市民同樣能申請） -->
+    <p v-if="resultBreakdown" class="summary-result-breakdown">{{ resultBreakdown }}</p>
     <div class="summary-body">
       <div v-if="shouldShowSummaryLoading" class="summary-loading">
         <span class="summary-spinner" aria-hidden="true"></span>
@@ -41,21 +61,54 @@
       <p v-if="streamError" class="summary-error">{{ streamError }}</p>
     </div>
 
-    <div v-if="canContinueConversation" class="summary-conversation">
-      <div v-if="conversationMessages.length || followUpDraft" class="summary-message-list" aria-live="polite">
-        <div
-          v-for="(message, index) in conversationMessages"
-          :key="`${message.role}-${index}`"
-          class="summary-message"
-          :class="message.role === 'user' ? 'is-user' : 'is-assistant'"
+    <!-- 條件收太緊時，直接告訴使用者放寬哪一項會有多少筆（筆數是真的查回來的） -->
+    <div v-if="relaxSuggestions.length" class="summary-relax">
+      <p class="summary-relax-label" id="ifare-summary-relax-label">
+        符合的政策很少，放寬其中一項會多出不少：
+      </p>
+      <div class="summary-relax-list" role="group" aria-labelledby="ifare-summary-relax-label">
+        <button
+          v-for="item in relaxSuggestions"
+          :key="item.field"
+          type="button"
+          class="summary-relax-chip"
+          @click="emit('clearFilter', item.field)"
         >
-          <span class="summary-message-label">{{ message.role === "user" ? "您" : "AI 摘要" }}</span>
+          <span>拿掉「{{ item.label }}：{{ item.value }}」</span>
+          <strong>{{ item.count }} 筆</strong>
+        </button>
+      </div>
+    </div>
+
+    <!-- 快捷鈕：內容跟著結尾問句走。點了是去改上方對應的篩選並重新搜尋，不是聊天回合 -->
+    <div v-if="showQuickOptions" class="summary-policy-options">
+      <p class="summary-policy-label" id="ifare-summary-policy-label">{{ activeQuickOptionLabel }}</p>
+      <div class="summary-policy-list" role="group" aria-labelledby="ifare-summary-policy-label">
+        <button
+          v-for="option in activeQuickOptions"
+          :key="option.val"
+          type="button"
+          class="summary-policy-chip"
+          @click="emit('selectQuickOption', { field: guidanceField, val: option.val })"
+        >{{ option.name }}</button>
+      </div>
+    </div>
+
+    <div v-if="canContinueConversation" class="summary-conversation">
+      <!--
+        只列使用者自己說過的話。AI 的回覆不另外開泡泡——它會直接取代上面那份摘要，
+        整張卡永遠只有一份最新的摘要，才不會變成「摘要」和「對話」兩個各講各的東西。
+      -->
+      <div v-if="userMessages.length || isFollowUpLoading" class="summary-message-list" aria-live="polite">
+        <div
+          v-for="(message, index) in userMessages"
+          :key="`user-${index}`"
+          class="summary-message is-user"
+        >
+          <span class="summary-message-label">您說</span>
           <p>{{ message.content }}</p>
         </div>
-        <div v-if="followUpDraft" class="summary-message is-assistant is-streaming">
-          <span class="summary-message-label">AI 摘要</span>
-          <p>{{ followUpDraft }}</p>
-        </div>
+        <p v-if="isFollowUpLoading" class="summary-message-pending">正在依照您的補充重新整理摘要…</p>
       </div>
 
       <form class="summary-followup-form" @submit.prevent="submitFollowUp">
@@ -112,6 +165,7 @@
 <script setup lang="ts">
 import {
   buildFallbackIntentSummary,
+  buildRelevanceQuery,
   normalizeFallbackIntentTopic,
 } from "~/utils/ifareIntent";
 
@@ -169,8 +223,24 @@ type SummaryConversationSearch = (payload: {
   conversation: SummaryConversationMessage[];
 }) => Promise<SummaryConversationSearchResult>;
 
+type SummaryQuickOption = { name: string; val: string };
+
+// 快捷鈕的標題要跟著問的條件走，不然會出現「問句問戶籍地、按鈕卻給類別」那種不一致。
+const QUICK_OPTION_LABELS: Record<string, string> = {
+  policy: "選一個方向，馬上縮小範圍",
+  area: "選一個縣市，馬上縮小範圍",
+  recipient: "選一個年齡區間，馬上縮小範圍",
+  income: "選一個經濟條件，馬上縮小範圍",
+  identity: "選一個身分，馬上縮小範圍",
+};
+
+type SummaryActiveFilter = { field: string; label: string; value: string };
+type SummaryRelaxSuggestion = SummaryActiveFilter & { count: number };
+
 const emit = defineEmits<{
   summaryComplete: [payload: { summary: string; provider: ProviderName }];
+  selectQuickOption: [payload: { field: string; val: string }];
+  clearFilter: [field: string];
 }>();
 
 const props = withDefaults(
@@ -184,9 +254,21 @@ const props = withDefaults(
     summaryCacheKey?: string;
     summaryResetKey?: number;
     conversationSearch?: SummaryConversationSearch;
+    /** 各條件可選的快捷選項，key 是 policy / area / recipient / income / identity */
+    quickOptions?: Record<string, SummaryQuickOption[]>;
+    /** 目前生效的限縮條件，顯示在摘要卡頂端 */
+    activeFilters?: SummaryActiveFilter[];
+    /** 選了縣市時的結果組成說明（在地幾筆、全國性幾筆） */
+    resultBreakdown?: string;
+    /** 條件收太緊時的「放寬哪一項會有幾筆」建議 */
+    relaxSuggestions?: SummaryRelaxSuggestion[];
   }>(),
   {
     query: "",
+    quickOptions: () => ({}),
+    activeFilters: () => [],
+    resultBreakdown: "",
+    relaxSuggestions: () => [],
     provider: "groq",
     resultsLoading: false,
     searchContext: () => ({}),
@@ -230,7 +312,31 @@ const canContinueConversation = computed(
 const canSubmitFollowUp = computed(
   () => Boolean(followUpInput.value.trim()) && !isFollowUpLoading.value
 );
-const SUMMARY_CACHE_VERSION = "v39-ai-overview";
+// 伺服器算出的「這輪在問哪一項條件」。快捷鈕只呈現對應那一項的選項，
+// 判斷邏輯不在前端重算，否則兩邊會各自算出不同答案。
+const guidanceField = ref("");
+const activeQuickOptions = computed<SummaryQuickOption[]>(
+  () => (guidanceField.value && props.quickOptions[guidanceField.value]) || []
+);
+const activeQuickOptionLabel = computed(
+  () => QUICK_OPTION_LABELS[guidanceField.value] || "選一個條件，馬上縮小範圍"
+);
+// 追問回覆會直接更新摘要，所以快捷鈕在對話開始之後仍然該留著——
+// 它問的是下一個還沒回答的條件，跟輸入框是同一條路的兩種走法。
+const showQuickOptions = computed(
+  () => activeQuickOptions.value.length > 0
+    && !isSummaryBusy.value
+    && !isFollowUpLoading.value
+    && Boolean(summaryDisplayText.value.trim())
+);
+/** 只顯示使用者自己說過的話；AI 的回覆會直接取代摘要 */
+const userMessages = computed(() =>
+  conversationMessages.value.filter((message) => message.role === "user")
+);
+// v40：引導階梯新增「政策類別」這一階、追問回合改成主題明確時給推薦，
+// 舊快取的結尾問句與模式都不一樣，必須整批失效。
+// v42：摘要提示詞新增「全國性政策設籍該縣市同樣適用」的說明規則
+const SUMMARY_CACHE_VERSION = "v42-nationwide-note";
 const SUMMARY_CACHE_KEY_PREFIX = "ifare-summary-cache:";
 const SUMMARY_CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -275,9 +381,22 @@ function splitQueryTokens(query: string) {
   return Array.from(tokens);
 }
 
-function rankCases(query: string, cases: SummaryCaseItem[]): RankedSummaryCaseItem[] {
+/**
+ * localArea：使用者選定的縣市名（沒選特定縣市時傳空字串）。
+ *
+ * 只用在「相關性完全同分」時的排序依據。實測「長照＋高雄市＋老人」11 筆裡有 10 筆
+ * 同分，這時誰排前面純粹看後端回傳順序，結果在地政策全被擠到後面。同分時優先在地
+ * 才符合「我選了高雄市」的期待；分數有差距時（例如台北市的長照在地政策根本沒提到
+ * 長照）仍然由相關性決定，不會把不相關的東西推上來。
+ */
+function rankCases(
+  query: string,
+  cases: SummaryCaseItem[],
+  localArea = ""
+): RankedSummaryCaseItem[] {
   const tokens = splitQueryTokens(query);
   const normalizedQuery = normalizeText(query);
+  const localAreaText = normalizeText(localArea);
 
   const ranked = cases
     .map((item) => {
@@ -347,11 +466,17 @@ function rankCases(query: string, cases: SummaryCaseItem[]): RankedSummaryCaseIt
       return {
         ...item,
         similarityScore: Math.round(score * 10) / 10,
+        isLocalArea: Boolean(localAreaText) && area === localAreaText,
         rank: 0,
         scorePercent: 0,
       };
     })
-    .sort((a, b) => b.similarityScore - a.similarityScore);
+    .sort((a, b) => {
+      const scoreDiff = b.similarityScore - a.similarityScore;
+      if (Math.abs(scoreDiff) > Number.EPSILON) return scoreDiff;
+      // 相關性同分才比在地，所以不會壓過相關性
+      return (b.isLocalArea ? 1 : 0) - (a.isLocalArea ? 1 : 0);
+    });
 
   const maxScore = ranked[0]?.similarityScore || 0;
 
@@ -456,7 +581,9 @@ function buildRankQuery() {
   const conversationQuery = normalizeSummaryKeyword(conversationSearchQuery.value);
   const keyword = normalizeSummaryKeyword(props.searchContext?.query);
   const query = normalizeSummaryKeyword(props.query);
-  return conversationQuery || keyword || query;
+  // 地區是獨立的篩選條件；留在排序關鍵字裡會讓每一筆都因為標題的【新北市】而命中，
+  // 引用政策就會排出一堆跟主題無關的東西。順便把訪客用語換成站內用詞。
+  return buildRelevanceQuery(conversationQuery || keyword || query);
 }
 
 const overSpecificSummaryGuards: Array<{ allowedBy: RegExp; blockedInSummary: RegExp }> = [
@@ -505,7 +632,19 @@ function isOverSpecificCaseForIntent(item: SummaryCaseItem, intent: string) {
 }
 
 const rankQuery = computed(() => buildRankQuery());
-const rankedCases = computed(() => rankCases(rankQuery.value, props.cases));
+// 這次搜尋使用者到底有沒有自己打關鍵字。沒有的話 props.query 是頁面用已選條件組出來的
+// 描述詞（見 result.vue 的 conditionSummaryQuery），對它做字面比對沒有意義。
+const hasTypedKeyword = computed(() =>
+  Boolean(normalizeSummaryKeyword(props.searchContext?.query))
+);
+// 選了特定縣市時才傳；「全國」「未指定」代表沒有在地偏好
+const localAreaName = computed(() => {
+  const area = String(props.searchContext?.area || "").trim();
+  return area === "全國" || area === "未指定" ? "" : area;
+});
+const rankedCases = computed(() =>
+  rankCases(rankQuery.value, props.cases, localAreaName.value)
+);
 const fallbackText = computed(() => {
   if (!hasKeyword.value) return "";
 
@@ -662,7 +801,9 @@ const referenceCases = computed<ReferencedCaseItem[]>(() => {
   const usedPolicyKeys = new Set<string>();
 
   return rankedCases.value
-    .filter((item) => !rankQuery.value || item.similarityScore > 0)
+    // 純篩選搜尋的結果集本來就是篩選器選出來的，這時再用字面比對砍掉零分政策，
+    // 會讓明明有結果的搜尋送出空的 cases，被伺服器判成站內查無政策而走一般知識總覽。
+    .filter((item) => !rankQuery.value || !hasTypedKeyword.value || item.similarityScore > 0)
     .filter((item) => !isOverSpecificCaseForIntent(item, buildIntentSource()))
     .filter((item) => {
       const key = `${normalizeText(item.title)}:${normalizeText(item.area)}`;
@@ -711,6 +852,7 @@ function readSummaryCache() {
     const parsed = JSON.parse(raw) as {
       savedAt?: number;
       summary?: string;
+      guidanceField?: string;
     };
 
     if (!parsed?.savedAt || Date.now() - parsed.savedAt > SUMMARY_CACHE_TTL_MS) {
@@ -718,7 +860,9 @@ function readSummaryCache() {
       return null;
     }
 
-    return typeof parsed.summary === "string" ? parsed.summary : null;
+    if (typeof parsed.summary !== "string" || !parsed.summary) return null;
+    // guidanceField 也要一起存：走快取時不會有 meta 事件，沒存的話快捷鈕就消失了
+    return { summary: parsed.summary, guidanceField: parsed.guidanceField || "" };
   } catch {
     sessionStorage.removeItem(buildSummaryCacheKey());
     return null;
@@ -733,15 +877,17 @@ function writeSummaryCache(summary: string) {
     JSON.stringify({
       savedAt: Date.now(),
       summary,
+      guidanceField: guidanceField.value,
     })
   );
 }
 
 function restoreCachedSummary() {
-  const cachedSummary = readSummaryCache();
-  if (!cachedSummary) return false;
+  const cached = readSummaryCache();
+  if (!cached) return false;
 
-  summaryText.value = cachedSummary;
+  summaryText.value = cached.summary;
+  guidanceField.value = cached.guidanceField;
   streamError.value = "";
   isLoading.value = false;
   return true;
@@ -793,6 +939,7 @@ async function loadSummary(forceRefresh = false) {
       },
       onMeta: (meta) => {
         if (currentRequestId !== requestId) return;
+        if (meta?.guidanceField !== undefined) guidanceField.value = meta.guidanceField || "";
         console.log("[IFareSummaryCard][llm-meta]", meta);
       },
     });
@@ -827,6 +974,8 @@ function resetFollowUpConversation() {
   followUpDraft.value = "";
   followUpError.value = "";
   conversationSearchQuery.value = "";
+  // 新的搜尋會重新算引導問題，先清掉舊的，避免短暫顯示上一輪的快捷鈕
+  guidanceField.value = "";
   isFollowUpLoading.value = false;
 }
 
@@ -838,16 +987,20 @@ async function submitFollowUp() {
   followUpController.value?.abort();
   const controller = new AbortController();
   followUpController.value = controller;
+  // 第一次追問時，把目前這份摘要當成對話的開頭；之後它已經在紀錄裡，不必再補一次
+  if (conversationMessages.value.length === 0) {
+    conversationMessages.value.push({
+      role: "assistant",
+      content: toPlainSummaryText(summaryDisplayText.value),
+    });
+  }
   conversationMessages.value.push({ role: "user", content: userReply });
   followUpInput.value = "";
   followUpDraft.value = "";
   followUpError.value = "";
   isFollowUpLoading.value = true;
 
-  const conversation: SummaryConversationMessage[] = [
-    { role: "assistant", content: toPlainSummaryText(summaryDisplayText.value) },
-    ...conversationMessages.value.slice(-7),
-  ];
+  const conversation: SummaryConversationMessage[] = conversationMessages.value.slice(-8);
 
   try {
     if (props.conversationSearch) {
@@ -871,6 +1024,10 @@ async function submitFollowUp() {
         if (currentRequestId !== followUpRequestId) return;
         followUpDraft.value = fullText;
       },
+      onMeta: (meta) => {
+        if (currentRequestId !== followUpRequestId) return;
+        if (meta?.guidanceField !== undefined) guidanceField.value = meta.guidanceField || "";
+      },
     });
 
     if (currentRequestId !== followUpRequestId) return;
@@ -878,6 +1035,10 @@ async function submitFollowUp() {
     if (reply) {
       conversationMessages.value.push({ role: "assistant", content: reply });
       conversationMessages.value = conversationMessages.value.slice(-8);
+      // 回覆本身就是「更新後的摘要」：直接取代上面那份，才會套到 Markdown 渲染，
+      // 也才不會變成一張卡裡「舊摘要」和「一串對話」兩套各講各的內容。
+      // 不寫進快取——快取 key 是依篩選條件算的，而追問並不會改篩選條件。
+      summaryText.value = reply;
     } else {
       followUpError.value = "目前暫時無法繼續整理，請稍後再試。";
     }
@@ -1375,10 +1536,168 @@ onBeforeUnmount(() => {
   gap: 7px;
 }
 
+.summary-message-pending {
+  margin: 0;
+  color: #8a7a63;
+  font-size: 13px;
+}
+
 .summary-followup-label {
   color: #5c431f;
   font-size: 13px;
   font-weight: 800;
+}
+
+.summary-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.summary-active-filters-label {
+  color: #8a7a63;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.summary-active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(92, 67, 31, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  color: #5c431f;
+  font-size: 13px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.summary-active-chip:hover,
+.summary-active-chip:focus-visible {
+  background: #fff;
+  border-color: rgba(92, 67, 31, 0.55);
+}
+
+.summary-active-chip-key {
+  color: #8a7a63;
+  font-size: 12px;
+}
+
+.summary-active-chip-value {
+  font-weight: 800;
+}
+
+.summary-active-chip-x {
+  color: #8a7a63;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.summary-active-chip:hover .summary-active-chip-x {
+  color: #b3541e;
+}
+
+.summary-result-breakdown {
+  margin: -6px 0 14px;
+  color: #8a7a63;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.summary-relax {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(92, 67, 31, 0.25);
+}
+
+.summary-relax-label {
+  color: #5c431f;
+  font-size: 13px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.summary-relax-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summary-relax-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 1px solid rgba(92, 67, 31, 0.3);
+  border-radius: 999px;
+  background: #fff;
+  color: #5c431f;
+  font-size: 14px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.summary-relax-chip strong {
+  font-weight: 800;
+  color: #b3541e;
+}
+
+.summary-relax-chip:hover,
+.summary-relax-chip:focus-visible {
+  background: #5c431f;
+  border-color: #5c431f;
+  color: #fff;
+}
+
+.summary-relax-chip:hover strong,
+.summary-relax-chip:focus-visible strong {
+  color: #ffd9a8;
+}
+
+.summary-policy-options {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(92, 67, 31, 0.25);
+}
+
+.summary-policy-label {
+  color: #5c431f;
+  font-size: 13px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.summary-policy-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summary-policy-chip {
+  border: 1px solid rgba(92, 67, 31, 0.3);
+  border-radius: 999px;
+  background: #fff;
+  color: #5c431f;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.summary-policy-chip:hover,
+.summary-policy-chip:focus-visible {
+  background: #5c431f;
+  border-color: #5c431f;
+  color: #fff;
 }
 
 .summary-followup-controls {

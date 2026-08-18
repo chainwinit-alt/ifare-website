@@ -1,6 +1,8 @@
 import { summarizeWithFreeTier } from "../../../utils/llm/freeTier";
 import {
   buildFallbackSummary,
+  getSummaryGuidanceField,
+  hasResolvedTopic,
   normalizeSummaryQuery,
   sanitizeSummaryCases,
   sanitizeSummaryConversation,
@@ -102,8 +104,19 @@ export default defineEventHandler(async (event) => {
         ?? "true"
     ).toLowerCase()
   );
+  // 追問回合：主題已經明確（問得出是哪一類福利）且有查到政策 → 一樣給引用版總覽，
+  // 讓每一輪都是「這幾筆最相符 ＋ 下一個問題」；主題還不明確（例如只說了「新北市補助」）
+  // → 只問不推薦，那時候的前三筆等於隨機挑。
+  const topicResolved = hasResolvedTopic({
+    query,
+    context: body.context,
+    cases: enrichedCases,
+    conversation,
+  });
   const mode: LlmSummaryMode = conversation.length > 0
-    ? "guidance"
+    ? topicResolved && enrichedCases.length > 0
+      ? "overview"
+      : "guidance"
     : enrichedCases.length > 0
       ? "overview"
       : generalFallbackEnabled
@@ -116,6 +129,8 @@ export default defineEventHandler(async (event) => {
     conversation,
     mode,
   };
+  // 前端要靠這個把快捷鈕對齊結尾的引導問題（問戶籍地就給縣市鈕、問年齡就給年齡鈕）。
+  const guidanceField = getSummaryGuidanceField(input);
 
   return createSseResponse(async (push) => {
     const startedAt = Date.now();
@@ -124,6 +139,7 @@ export default defineEventHandler(async (event) => {
       provider: "auto",
       model: "",
       mode,
+      guidanceField,
       requestBytes,
       requestKilobytes: toKilobytes(requestBytes),
       streaming: false,
@@ -144,6 +160,7 @@ export default defineEventHandler(async (event) => {
         provider: result.provider,
         model: result.model,
         mode,
+        guidanceField,
         cached: result.cached,
         streaming: false,
       });
@@ -153,6 +170,7 @@ export default defineEventHandler(async (event) => {
         provider: result.provider,
         model: result.model,
         mode,
+        guidanceField,
         cached: result.cached,
         fallback: false,
         requestBytes,

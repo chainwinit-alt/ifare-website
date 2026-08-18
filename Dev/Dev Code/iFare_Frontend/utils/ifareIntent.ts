@@ -119,9 +119,13 @@ export function extractExplicitSearchConditions(value: unknown): ExplicitSearchC
     UNIQUE_AREA_SHORT_NAMES.find(([short]) => text.includes(short))?.[1] ||
     "";
 
-  // 順序重要：先比對「中低收入」再比對「低收入」，避免誤判
-  if (/中低收入/u.test(text)) conditions.income = "中低收入戶";
-  else if (/低收入/u.test(text)) conditions.income = "低收入戶";
+  // 順序重要：先比對「中低收」再比對「低收」，避免誤判。
+  // 收「低收／中低收」這種省略「入」的口語寫法：追問框實測輸入「資格為低收」，
+  // 字面抽不到，下游就只剩 LLM 的猜測（實測猜成中低收入戶），白名單也攔不住。
+  // 「降低收入／降低收費／低收費」是同字不同義，要排除。
+  const isLowIncomeFalseFriend = /[降減壓調]低收|低收費/u.test(text);
+  if (/中低收/u.test(text)) conditions.income = "中低收入戶";
+  else if (/低收/u.test(text) && !isLowIncomeFalseFriend) conditions.income = "低收入戶";
   else if (/經濟弱勢/u.test(text)) conditions.income = "經濟弱勢";
 
   if (/老人|長者|長輩|高齡|銀髮|失智|敬老/u.test(text)) conditions.recipient = "老人";
@@ -136,4 +140,97 @@ export function extractExplicitSearchConditions(value: unknown): ExplicitSearchC
   if (/新住民|外籍配偶/u.test(text)) conditions.identities.push("新住民");
 
   return conditions;
+}
+
+const AREA_ONLY_TERMS = new Set<string>([
+  ...TAIWAN_AREA_NAMES,
+  ...UNIQUE_AREA_SHORT_NAMES.map(([short]) => short),
+]);
+
+/**
+ * 這個片段是否「只是」一個縣市名。
+ *
+ * 多關鍵字輸入會拆段各查一次（「新北市 孩童補助」→ 查「新北市」＋查「孩童補助」），
+ * 但地區已經被抽出來套進 CodeDomicile 了，再把「新北市」單獨拿去做關鍵字查詢，
+ * 會命中所有標題含【新北市】的政策，把真正的主題詞稀釋掉。
+ *
+ * 只排除純地區詞：年齡、經濟、身分那些詞本身常常也是有意義的主題詞
+ * （失智、身心障礙、低收入戶），不能一併拿掉。
+ */
+export function isAreaOnlySegment(value: unknown) {
+  const text = normalizeConditionText(fixCommonTypos(value));
+  return Boolean(text) && AREA_ONLY_TERMS.has(text);
+}
+
+// 長的排前面，否則「新北」會先把「新北市」吃掉，留下一個孤零零的「市」。
+const AREA_STRIP_PATTERNS = [...AREA_ONLY_TERMS]
+  .sort((a, b) => b.length - a.length)
+  .map((name) => new RegExp(name.replace(/台/gu, "[台臺]"), "gu"));
+
+/**
+ * 把縣市名從關鍵字裡拿掉，只留主題詞。
+ *
+ * 地區是獨立的篩選條件（CodeDomicile），結果集本來就全都是該地區。
+ * 但每一筆政策的標題都以【新北市】開頭，所以拿縣市名去比對標題會讓所有結果
+ * 一起命中，把真正的主題詞（孩童、長照…）擠到後面——實測「新北市 孩童補助」
+ * 排在最前面的是身心障礙類政策，就是這樣來的。
+ *
+ * 前端兩套相關性評分（結果清單的 getPolicySearchTerms、摘要卡的 rankCases）
+ * 都要先經過這一步。
+ */
+export function stripAreaTerms(value: unknown) {
+  let text = String(value ?? "");
+  for (const pattern of AREA_STRIP_PATTERNS) {
+    text = text.replace(pattern, " ");
+  }
+  return text.replace(/\s+/gu, " ").trim();
+}
+
+// 訪客用語 → 站內政策實際使用的詞。
+// 政策標題寫的是「兒童」「兒少」「子女」，沒有一筆寫「孩童」，所以字面比對完全落空。
+// 只收幾乎不可能有別的意思的映射；「孩子」刻意不收（「孩子的媽」會被誤判）。
+const SITE_VOCABULARY_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/孩童|幼童|小孩/gu, "兒童"],
+];
+
+/**
+ * 相關性排序專用的關鍵字：拿掉縣市名，再把訪客用語換成站內政策實際使用的詞。
+ * 只影響排序，不影響顯示給使用者的搜尋詞，也不影響送去後端的查詢字串。
+ */
+export function buildRelevanceQuery(value: unknown) {
+  let text = stripAreaTerms(value);
+  for (const [pattern, replacement] of SITE_VOCABULARY_REPLACEMENTS) {
+    text = text.replace(pattern, replacement);
+  }
+  return text;
+}
+
+// ---------------------------------------------------------------------------
+// 政策類別（後端 /Code/GetCodePolicyList，畫面上是「受助者情況」下拉）
+//
+// 訪客不會照著這 12 個官方名稱講——會說「長照」而不是「長期照顧」、
+// 說「身障」而不是「身心障礙福利」。這張表把訪客用語對到官方類別名，
+// 讓摘要的引導提問知道「這次要不要問類別」，也讓使用者的回答能套進篩選器。
+// ---------------------------------------------------------------------------
+export const POLICY_CATEGORY_KEYWORDS: Array<[string, RegExp]> = [
+  ["長期照顧", /長期照顧|長照|失能|失智|喘息|照顧者|居家服務|日間照顧/u],
+  ["身心障礙福利", /身心障礙|身障|智能障礙|輔具|重大傷病/u],
+  ["兒少福利", /兒少|兒童|少年|孩童|幼童|小孩|育兒|托育|托嬰|生育|懷孕|新生兒|嬰幼兒|學童/u],
+  ["老人福利", /老人|長者|長輩|高齡|銀髮|敬老/u],
+  ["社會救助", /社會救助|低收入|中低收入|經濟弱勢|急難|生活扶助|喪葬/u],
+  ["社會保險", /社會保險|健保|全民健康保險|勞保|勞工保險|國民年金|農保/u],
+  ["勞工福利", /勞工|失業|就業|職業訓練|職訓|非自願離職/u],
+  ["住宅福利", /住宅|租屋|租金|包租代管|購屋|房屋/u],
+  ["原民福利", /原住民|原民/u],
+  ["家庭福利", /家庭福利|特殊境遇|單親|婦女/u],
+];
+
+/** 從自由文字推出政策類別的官方名稱；推不出來回空字串（絕不猜） */
+export function matchPolicyCategory(value: unknown) {
+  const text = normalizeConditionText(fixCommonTypos(value));
+  if (!text) return "";
+  for (const [category, pattern] of POLICY_CATEGORY_KEYWORDS) {
+    if (pattern.test(text)) return category;
+  }
+  return "";
 }

@@ -5,6 +5,7 @@ import type {
   LlmSummarySearchContext,
 } from "./types";
 import {
+  matchPolicyCategory,
   normalizeFallbackIntentTopic,
 } from "../../../utils/ifareIntent";
 
@@ -20,9 +21,10 @@ export function normalizeSummaryQuery(value?: string) {
   return query;
 }
 
-type SummaryGuidanceField = "area" | "recipient" | "income" | "identity";
+type SummaryGuidanceField = "policy" | "area" | "recipient" | "income" | "identity";
 
 const SUMMARY_GUIDANCE_QUESTIONS: Record<SummaryGuidanceField, string> = {
+  policy: "想先確認方向：您要找的比較接近哪一類福利呢？例如長期照顧、兒少福利、老人福利、社會救助。",
   area: "方便告訴我受助者的戶籍地嗎？",
   recipient: "接著想確認，受助者大約是哪個年齡區間呢？",
   income: "這些政策有限制經濟條件，方便告訴我目前屬於哪一類嗎？",
@@ -30,6 +32,7 @@ const SUMMARY_GUIDANCE_QUESTIONS: Record<SummaryGuidanceField, string> = {
 };
 
 const SUMMARY_GUIDANCE_PATTERNS: Record<SummaryGuidanceField, RegExp> = {
+  policy: /哪一類福利|哪一類|哪一方面|類別/u,
   area: /戶籍|地區|縣市|居住地/u,
   recipient: /年齡|幾歲|歲數|年齡區間/u,
   income: /經濟條件|低收入|中低收入|經濟弱勢|收入資格/u,
@@ -76,6 +79,49 @@ function hasExplicitIdentity(text: string) {
   return /身心障礙|身障|原住民|新住民|特殊境遇|重大傷病|無特殊身分|沒有特殊身分/u.test(text);
 }
 
+/**
+ * 使用者有沒有講出「哪一類福利」。
+ *
+ * 只打「新北市補助」時地區有了、類別還沒有——這時先問類別最有幫助，
+ * 因為那是把 200 多筆縮到可讀範圍最有效的一刀，也是使用者最容易回答的一題。
+ */
+function hasExplicitPolicyCategory(text: string) {
+  return Boolean(matchPolicyCategory(text));
+}
+
+/**
+ * 追問回合要不要給政策推薦。
+ *
+ * 只有在問得出「是哪一類福利」時才算主題明確。使用者只說了「新北市補助」的時候，
+ * 站內符合的還有兩百多筆，這時候硬推前三筆等於隨機挑，會折損信任——那種情況
+ * 應該只問不推薦。
+ */
+export function hasResolvedTopic(input: LlmSummaryInput) {
+  const text = [
+    normalizeSummaryQuery(input.query),
+    input.context?.policy,
+    ...(input.conversation || [])
+      .filter((item) => item.role === "user")
+      .map((item) => item.content),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return Boolean(matchPolicyCategory(text));
+}
+
+export type SummaryGuidanceFieldName = SummaryGuidanceField;
+
+/**
+ * 這一輪的引導問題問的是哪一項條件。
+ *
+ * 前端需要知道這件事才能把快捷鈕對齊問題——問戶籍地就給縣市鈕、問年齡就給年齡鈕。
+ * 判斷邏輯只能有一份（伺服器這份），否則兩邊會各自算出不同答案，
+ * 就會出現「問句問戶籍地、按鈕卻給類別」那種不一致。
+ */
+export function getSummaryGuidanceField(input: LlmSummaryInput) {
+  return getNextSummaryGuidanceField(input);
+}
+
 function getNextSummaryGuidanceField(input: LlmSummaryInput): SummaryGuidanceField | null {
   const conversation = sanitizeSummaryConversation(input.conversation);
   const explicitUserText = [
@@ -83,6 +129,10 @@ function getNextSummaryGuidanceField(input: LlmSummaryInput): SummaryGuidanceFie
     ...conversation.filter(item => item.role === "user").map(item => item.content),
   ].join(" ");
   const context = input.context || {};
+  const hasPolicyCategory =
+    isProvidedContextValue(context.policy, ["全部", "全部類別"]) ||
+    hasExplicitPolicyCategory(explicitUserText) ||
+    wasAnsweredInConversation("policy", conversation);
   const hasArea =
     isProvidedContextValue(context.area, ["全國", "全部"]) ||
     hasExplicitArea(explicitUserText) ||
@@ -100,8 +150,12 @@ function getNextSummaryGuidanceField(input: LlmSummaryInput): SummaryGuidanceFie
     hasExplicitIdentity(explicitUserText) ||
     wasAnsweredInConversation("identity", conversation);
 
+  // 類別排最前面：它是把結果縮到可讀範圍最有效的一刀，使用者也最容易回答。
+  if (!hasPolicyCategory) return "policy";
   if (!hasArea) return "area";
-  if (!hasRecipient) return "recipient";
+  // 跟經濟／身分同一個守則：候選政策真的有這項限制才值得問。
+  // 否則會問出「長照要找嬰幼兒還是兒少」這種對結果沒有鑑別度的問題。
+  if (!hasRecipient && input.cases.some(item => item.hasRecipient)) return "recipient";
   if (!hasIncome && input.cases.some(item => item.hasIncome)) return "income";
   if (!hasIdentity && input.cases.some(item => item.hasIndentity)) return "identity";
   return null;
@@ -615,6 +669,7 @@ export function buildOverviewPrompt(
     "- 開頭第一句直接進入主題，不要用「歡迎、您好、哈囉、很高興」等寒暄或客套開場。",
     "- 接著輸出「### 站內相符的福利」：用 - 列點，每點格式「**重點名稱**：一句話說明提供內容與適用對象 [參考 N]」，一張政策一點，最多 3 點。",
     "- 若候選政策含申請方式、應備文件或承辦單位資訊，再輸出「### 如何申請」：用 1. 2. 3. 數字步驟整理申請流程，每步驟句尾加 [參考 N]；資料不足就整段省略，不得腦補流程。",
+    "- 使用者已選特定縣市、而候選政策的地區是「全國」時，開頭總覽要明確說明這些是全國性政策、設籍該縣市同樣適用；不要讓使用者以為選了縣市就不適用，也不要因此改寫或省略政策內容。",
     "- [參考 N] 的 N 對應下方「政策 N」編號，只能使用實際存在的編號；同一句可連續標多個，例如 [參考 1][參考 2]。",
     "- 不要輸出網址、Markdown 連結或候選政策以外的機構名稱。",
     "- 全文約 120 到 260 個中文字（不含標記符號）。語氣溫暖白話，像有耐心的福利導覽員在幫忙整理，不要像公文、分析報告或系統通知。",

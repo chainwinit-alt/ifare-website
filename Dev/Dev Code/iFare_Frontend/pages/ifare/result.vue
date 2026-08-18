@@ -165,7 +165,7 @@
           <button class="btn btn-reset" @click="ResetParam">清空</button>
         </div>
       </section>
-      <section v-if="hasSummaryKeyword" ref="summarySectionRef" class="section-summary">
+      <section v-if="hasSummaryCard" ref="summarySectionRef" class="section-summary">
         <IfareSummaryCard
           :query="summaryQuery"
           :cases="storageiFarePolicyList"
@@ -175,7 +175,13 @@
           :summary-reset-key="summaryResetKey"
           :summary-cache-key="summaryCacheKey"
           :conversation-search="searchSummaryConversationPolicies"
+          :quick-options="summaryQuickOptions"
+          :active-filters="summaryActiveFilters"
+          :result-breakdown="summaryResultBreakdown"
+          :relax-suggestions="relaxSuggestions"
           @summary-complete="handleSummaryComplete"
+          @select-quick-option="applySummaryQuickOption"
+          @clear-filter="clearSummaryFilter"
         />
       </section>
       <section ref="resultSectionRef" class="section-result">
@@ -238,6 +244,7 @@ import CompSelectElse from "~/components/CompSelectElse.vue";
 import CompPage from "~/components/CompPage.vue"
 import IfareSummaryCard from "~/components/IfareSummaryCard.vue";
 import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
+import { buildRelevanceQuery, isAreaOnlySegment } from "~/utils/ifareIntent";
 
 const isOpts = ref(false);
 
@@ -329,22 +336,29 @@ function getSpecificArea(value = codeSelectArea.value) {
   return isAllAreaValue(value) ? undefined : value;
 }
 
-function buildFarePolicyApiQueries(keywordOverride?: string) {
+/**
+ * omitField：組查詢時刻意略過某一項條件，用來算「放寬這一項會有幾筆」。
+ * 一律走同一個組裝流程，避免建議的筆數跟實際搜尋結果對不上。
+ */
+function buildFarePolicyApiQueries(keywordOverride?: string, omitField = "") {
   const baseQuery: Record<string, any> = {};
   const selectedPolicy = codeSelect_policy.value || ALL_POLICY_VALUE;
 
-  if (!isAllPolicyValue(selectedPolicy)) baseQuery.CodePolicy = selectedPolicy;
-  if (codeSelectRecipient.value) baseQuery.CodeRecipient = codeSelectRecipient.value;
+  if (omitField !== "policy" && !isAllPolicyValue(selectedPolicy)) baseQuery.CodePolicy = selectedPolicy;
+  if (omitField !== "recipient" && codeSelectRecipient.value) baseQuery.CodeRecipient = codeSelectRecipient.value;
   const keywordSource = keywordOverride === undefined ? searchQuery.value : keywordOverride;
   const keyword = normalizeSummaryKeyword(keywordSource);
   if (keyword) baseQuery.Query = keyword;
-  if (codeSelectIdentity.value.length > 0) baseQuery.CodeIdentities = [...codeSelectIdentity.value];
+  if (omitField !== "identity" && codeSelectIdentity.value.length > 0) {
+    baseQuery.CodeIdentities = [...codeSelectIdentity.value];
+  }
 
-  const incomeQueries: Array<string | undefined> = codeSelectIncomes.value.length > 0
-    ? [...codeSelectIncomes.value]
+  const selectedIncomes = omitField === "income" ? [] : codeSelectIncomes.value;
+  const incomeQueries: Array<string | undefined> = selectedIncomes.length > 0
+    ? [...selectedIncomes]
     : [undefined];
 
-  const area = getSpecificArea();
+  const area = omitField === "area" ? undefined : getSpecificArea();
   return incomeQueries.map((income) => ({
     ...baseQuery,
     ...(area ? { CodeDomicile: area } : {}),
@@ -401,10 +415,32 @@ const activeIdentityLabel = computed(() => {
   return labels.join("、");
 });
 
+/**
+ * 沒打關鍵字、只選了篩選條件時，用「已選條件」組出來的描述性查詢詞。
+ *
+ * 摘要 API 的 query 一空就直接回空摘要（stream.post.ts 的早退分支），
+ * 但只選「台北市＋長期照顧」的人一樣需要引導問句、快捷鈕與放寬建議；
+ * 條件本身就是他表達需求的方式，拿它當查詢詞才不會整張卡消失。
+ * 取捨與 summaryActiveFilters 的標籤一致——卡片上看得到的條件，就是送進摘要的條件。
+ * 什麼都沒選時回空字串：初始狀態不該憑空跑出一張摘要卡。
+ */
+const conditionSummaryQuery = computed(() =>
+  [
+    isAllPolicyValue(activeSummaryState.policy) ? "" : activePolicyLabel.value,
+    isAllAreaValue(activeSummaryState.area) ? "" : activeAreaLabel.value,
+    activeRecipientLabel.value,
+    activeIncomeLabel.value,
+    activeIdentityLabel.value,
+  ]
+    .filter(Boolean)
+    .join(" ")
+);
+
 const summaryQuery = computed(
   () =>
     normalizeSummaryKeyword(resolvedPolicySearchQuery.value) ||
-    normalizeSummaryKeyword(activeSummaryState.query)
+    normalizeSummaryKeyword(activeSummaryState.query) ||
+    conditionSummaryQuery.value
 );
 // PRD 移植版保留摘要程式碼，只透過建置設定暫時關閉掛載。
 const ifareAiSummaryEnabled = computed(
@@ -412,7 +448,8 @@ const ifareAiSummaryEnabled = computed(
     String(runtimeConfig.public.enableIfareAiSummary ?? true).toLowerCase()
   )
 );
-const hasSummaryKeyword = computed(
+// 有關鍵字、或有任何篩選條件就顯示摘要卡：純篩選與 0 筆才是最需要引導的時候。
+const hasSummaryCard = computed(
   () => ifareAiSummaryEnabled.value && Boolean(summaryQuery.value)
 );
 
@@ -437,6 +474,184 @@ const summaryCacheKey = computed(() =>
     resultIds: storageiFarePolicyList.slice(0, 5).map((item) => item.id),
   })
 );
+
+/**
+ * 摘要卡的快捷鈕選項，依「這輪在問哪一項條件」分組。
+ *
+ * 由伺服器決定要問哪一項（見 stream.post.ts 的 guidanceField），這裡只負責備好
+ * 各項的可選值。
+ *
+ * 每一項都限縮成「目前結果裡真的有政策標記該值」的選項。以「長照」為例，11 筆政策
+ * 的年齡標記只有老人與成人，一筆嬰幼兒或兒少都沒有——那時候還把四個年齡全列出來，
+ * 點「嬰幼兒」只會篩出「沒有年齡限制」的那幾筆，看起來有縮小其實是假的。
+ *
+ * 這些鈕不是聊天回合——點了是去改上方對應的篩選並重新搜尋，讓使用者看見畫面被改了。
+ */
+/**
+ * 目前生效的限縮條件，給摘要卡在頂端列成一排可移除的標籤。
+ *
+ * 上方搜尋區雖然也有這些條件，但使用者在看摘要時那一區已經捲出畫面了。
+ * 在摘要卡再列一次，才看得出自己收斂到哪裡，也才能一鍵退回上一個範圍。
+ */
+const summaryActiveFilters = computed(() => {
+  const chips: Array<{ field: string; label: string; value: string }> = [];
+  const push = (field: string, label: string, value: string) => {
+    if (value) chips.push({ field, label, value });
+  };
+
+  push("policy", "類別", isAllPolicyValue(activeSummaryState.policy) ? "" : activePolicyLabel.value);
+  push("area", "地區", isAllAreaValue(activeSummaryState.area) ? "" : activeAreaLabel.value);
+  push("recipient", "年齡", activeRecipientLabel.value);
+  push("income", "經濟條件", activeIncomeLabel.value);
+  push("identity", "特殊身分", activeIdentityLabel.value);
+  return chips;
+});
+
+/**
+ * 選了特定縣市、但相符的多半是全國性政策時的說明。
+ *
+ * 後端的地區篩選是「該縣市 或 中央」，所以全國性政策本來就會一起出現——縣市民
+ * 同樣能申請。但畫面上完全看不出這件事，使用者會以為「我選了台北市，怎麼都是全國」。
+ * 不動排序（全國那幾筆通常才是真正相關的），改成把結果組成講明白。
+ */
+const summaryResultBreakdown = computed(() => {
+  if (isAllAreaValue(activeSummaryState.area)) return "";
+  if (isLoading.value || storageiFarePolicyList.length === 0) return "";
+
+  const areaLabel = activeAreaLabel.value;
+  if (!areaLabel || areaLabel === ALL_AREA_VALUE) return "";
+
+  const local = storageiFarePolicyList.filter(
+    (item) => item.area && item.area !== ALL_AREA_VALUE
+  ).length;
+  const nationwide = storageiFarePolicyList.length - local;
+  if (nationwide === 0) return "";
+
+  return `符合的 ${storageiFarePolicyList.length} 筆中，${areaLabel}在地 ${local} 筆、全國性 ${nationwide} 筆 — 全國性政策設籍${areaLabel}同樣可以申請。`;
+});
+
+function clearSummaryFilter(field: string) {
+  if (field === "policy") codeSelect_policy.value = ALL_POLICY_VALUE;
+  else if (field === "area") codeSelectArea.value = ALL_AREA_VALUE;
+  else if (field === "recipient") SwitchRecipient("reset");
+  else if (field === "income") SwitchIncome("reset");
+  else if (field === "identity") SwitchIdentity("reset");
+  else return;
+
+  Search();
+}
+
+/** 結果少於這個數量才去算「放寬條件」建議，避免每次搜尋都多打好幾次 API */
+const RELAX_SUGGESTION_THRESHOLD = 3;
+
+/**
+ * 條件收得太緊、幾乎沒東西可推薦時，算出「拿掉哪一項會有幾筆」。
+ *
+ * 筆數是真的去查回來的，不是估的也不是 AI 猜的——這種時候給錯數字比不給更糟。
+ * 只在結果很少時才觸發，平常搜尋不會多打 API。
+ */
+const relaxSuggestions = ref<
+  Array<{ field: string; label: string; value: string; count: number }>
+>([]);
+let relaxSuggestionRequestId = 0;
+
+async function refreshRelaxSuggestions() {
+  const requestId = ++relaxSuggestionRequestId;
+  const current = storageiFarePolicyList.length;
+  const chips = summaryActiveFilters.value;
+
+  if (current > RELAX_SUGGESTION_THRESHOLD || chips.length === 0) {
+    relaxSuggestions.value = [];
+    return;
+  }
+
+  const results = await Promise.all(
+    chips.map(async (chip) => {
+      try {
+        const responses = await Promise.all(
+          buildFarePolicyApiQueries(undefined, chip.field).map((query) =>
+            $WebApiGet("/FarePolicy/GetIFarePolicyList", query)
+          )
+        );
+        const ids = new Set<string>();
+        responses.forEach((response) => {
+          getPolicyResponseItems(response).forEach((item: any) => {
+            const id = String(item?.id ?? item?.ID ?? "");
+            if (id) ids.add(id);
+          });
+        });
+        return { ...chip, count: ids.size };
+      } catch {
+        return { ...chip, count: -1 };
+      }
+    })
+  );
+
+  if (requestId !== relaxSuggestionRequestId) return;
+  relaxSuggestions.value = results
+    .filter((item) => item.count > current)
+    .sort((a, b) => b.count - a.count);
+}
+
+const summaryQuickOptions = computed<Record<string, Array<{ name: string; val: string }>>>(() => {
+  if (isLoading.value || storageiFarePolicyList.length === 0) return {};
+
+  const toOptions = (list: Array<selectItem>, keep?: (item: selectItem) => boolean) =>
+    list
+      .filter((item) => (keep ? keep(item) : true))
+      .map((item) => ({ name: item.name, val: String(item.val) }));
+
+  const presentCategories = new Set(
+    storageiFarePolicyList.map((item) => item.policyCategory).filter(Boolean)
+  );
+  const presentAreas = new Set(
+    storageiFarePolicyList.map((item) => item.area).filter(Boolean)
+  );
+  const presentIn = (
+    key: "recipientNames" | "incomeNames" | "identityNames",
+    name: string
+  ) => storageiFarePolicyList.some((item) => item[key]?.includes(name));
+
+  return {
+    policy: toOptions(
+      policySelectList,
+      (item) => !isAllPolicyValue(item.val) && presentCategories.has(item.name)
+    ),
+    area: toOptions(
+      areaSelectList,
+      (item) => item.val !== ALL_AREA_VALUE && presentAreas.has(item.name)
+    ),
+    recipient: toOptions(recipientSelectList, (item) => presentIn("recipientNames", item.name)),
+    income: toOptions(incomeSelectList, (item) => presentIn("incomeNames", item.name)),
+    identity: toOptions(identitySelectList, (item) => presentIn("identityNames", item.name)),
+  };
+});
+
+function applySummaryQuickOption(payload: { field: string; val: string }) {
+  const { field, val } = payload;
+  if (!val) return;
+
+  if (field === "policy") {
+    if (codeSelect_policy.value === val) return;
+    codeSelect_policy.value = val;
+  } else if (field === "area") {
+    if (codeSelectArea.value === val) return;
+    codeSelectArea.value = val;
+  } else if (field === "recipient") {
+    if (codeSelectRecipient.value === val) return;
+    SwitchRecipient(val);
+  } else if (field === "income") {
+    if (codeSelectIncomes.value.includes(val)) return;
+    SwitchIncome(val);
+  } else if (field === "identity") {
+    if (codeSelectIdentity.value.includes(val)) return;
+    SwitchIdentity(val);
+  } else {
+    return;
+  }
+
+  Search();
+}
 
 let summaryPinTimers: number[] = [];
 let resultPinTimers: number[] = [];
@@ -475,7 +690,7 @@ function scrollToSummary() {
 function pinSummaryViewport() {
   if (!process.client) return;
   clearSummaryPinTimers();
-  if (!hasSummaryKeyword.value) return;
+  if (!hasSummaryCard.value) return;
   scrollToSummary();
   summaryPinTimers = [120, 420].map((delay) =>
     window.setTimeout(() => scrollToSummary(), delay)
@@ -503,7 +718,7 @@ function scrollToFirstResult() {
 }
 
 function pinFirstResultViewport() {
-  if (!process.client || hasSummaryKeyword.value || storageiFarePolicyList.length === 0) return;
+  if (!process.client || hasSummaryCard.value || storageiFarePolicyList.length === 0) return;
   clearResultPinTimers();
   scrollToFirstResult();
   resultPinTimers = [120, 420].map((delay) =>
@@ -727,6 +942,12 @@ interface iFarePolicyItem {
   hasIndentity: boolean;
   hasIncome: boolean;
   hasRecipient: boolean;
+  /** 政策類別名稱（畫面上的「受助者情況」下拉）；用來算出還值得問哪幾類 */
+  policyCategory: string;
+  /** 這筆政策實際標記的年齡／經濟／身分名稱，用來決定快捷鈕要列哪些選項 */
+  recipientNames: string[];
+  incomeNames: string[];
+  identityNames: string[];
 }
 
 interface pageNum {
@@ -912,7 +1133,9 @@ function normalizePolicySearchText(value: unknown) {
 }
 
 function getPolicySearchTerms(query: string) {
-  const normalizedQuery = String(query ?? "").normalize("NFKC").toLowerCase().trim();
+  // 先拿掉縣市名（地區已經是篩選條件，留著只會讓每一筆都命中標題的【新北市】），
+  // 再把訪客用語換成站內政策實際使用的詞（孩童 → 兒童）。
+  const normalizedQuery = buildRelevanceQuery(query).normalize("NFKC").toLowerCase().trim();
   if (!normalizedQuery) return [];
 
   const terms = new Set<string>();
@@ -946,6 +1169,8 @@ type PolicyKeywordMatchMetrics = {
   specificTitleMatches: number;
   matchedSpecificTerms: number;
   score: number;
+  /** 這次查詢有沒有「具體詞」可比對。沒有的話客戶端評分等於雜訊，要讓位給後端相關性 */
+  hasSpecificTerms: boolean;
 };
 
 function getPolicyKeywordMatchMetrics(item: any, query: string): PolicyKeywordMatchMetrics {
@@ -954,6 +1179,7 @@ function getPolicyKeywordMatchMetrics(item: any, query: string): PolicyKeywordMa
     return {
       exactLevel: 0,
       specificCoverage: 0,
+      hasSpecificTerms: false,
       specificTitleMatches: 0,
       matchedSpecificTerms: 0,
       score: 0,
@@ -1005,6 +1231,7 @@ function getPolicyKeywordMatchMetrics(item: any, query: string): PolicyKeywordMa
     specificCoverage: specificTerms.length > 0
       ? matchedSpecificTerms / specificTerms.length
       : 0,
+    hasSpecificTerms: specificTerms.length > 0,
     specificTitleMatches,
     matchedSpecificTerms,
     score,
@@ -1022,10 +1249,15 @@ function mergeRankedPolicySearchResults(
     score: number;
     keywordMatch: PolicyKeywordMatchMetrics;
     aiMatch: PolicyKeywordMatchMetrics;
+    isLocal: boolean;
     bestOriginalRank: number;
     firstOrder: number;
   }>();
   let firstOrder = 0;
+  // 使用者選定的縣市，用於相關性同分時的排序（沒選特定縣市時為空字串）
+  const localAreaName = isAllAreaValue(codeSelectArea.value)
+    ? ""
+    : getSelectedLabel(areaSelectList, codeSelectArea.value, "");
 
   responses.forEach((response, responseIndex) => {
     const plan = plans[responseIndex];
@@ -1040,6 +1272,9 @@ function mergeRankedPolicySearchResults(
         score: 0,
         keywordMatch: getPolicyKeywordMatchMetrics(item, originalQuery),
         aiMatch: getPolicyKeywordMatchMetrics(item, resolvedQuery),
+        isLocal:
+          Boolean(localAreaName) &&
+          String(item?.codeDomicile_LabelName ?? "") === localAreaName,
         bestOriginalRank: Number.POSITIVE_INFINITY,
         firstOrder: firstOrder++,
       };
@@ -1059,23 +1294,41 @@ function mergeRankedPolicySearchResults(
     .sort((a, b) => {
       // Original wording always wins. AI intent only breaks ties between items
       // with the same direct keyword relevance.
-      const originalComparisons = [
-        b.keywordMatch.exactLevel - a.keywordMatch.exactLevel,
-        b.keywordMatch.specificCoverage - a.keywordMatch.specificCoverage,
-        b.keywordMatch.specificTitleMatches - a.keywordMatch.specificTitleMatches,
-        b.keywordMatch.matchedSpecificTerms - a.keywordMatch.matchedSpecificTerms,
-        b.keywordMatch.score - a.keywordMatch.score,
-      ];
-      const originalDiff = originalComparisons.find(diff => Math.abs(diff) > Number.EPSILON);
-      if (originalDiff !== undefined) return originalDiff;
+      // 只有在查詢真的含具體詞時，客戶端比對才有判斷力。像「孩童補助」這種
+      // 只剩下泛用詞的查詢，這串比較會被「標題含補助」之類的雜訊主導，
+      // 反而蓋掉後端 BM25 算好的相關性——那種情況直接讓位給下面的 RRF 分數。
+      if (a.keywordMatch.hasSpecificTerms || b.keywordMatch.hasSpecificTerms) {
+        const originalComparisons = [
+          b.keywordMatch.exactLevel - a.keywordMatch.exactLevel,
+          b.keywordMatch.specificCoverage - a.keywordMatch.specificCoverage,
+          b.keywordMatch.specificTitleMatches - a.keywordMatch.specificTitleMatches,
+          b.keywordMatch.matchedSpecificTerms - a.keywordMatch.matchedSpecificTerms,
+          b.keywordMatch.score - a.keywordMatch.score,
+        ];
+        const originalDiff = originalComparisons.find(diff => Math.abs(diff) > Number.EPSILON);
+        if (originalDiff !== undefined) return originalDiff;
+      } else {
+        // 沒有具體詞（例如只搜「長照」）時不做上面那幾層細分，但仍要用整體關鍵字分數
+        // 區分「內文到底有沒有提到這個主題」——否則下面的在地優先會把完全沒提到長照的
+        // 在地政策推到最前面（台北市的長照在地政策就是這種情況）。
+        const rawDiff = b.keywordMatch.score - a.keywordMatch.score;
+        if (Math.abs(rawDiff) > Number.EPSILON) return rawDiff;
+      }
 
-      const aiComparisons = [
-        b.aiMatch.exactLevel - a.aiMatch.exactLevel,
-        b.aiMatch.specificCoverage - a.aiMatch.specificCoverage,
-        b.aiMatch.score - a.aiMatch.score,
-      ];
-      const aiDiff = aiComparisons.find(diff => Math.abs(diff) > Number.EPSILON);
-      if (aiDiff !== undefined) return aiDiff;
+      if (a.aiMatch.hasSpecificTerms || b.aiMatch.hasSpecificTerms) {
+        const aiComparisons = [
+          b.aiMatch.exactLevel - a.aiMatch.exactLevel,
+          b.aiMatch.specificCoverage - a.aiMatch.specificCoverage,
+          b.aiMatch.score - a.aiMatch.score,
+        ];
+        const aiDiff = aiComparisons.find(diff => Math.abs(diff) > Number.EPSILON);
+        if (aiDiff !== undefined) return aiDiff;
+      }
+
+      // 相關性打平時，使用者選的縣市優先於「哪一路查詢先撈到」這種順序性因素。
+      // 實測「長照＋高雄市」11 筆有 10 筆同分，不這樣排的話在地政策會全被擠到後面。
+      const localDiff = (b.isLocal ? 1 : 0) - (a.isLocal ? 1 : 0);
+      if (localDiff !== 0) return localDiff;
 
       const scoreDiff = b.score - a.score;
       if (Math.abs(scoreDiff) > Number.EPSILON) return scoreDiff;
@@ -1251,7 +1504,11 @@ function splitQuerySegments(query: string) {
     .map((item) => item.trim())
     .filter((item) => item.length >= 2);
   const unique = [...new Set(segments)].filter((item) => item !== query.trim());
-  return unique.length >= 2 ? unique : [];
+  if (unique.length < 2) return [];
+  // 地區已經套進 CodeDomicile，就不要再把縣市名單獨查一次：
+  // 「新北市 孩童補助」若單獨查「新北市」，會命中所有標題含【新北市】的政策，
+  // 把主題詞擠掉。完整原句仍以較高權重查詢，所以不會漏。
+  return unique.filter((item) => !isAreaOnlySegment(item));
 }
 
 function mapPolicySearchItems(items: any[]): iFarePolicyItem[] {
@@ -1269,9 +1526,31 @@ function mapPolicySearchItems(items: any[]): iFarePolicyItem[] {
       hasIndentity: hasPolicyRestriction(item.codeIdentityList),
       hasIncome: hasPolicyRestriction(item.codeIncomeList),
       hasRecipient: recipientList.findIndex((entry: any) => entry.id == 1) < 0,
+      policyCategory: item.codePolicy_LabelName ?? "",
+      recipientNames: getPolicyCodeNameList(recipientList),
+      incomeNames: getPolicyCodeNameList(item.codeIncomeList),
+      identityNames: getPolicyCodeNameList(item.codeIdentityList),
     };
   });
 }
+
+/** 取出後端回傳的代碼名稱清單（用於判斷結果集裡真的出現過哪些選項） */
+function getPolicyCodeNameList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry: any) => String(entry?.codeName ?? entry?.CodeName ?? "").trim())
+    .filter(Boolean);
+}
+
+// 放在 storageiFarePolicyList 宣告之後：watch 會立刻執行一次 getter，
+// 寫在宣告之前會踩到 TDZ，整個 script setup 會直接拋錯。
+watch(
+  () => [isLoading.value, storageiFarePolicyList.length] as const,
+  ([loading]) => {
+    if (loading) return;
+    void refreshRelaxSuggestions();
+  }
+);
 
 function replacePolicySearchItems(items: iFarePolicyItem[]) {
   storageiFarePolicyList.splice(0, storageiFarePolicyList.length, ...items);
@@ -1309,7 +1588,11 @@ async function searchSummaryConversationPolicies(
     return { query: resolvedQuery || originalQuery, cases: [...storageiFarePolicyList] };
   }
 
-  const originalQueries = buildFarePolicyApiQueries(originalQuery);
+  // 沒打關鍵字時 originalQuery 是「已選條件」組出來的描述詞（見 conditionSummaryQuery）：
+  // 當意圖解析與排序的主題沒問題，但不能當成送進 API 的關鍵字——
+  // 那些字使用者從沒打過，拿去比對政策內文只會把純靠篩選撈到的結果無故砍掉。
+  const typedQuery = normalizeSummaryKeyword(activeSummaryState.query || searchQuery.value);
+  const originalQueries = buildFarePolicyApiQueries(typedQuery);
   const hasMemoryExpansion = Boolean(resolvedQuery && resolvedQuery !== originalQuery);
   const memoryQueries = hasMemoryExpansion ? buildFarePolicyApiQueries(resolvedQuery) : [];
   const plans: PolicySearchRequestPlan[] = [
@@ -1416,7 +1699,7 @@ async function SetDataInit() {
     if (requestId !== policySearchRequestId) return;
     isLoading.value = false;
     summaryTriggerKey.value += 1;
-    if (hasSummaryKeyword.value) {
+    if (hasSummaryCard.value) {
       pinSummaryViewport();
     } else {
       pinFirstResultViewport();
