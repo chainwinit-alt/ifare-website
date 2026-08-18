@@ -46,6 +46,9 @@ npm run dev        # 開發模式
 npm run build      # 正式建置
 ```
 
+> dev 模式啟動後會自動用預設瀏覽器開啟 `http://localhost:3000/ifare`（見 `modules/dev-auto-open.ts`）。
+> 設 `IFARE_DEV_OPEN=0` 可關閉；設 `IFARE_DEV_OPEN_PATH` 可改開其他頁面。
+
 ---
 
 ### `iFare_Frontend_API` — 前台 API
