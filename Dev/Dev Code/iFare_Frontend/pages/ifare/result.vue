@@ -161,6 +161,14 @@
             </div>
           </div>
         </div>
+        <!--
+          選項沒載進來時要講出來。不講的話畫面只是「下拉是空的、年齡按鈕不見了」，
+          使用者會以為這個網站本來就不能篩，而不是知道可以按一下重試。
+        -->
+        <div v-if="filterOptionsFailed" class="card-filter-failed" role="alert">
+          <p class="card-filter-failed-text">篩選條件載入失敗，目前只能用關鍵字搜尋。</p>
+          <button type="button" class="btn card-filter-failed-retry" @click="ReloadFilterOptions">重新載入篩選條件</button>
+        </div>
         <div class="card-filter-reset">
           <button class="btn btn-reset" @click="ResetParam">清空</button>
         </div>
@@ -180,6 +188,7 @@
           :active-filters="summaryActiveFilters"
           :result-breakdown="summaryResultBreakdown"
           :relax-suggestions="relaxSuggestions"
+          :search-failed="searchFailed"
           @summary-complete="handleSummaryComplete"
           @select-quick-option="applySummaryQuickOption"
           @clear-filter="clearSummaryFilter"
@@ -187,15 +196,29 @@
       </section>
       <section ref="resultSectionRef" class="section-result">
         <div class="part-list">
-          <span v-if="!isLoading" class="result-total">{{ storageiFarePolicyList.length }}</span>
+          <span v-if="!isLoading && !searchFailed" class="result-total">{{ storageiFarePolicyList.length }}</span>
           <div class="result-loading" v-if="isLoading">政策資料搜尋中...</div>
+          <!--
+            連線失敗不能借用「0 筆」的版面。那一行搭配 CSS 的前後綴會讀成
+            「找到 0 筆福利政策」，等於替後端斷線背書說本站沒有這類補助——
+            實測擋掉 GetIFarePolicyList 再搜「長照」就是這樣，但站內其實有 52 筆。
+          -->
+          <div class="result-failed" v-else-if="searchFailed">
+            <p class="result-failed-text">搜尋暫時無法完成，請稍後再試。</p>
+            <p class="result-failed-note">這次沒有取得站內政策資料，不代表沒有符合的補助。</p>
+            <button type="button" class="btn result-failed-retry" @click="RetrySearch">重試</button>
+          </div>
           <ul class="list-unstyled result-list" v-else>
             <li
               class="result-item transition-general"
               v-for="_item in iFarePolicyList"
               :key="_item.id"
             >
-              <NuxtLink :to="{ path: '/ifare/info', query: { id: _item.id, reload: _item.id } }">
+              <!-- 不要帶 reload：route.global.ts 看到它會改用 router.replace 收尾，
+                   那次 replace 執行時網址還停在結果頁，被覆蓋掉的就是結果頁這一筆，
+                   使用者從政策明細按上一頁就再也回不來。明細頁的 watcher 早就 key 在
+                   route.query.id，換 id 本來就會重抓，reload 已經沒有存在的必要。 -->
+              <NuxtLink :to="{ path: '/ifare/info', query: { id: _item.id } }">
                 <h4 class="result-title">{{ _item.title }}</h4>
                 <div class="result-item-bottom">
                   <div class="result-filter">
@@ -214,7 +237,7 @@
             </li>
           </ul>
         </div>
-        <div class="part-pages" v-show="!isLoading">
+        <div class="part-pages" v-show="!isLoading && !searchFailed">
           <CompPage :page-list="pageNums" @change-page="PageChange"/>
         </div>
       </section>
@@ -237,7 +260,7 @@ definePageMeta({
   toLinkName: "i-Fare",
   toLink: "/ifare",
 });
-const { $WebApiGet } = useNuxtApp();
+const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
 const runtimeConfig = useRuntimeConfig();
 import CompSelect from "~/components/CompSelect.vue";
 import CompSelectRecipient from "~/components/CompSelectRecipient.vue";
@@ -291,6 +314,12 @@ const codeSelectIdentity = ref<string[]>([]);
 // 之前預設 false，重新整理後會先顯示「找到 0 筆福利政策」約半秒才切成搜尋中——
 // 看起來就像重整沒作用、或這組條件真的查不到東西。
 const isLoading = ref(true);
+// 這一輪搜尋是「一路都沒查成功」，不是站內真的沒有符合的政策。
+// 兩件事以前分不出來：$WebApiGet 失敗只回 null，前端拿到的一樣是空清單，
+// 於是結果區寫「找到 0 筆福利政策」、摘要卡也因為 cases 是空的被伺服器判成
+// 站內查無資料，改用一般知識寫一整篇科普。實測擋掉 GetIFarePolicyList 搜「長照」
+// 就是這個畫面，但站內其實有 52 筆——一篇看起來很權威的文章比空白更誤導人。
+const searchFailed = ref(false);
 const summarySectionRef = ref<HTMLElement | null>(null);
 const resultSectionRef = ref<HTMLElement | null>(null);
 const summaryTriggerKey = ref(0);
@@ -593,7 +622,9 @@ async function refreshRelaxSuggestions() {
   const current = storageiFarePolicyList.length;
   const chips = summaryActiveFilters.value;
 
-  if (current > RELAX_SUGGESTION_THRESHOLD || chips.length === 0) {
+  // 連線失敗那一輪的 0 筆不是「條件收太緊」，這時再去算放寬建議只會多打幾次
+  // 一樣會失敗的 API，還可能讓使用者以為問題出在自己的篩選條件上。
+  if (searchFailed.value || current > RELAX_SUGGESTION_THRESHOLD || chips.length === 0) {
     relaxSuggestions.value = [];
     return;
   }
@@ -907,9 +938,34 @@ function getSelectItems(type: string, items: any) {
   codeSelectIdentity.value = selectIdentities.map((item: any) => String(item.value));
 }
 
+// 篩選選單的選項全部來自 /Code/GetCode*，而 $WebApiGet 失敗只回 null，
+// 五個載入器又都是「拿不到就 return」，選單於是靜靜地渲染成空的。
+// 實測擋掉這幾支：搜尋照常回 52 筆，但受助者情況下拉 0 個選項、年齡四顆按鈕
+// 整組消失，畫面上連一句提示都沒有——使用者只會覺得「這個網站不能篩」。
+const filterOptionsFailed = ref(false);
+
+// 這幾份清單本來就有預設項（全部／全國），重載時要留著
+const FILTER_OPTION_BASE_LENGTHS = {
+  policy: policySelectList.length,
+  area: areaSelectList.length,
+  recipient: recipientSelectList.length,
+  income: incomeSelectList.length,
+  identity: identitySelectList.length,
+};
+
+/** 走 Detailed 版本才分得出「這個選單真的沒選項」與「根本沒連上」 */
+async function loadCodeList(path: string) {
+  const { data, error } = await $WebApiGetDetailed(path);
+  if (error || !data?.result?.result) {
+    filterOptionsFailed.value = true;
+    return null;
+  }
+  return data;
+}
+
 // Code Policy
-const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
-codePolicy.then((res: any) => {
+function loadPolicyOptions() {
+  return loadCodeList("/Code/GetCodePolicyList").then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
@@ -919,11 +975,13 @@ codePolicy.then((res: any) => {
     };
   });
   policySelectList.push(..._list);
-});
+  });
+}
+let codePolicy = loadPolicyOptions();
 
 // Code area
-const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
-codeArea.then((res: any) => {
+function loadAreaOptions() {
+  return loadCodeList("/Code/GetCodeDomicileList").then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
@@ -933,11 +991,13 @@ codeArea.then((res: any) => {
     };
   });
   areaSelectList.push(..._list);
-});
+  });
+}
+let codeArea = loadAreaOptions();
 
 // Code recipient
-const codeRecipient = $WebApiGet("/Code/GetCodeRecipientList");
-codeRecipient.then((res: any) => {
+function loadRecipientOptions() {
+  return loadCodeList("/Code/GetCodeRecipientList").then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
@@ -948,8 +1008,9 @@ codeRecipient.then((res: any) => {
     };
   });
   recipientSelectList.push(..._list);
-})
-.then(() => {
+  });
+}
+let codeRecipient = loadRecipientOptions().then(() => {
   SwitchRecipient($route.query.recipient)
 });
 
@@ -978,8 +1039,8 @@ function SwitchRecipient(codeVal: any) {
 }
 
 // Code income
-const codeIncome = $WebApiGet("/Code/GetCodeIncomeList");
-codeIncome.then((res: any) => {
+function loadIncomeOptions() {
+  return loadCodeList("/Code/GetCodeIncomeList").then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
@@ -993,7 +1054,9 @@ codeIncome.then((res: any) => {
   incomeSelectList.forEach((item) => {
     item.isActive = codeSelectIncomes.value.includes(item.val);
   });
-});
+  });
+}
+let codeIncome = loadIncomeOptions();
 
 function SwitchIncome(codeVal: any) {
   if (codeVal == "reset") {
@@ -1011,8 +1074,8 @@ function SwitchIncome(codeVal: any) {
 }
 
 // Code identity
-const codeIdentity = $WebApiGet("/Code/GetCodeIdentityList");
-codeIdentity.then((res: any) => {
+function loadIdentityOptions() {
+  return loadCodeList("/Code/GetCodeIdentityList").then((res: any) => {
   if (!res?.result?.result) return;
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
@@ -1026,7 +1089,33 @@ codeIdentity.then((res: any) => {
   identitySelectList.forEach((item) => {
     item.isActive = codeSelectIdentity.value.includes(item.val);
   });
-});
+  });
+}
+let codeIdentity = loadIdentityOptions();
+
+/**
+ * 重新載入篩選選項：清回預設項再重抓一次。
+ * 不用整頁重新整理，因為那會被當成「使用者按了重新整理」而清掉搜尋條件。
+ * 重抓後要把使用者原本選的年齡重新標回去——清單是重建的，isActive 會掉。
+ */
+function ReloadFilterOptions() {
+  filterOptionsFailed.value = false;
+  policySelectList.splice(FILTER_OPTION_BASE_LENGTHS.policy);
+  areaSelectList.splice(FILTER_OPTION_BASE_LENGTHS.area);
+  recipientSelectList.splice(FILTER_OPTION_BASE_LENGTHS.recipient);
+  incomeSelectList.splice(FILTER_OPTION_BASE_LENGTHS.income);
+  identitySelectList.splice(FILTER_OPTION_BASE_LENGTHS.identity);
+
+  codePolicy = loadPolicyOptions();
+  codeArea = loadAreaOptions();
+  codeRecipient = loadRecipientOptions().then(() => {
+    recipientSelectList.forEach((item) => {
+      item.isActive = item.val === codeSelectRecipient.value;
+    });
+  });
+  codeIncome = loadIncomeOptions();
+  codeIdentity = loadIdentityOptions();
+}
 
 function SwitchIdentity(codeVal: any) {
   if (codeVal == "reset") {
@@ -1061,6 +1150,15 @@ function Search() {
   if (codeSelectIdentity.value.length > 0) routeQuery.identities = codeSelectIdentity.value.join(",");
   if (searchQuery.value.trim()) routeQuery.query = searchQuery.value.trim();
   void $router.replace({ query: routeQuery });
+  void SetDataInit();
+}
+
+/**
+ * 連線失敗後的重試：直接重跑同一組條件，不動網址也不重整頁面。
+ * 後端主機連線不穩通常撐不了幾秒，讓使用者按一下就好，不必自己再組一次條件。
+ */
+function RetrySearch() {
+  if (isLoading.value) return;
   void SetDataInit();
 }
 
@@ -1230,6 +1328,21 @@ let policySearchRequestId = 0;
 
 function getPolicyResponseItems(response: any) {
   return Array.isArray(response?.result?.result) ? response.result.result : [];
+}
+
+/** 一路查詢的結果：ok 為 false 代表這次請求根本沒回來，不是查到 0 筆 */
+type PolicySearchOutcome = { ok: boolean; response: any };
+
+/**
+ * 政策搜尋改走 Detailed 版本，才知道「沒有資料」是查不到還是連不上。
+ *
+ * $WebApiGet 把錯誤吞在外掛裡、一律回 null（見 plugins/WebAPI.ts），呼叫端看到的
+ * 永遠是空清單；Detailed 版本會一併回傳 error，這裡只是把它翻成 ok 旗標，
+ * 讓 Promise.all 底下每一路的成敗都留得下來。
+ */
+async function requestPolicyList(query: Record<string, any>): Promise<PolicySearchOutcome> {
+  const { data, error } = await $WebApiGetDetailed("/FarePolicy/GetIFarePolicyList", query);
+  return { ok: !error, response: data };
 }
 
 function getPolicyTimestamp(value: unknown) {
@@ -1603,7 +1716,13 @@ function matchFilterLabel(optionName: string, target: string) {
  * 「使用者尚未自行選擇」時才自動帶入，絕不覆蓋使用者手動設定的條件。
  */
 async function applyResolvedSearchFilters(intent: ResolvedPolicySearchIntent) {
-  let changed = await applyResolvedSearchArea(intent.area);
+  // 地區要跟年齡、經濟、身分一樣守門：使用者自己選過就不能被意圖解析覆蓋。
+  // 少了這一道，打關鍵字時解析回來的縣市會蓋掉使用者選的那個，連網址一起改寫，
+  // 而且畫面上完全沒有跡象——實測開 ?area=20（台東縣）再加關鍵字「長照」會變成
+  // 台中市、加「孩童補助」會變成桃園市，分享出去的連結也會被改掉。
+  let changed = isAllAreaValue(codeSelectArea.value)
+    ? await applyResolvedSearchArea(intent.area)
+    : false;
 
   if (intent.recipient && !codeSelectRecipient.value) {
     await codeRecipient.catch(() => undefined);
@@ -1794,11 +1913,13 @@ async function SetDataInit() {
   iFarePolicyList.splice(0);
   pageNums.splice(0);
   isLoading.value = true;
+  // 上一輪失敗留下的錯誤畫面在這裡收掉，重試才看得出真的重新查了
+  searchFailed.value = false;
   pinSummaryViewport();
   const originalQuery = normalizeSummaryKeyword(searchQuery.value);
   const prefetchedOriginalQueries = buildFarePolicyApiQueries(originalQuery);
   const prefetchedOriginalResponse = Promise.all(
-    prefetchedOriginalQueries.map((query) => $WebApiGet("/FarePolicy/GetIFarePolicyList", query))
+    prefetchedOriginalQueries.map((query) => requestPolicyList(query))
   );
   const resolvedIntent = await resolvePolicySearchIntent(originalQuery);
   const resolvedQuery = resolvedIntent.query;
@@ -1809,9 +1930,7 @@ async function SetDataInit() {
     ? buildFarePolicyApiQueries(originalQuery)
     : prefetchedOriginalQueries;
   const originalResponsePromise = filtersChanged
-    ? Promise.all(
-        originalQueries.map((query) => $WebApiGet("/FarePolicy/GetIFarePolicyList", query))
-      )
+    ? Promise.all(originalQueries.map((query) => requestPolicyList(query)))
     : prefetchedOriginalResponse;
   resolvedPolicySearchQuery.value = resolvedQuery;
   const hasAiExpansion = Boolean(resolvedQuery && resolvedQuery !== originalQuery);
@@ -1850,16 +1969,29 @@ async function SetDataInit() {
 
   try {
     const extraPlans = [...segmentPlans, ...aiPlans, ...situationPlans];
-    const [originalResponses, extraResponses] = await Promise.all([
+    const [originalOutcomes, extraOutcomes] = await Promise.all([
       originalResponsePromise,
-      Promise.all(
-        extraPlans.map((plan) => $WebApiGet("/FarePolicy/GetIFarePolicyList", plan.query))
-      ),
+      Promise.all(extraPlans.map((plan) => requestPolicyList(plan.query))),
     ]);
     if (requestId !== policySearchRequestId) return;
 
-    const responses = [...originalResponses, ...extraResponses];
-    const plans = [...requestPlans, ...extraPlans];
+    // 只留查成功的那幾路。mergeRankedPolicySearchResults 是靠索引把 responses 對回
+    // plans 的，兩邊必須同進同退，否則權重會套到別路查詢的結果上。
+    const allOutcomes = [...originalOutcomes, ...extraOutcomes];
+    const allPlans = [...requestPlans, ...extraPlans];
+    const plans: PolicySearchRequestPlan[] = [];
+    const responses: any[] = [];
+    allOutcomes.forEach((outcome, index) => {
+      if (!outcome.ok) return;
+      plans.push(allPlans[index]);
+      responses.push(outcome.response);
+    });
+
+    // 有任何一路回來就照常出結果——合併機制本來就容許只拿到部分查詢計畫。
+    // 一路都沒回來才是連線失敗，這時候寧可什麼都不顯示，也不要留下 0 筆的假結論。
+    searchFailed.value = allOutcomes.length > 0 && responses.length === 0;
+    if (searchFailed.value) return;
+
     const responseItems = responses.flatMap(getPolicyResponseItems);
     const rawItems = originalQuery
       // 排序也要看得到補上的站內用語，否則撈回來的長照政策全部算 0 分
@@ -1949,6 +2081,73 @@ onBeforeUnmount(() => {
   overflow-anchor: none;
 }
 
+/* 連線失敗的說明沿用 .result-loading 的版位（同樣的內距與上分隔線），
+   換頁面不會跳動，也一眼看得出是取代結果清單的那一塊 */
+.card-filter-failed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(214, 62, 20, 0.06);
+}
+
+.card-filter-failed-text {
+  margin: 0;
+  color: #a8391a;
+  font-size: 14px;
+}
+
+.card-filter-failed-retry {
+  padding: 6px 16px;
+  font-size: 14px;
+}
+
+.result-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 32px 48px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.result-failed-text {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.75);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 32px;
+}
+
+.result-failed-note {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.result-failed-retry {
+  margin-top: 4px;
+  padding: 10px 28px;
+  border: 0;
+  border-radius: 999px;
+  background: #c26f0c;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.result-failed-retry:hover {
+  background: #a85f08;
+}
+
 .result-filter-area-text {
   display: inline-block;
   max-width: 5em;
@@ -1961,6 +2160,10 @@ onBeforeUnmount(() => {
 @media (max-width: 767px) {
   .section-summary {
     scroll-margin-top: 84px;
+  }
+
+  .result-failed {
+    padding: 24px 24px 24px 44px;
   }
 }
 </style>

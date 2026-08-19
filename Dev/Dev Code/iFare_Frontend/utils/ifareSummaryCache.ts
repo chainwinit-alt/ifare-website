@@ -35,6 +35,22 @@ export function consumeReloadNavigation() {
   reloadConsumed = true;
 
   if (typeof sessionStorage === "undefined" || typeof location === "undefined") return false;
+
+  // 網址與上一次離開時相同，代表使用者停在原地。但「原地」還有另一種可能：
+  // 從別的頁按上一頁整頁載回這一頁時，網址也會對上。所以要再看導覽類型。
   const lastUnloadUrl = sessionStorage.getItem(IFARE_LAST_UNLOAD_URL_KEY);
-  return Boolean(lastUnloadUrl) && lastUnloadUrl === location.href;
+  if (!lastUnloadUrl || lastUnloadUrl !== location.href) return false;
+
+  // 站內連結已經全部改成 SPA 導覽（不再帶 reload 參數強制整頁重載），
+  // 導覽類型因此重新變得可信：只有真的按了重新整理才會是 reload。
+  // back_forward 代表使用者按的是上一頁，那時清空條件會讓他找不到剛剛在看的東西。
+  if (typeof performance === "undefined") return true;
+  const entries = performance.getEntriesByType?.("navigation") as
+    | PerformanceNavigationTiming[]
+    | undefined;
+  if (entries && entries.length) return entries[0].type === "reload";
+
+  // 舊瀏覽器沒有 navigation timing level 2，退回已淘汰的 performance.navigation
+  const legacy = (performance as any).navigation;
+  return legacy ? legacy.type === 1 : true;
 }

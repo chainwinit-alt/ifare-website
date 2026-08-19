@@ -25,10 +25,11 @@
           想換一份就按這顆：清掉快取重新產生，之前的問答也一起收掉——
           摘要都換了，那些問答已經不對應現在這一份。
         -->
+        <!-- 沒查到站內政策時按這顆也只會重跑一份空摘要，該按的是結果區的重試 -->
         <button
           class="summary-retry"
           type="button"
-          :disabled="isSummaryBusy"
+          :disabled="isSummaryBusy || searchFailed"
           @click="regenerateSummary"
         >
           {{ isSummaryBusy ? "判斷中" : "重新摘要" }}
@@ -61,8 +62,22 @@
         <p class="summary-loading-text">{{ summaryLoadingText }}</p>
       </div>
 
+      <!--
+        搜尋沒查成功時只講連線狀況，一個字的政策內容都不寫。
+        照常產生摘要的話，空的 cases 會讓伺服器走「站內查無政策 → 一般知識總覽」，
+        使用者看到的會是一篇跟本站資料無關、卻長得像官方結論的科普。
+      -->
+      <div v-else-if="searchFailed" class="summary-empty">
+        <p class="summary-text">搜尋暫時無法完成，這次沒有取得站內政策資料，因此不產生 AI 摘要。請按下方的重試再查一次。</p>
+      </div>
+
       <template v-else>
-        <div v-if="summaryHtml" class="summary-markdown" v-html="summaryHtml"></div>
+        <div
+          v-if="summaryHtml"
+          class="summary-markdown"
+          v-html="summaryHtml"
+          @click="handleSummaryLinkClick"
+        ></div>
         <div v-else class="summary-empty">
           <p class="summary-text">{{ fallbackText }}</p>
         </div>
@@ -119,7 +134,11 @@
           </div>
           <div v-else class="summary-answer">
             <span class="summary-answer-label">AI 回覆</span>
-            <div class="summary-markdown" v-html="renderThreadAnswer(item.content)"></div>
+            <div
+              class="summary-markdown"
+              v-html="renderThreadAnswer(item.content)"
+              @click="handleSummaryLinkClick"
+            ></div>
             <!-- 回答說「改成台北市就看得到」時，直接給一顆按鈕，不用自己回上面改篩選 -->
             <div v-if="item.action" class="summary-answer-action">
               <button
@@ -318,6 +337,15 @@ const props = withDefaults(
     resultBreakdown?: string;
     /** 條件收太緊時的「放寬哪一項會有幾筆」建議 */
     relaxSuggestions?: SummaryRelaxSuggestion[];
+    /**
+     * 這次搜尋是請求失敗，不是站內真的沒有政策（由結果頁判斷，見 result.vue）。
+     *
+     * true 時整張卡不產生摘要。cases 空掉的原因有兩種，但送進伺服器長得一模一樣：
+     * 伺服器會判定站內查無政策而改走一般知識總覽，於是連線失敗被包裝成一整篇
+     * 看起來很權威的科普——實測擋掉 GetIFarePolicyList 搜「長照」就會拿到長照科普，
+     * 但站內其實有 52 筆。那條路是誤導的來源，這裡直接不讓它走到。
+     */
+    searchFailed?: boolean;
   }>(),
   {
     query: "",
@@ -325,6 +353,7 @@ const props = withDefaults(
     activeFilters: () => [],
     resultBreakdown: "",
     relaxSuggestions: () => [],
+    searchFailed: false,
     provider: "groq",
     resultsLoading: false,
     searchContext: () => ({}),
@@ -335,6 +364,7 @@ const props = withDefaults(
 );
 
 const { $llm } = useNuxtApp();
+const router = useRouter();
 const selectedProvider = ref<ProviderName>("groq");
 const isLoading = ref(false);
 const streamError = ref("");
@@ -355,6 +385,8 @@ let followUpRequestId = 0;
 const hasKeyword = computed(() => Boolean(normalizeSummaryKeyword(props.query)));
 const isSummaryBusy = computed(() => props.resultsLoading || isLoading.value);
 const shouldShowSummaryLoading = computed(() => {
+  // 搜尋沒查成功就不會再有摘要進來，轉圈圈只會讓人一直等
+  if (props.searchFailed) return false;
   return props.resultsLoading || (isLoading.value && !summaryText.value.trim());
 });
 const summaryLoadingText = computed(() => {
@@ -782,6 +814,10 @@ const rankedCases = computed(() =>
   rankCases(rankQuery.value, props.cases, localAreaName.value, props.searchContext)
 );
 const fallbackText = computed(() => {
+  // 連本地備援摘要也不給：那段文字寫的是「站內的情況」，但這次根本沒拿到站內資料。
+  // 順帶讓 summaryDisplayText 保持空的，追問輸入框與快捷鈕都不會冒出來——
+  // 沒有政策可談的時候，那些入口只會把使用者引到更多空回答。
+  if (props.searchFailed) return "";
   if (!hasKeyword.value) return "";
 
   const queryText = buildRankQuery();
@@ -814,10 +850,30 @@ function toPlainSummaryText(value: string) {
     .slice(0, 400);
 }
 
+/**
+ * 摘要內文的「參考 N」是塞在 v-html 裡的原生 <a>，點下去會整頁重新載入。
+ * 那會讓離開結果頁時觸發 pagehide，回來時被 consumeReloadNavigation 誤判成
+ * 「使用者按了重新整理」，於是條件被整組清空——回得去卻要重打一次。
+ * 這裡接管點擊改走 SPA 導覽，維持與政策卡連結一致的行為。
+ * 修飾鍵、中鍵、外部連結一律放行給瀏覽器，不搶使用者的開新分頁。
+ */
+function handleSummaryLinkClick(event: MouseEvent) {
+  if (event.defaultPrevented || event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+  const anchor = (event.target as HTMLElement | null)?.closest?.("a") as HTMLAnchorElement | null;
+  const href = anchor?.getAttribute("href") || "";
+  if (!href.startsWith("/ifare/info")) return;
+
+  event.preventDefault();
+  void router.push(href);
+}
+
 function buildCaseLink(id: number) {
   return {
     path: "/ifare/info",
-    query: { id: String(id), reload: String(id) },
+    // 不帶 reload，理由同結果頁：那個參數會讓上一頁回不到搜尋結果
+    query: { id: String(id) },
   };
 }
 
@@ -843,7 +899,7 @@ function applyInlineMarkdown(text: string) {
     // 模型標到不存在的編號時整顆引用移除，不留 [參考 N] 原文干擾閱讀
     if (!item) return "";
 
-    const href = `/ifare/info?id=${encodeURIComponent(String(item.id))}&reload=${encodeURIComponent(String(item.id))}`;
+    const href = `/ifare/info?id=${encodeURIComponent(String(item.id))}`;
     return `<a class="summary-inline-reference" href="${href}" title="${escapeHtml(item.title)}">參考 ${item.referenceNo}</a>`;
   });
 
@@ -1158,6 +1214,17 @@ function emitSummaryComplete() {
 }
 
 async function loadSummary(forceRefresh = false) {
+  // 這次沒查到站內資料就別打模型了。空的 cases 會被伺服器判成站內查無政策而改走
+  // 一般知識總覽，寫出來的東西讀起來像「本站就是沒有」的結論——那正是誤導的來源。
+  if (props.searchFailed) {
+    activeController.value?.abort();
+    resetFollowUpConversation();
+    isLoading.value = false;
+    streamError.value = "";
+    summaryText.value = "";
+    return;
+  }
+
   if (!hasKeyword.value) {
     activeController.value?.abort();
     resetFollowUpConversation();

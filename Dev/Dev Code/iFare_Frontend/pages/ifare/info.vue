@@ -1,6 +1,22 @@
 <template>
   <div class="app-body-child" :name="$route.name">
-    <div class="section-list">
+    <div class="part-loading" v-if="isLoading" role="status" aria-live="polite">
+      <div class="loading-hint">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span>政策資料載入中...</span>
+      </div>
+      <span class="skeleton-line skeleton-line-title"></span>
+      <span class="skeleton-line"></span>
+      <span class="skeleton-line"></span>
+      <span class="skeleton-line skeleton-line-info"></span>
+    </div>
+
+    <div class="part-empty part-error" v-else-if="hasError" role="alert">
+      <p>{{ errorMessage }}</p>
+      <button class="btn-retry transition-general" type="button" @click="retryLoad">重新載入</button>
+    </div>
+
+    <div class="section-list" v-else-if="hasPolicy">
       <section class="section-top">
         <h1 class="info-title">{{ _welfareItem.title }}</h1>
         <div class="date-group">
@@ -76,7 +92,8 @@
           </div>
         </div>
       </section>
-      <section class="section-relation">
+      <!-- 相關福利載不到時整區收起，不要留一個空標題讓使用者以為這筆政策沒有相關福利 -->
+      <section class="section-relation" v-if="iFarePolicyList.length > 0">
         <div class="relation-links">
           <h2 class="relation-title">相關福利</h2>
           <ul class="list-unstyled relation-list">
@@ -84,7 +101,9 @@
               <NuxtLink
                   :to="{
                     path: '/ifare/info',
-                    query: { id: _welfare.id, reload: _welfare.id },
+                    // 不帶 reload：它會讓 route.global.ts 用 replace 吃掉上一筆歷史紀錄。
+                    // 換 id 的重抓由本頁 watcher 負責，不需要這個參數。
+                    query: { id: _welfare.id },
                   }"
                 >
                 <h3 class="link-title">{{ _welfare.title }}</h3>
@@ -108,6 +127,10 @@
         </div>
       </section>
     </div>
+
+    <div class="part-empty" v-else>
+      <p>查無這筆政策，可能已經下架，或是網址中的編號有誤。</p>
+    </div>
   </div>
 </template>
 
@@ -121,11 +144,31 @@ definePageMeta({
 // 福利政策資格預覽截斷長度（字元數）
 const QUALIFICATION_PREVIEW_LENGTH = 50;
 
-const { $WebApiGet } = useNuxtApp();
+// 載入失敗的預設說法 — 分不出原因時就用這句，總比讓使用者對著空白頁猜好
+const DETAIL_ERROR_MESSAGE = "政策資料載入失敗，請稍後再試。";
+
+const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
 const { getApiResultValue } = useApiResult();
+const { getApiErrorMessage } = useApiErrorMessage();
 const { formatDisplayDate } = useDateFormatter();
 const route = useRoute();
 const $router = useRouter();
+
+// 這頁原本只憑 _welfareItem 有沒有內容決定畫面，於是「還在載入」「連線失敗」
+// 「查無政策」三種情況全都長成同一片空白，使用者無從判斷該重試還是換一筆看。
+const isLoading = ref(true);
+const hasError = ref(false);
+const errorMessage = ref(DETAIL_ERROR_MESSAGE);
+// 後端確實回了一筆政策才算數。不直接看 _welfareItem.id，是為了避免資料缺 id 時被誤判成查無
+const hasPolicy = ref(false);
+const currentPolicyId = computed(() => Number(route.query.id || 0));
+
+function toDetailErrorMessage(error: any) {
+  const message = getApiErrorMessage(error, DETAIL_ERROR_MESSAGE);
+  // getApiErrorMessage 分不出類別時會原封不動回傳底層訊息（例如 "Failed to fetch"），
+  // 那是給開發者看的，不該端到使用者面前
+  return message === error?.message ? DETAIL_ERROR_MESSAGE : message;
+}
 
 function JumpTo(id: any) {
   if (id == 1) return false;
@@ -324,43 +367,71 @@ function normalizeWelfareHtml(value: string) {
 
 let detailRequestToken = 0;
 async function loadPolicyDetail(infoID: number) {
-  if (!infoID) {
-    resetWelfareItem();
-    return;
-  }
-
   const requestToken = ++detailRequestToken;
+  isLoading.value = true;
+  hasError.value = false;
+  errorMessage.value = DETAIL_ERROR_MESSAGE;
+  hasPolicy.value = false;
   resetWelfareItem();
 
-  const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyDetail", {
-    farePolicyID: infoID,
-  });
-  const _data = getApiResultValue<any>(res);
-  if (!_data || requestToken !== detailRequestToken) return;
+  try {
+    // 網址沒帶 id 不是連線問題，讓它落到「查無政策」，才不會給一個按了也沒用的重試鈕
+    if (!infoID) return;
 
-  _welfareItem.id = _data.id;
-  _welfareItem.title = _data.title;
-  _welfareItem.area = _data.codeDomicile_LabelName ?? "";
-  _welfareItem.qualification = _data.qualification;
-  _welfareItem.evidence = _data.evidence;
-  _welfareItem.remark = _data.remark ?? "";
-  _welfareItem.welfareInfo = normalizeWelfareHtml(_data.welfareInfo);
-  _welfareItem.welfareTel = _data.officeUnitTel
-    ? _data.officeUnitTel.indexOf("分機") >= 0
-      ? `${_data.officeUnitTel.replace("分機", ",")}%23`
-      : _data.officeUnitTel
-    : "";
-  _welfareItem.welfareTelStr = _data.officeUnitTel ?? "";
-  _welfareItem.releaseTime = _data.releaseTime;
-  _welfareItem.discontinuedTime = _data.discontinuedTime;
-  _welfareItem.updateTime = _data.updateTime;
-  _welfareItem.officeUnitInfo = _data.officeUnitInfo ?? "";
-  _welfareItem.officeUnitID = _data.iFareOfficeUnitID ?? 0;
-  _welfareItem.codeDomicileID = _data.codeDomicile_ID ?? 0;
-  _welfareItem.codePolicyID = _data.codePolicy_ID ?? 0;
-  _welfareItem.codeIdentityIDs = Array.isArray(_data.codeIdentityList) ? _data.codeIdentityList.map((p: any) => Number(p.id)) : [];
-  _welfareItem.codeIncomeIDs = Array.isArray(_data.codeIncomeList) ? _data.codeIncomeList.map((p: any) => Number(p.id)) : [];
-  _welfareItem.codeRecipientIDs = Array.isArray(_data.codeRecipientList) ? _data.codeRecipientList.map((p: any) => Number(p.id)) : [];
+    // 用 Detailed 版本才拿得到 error：$WebApiGet 會把連線錯誤吞成 null，
+    // 於是「後端連不上」和「這筆政策不存在」回到頁面時完全同形，只能一起留白
+    const { data, error } = await $WebApiGetDetailed("/FarePolicy/GetIFarePolicyDetail", {
+      farePolicyID: infoID,
+    });
+
+    // 在相關福利之間連點時舊請求可能後到，不能讓它蓋掉新請求的結果
+    if (requestToken !== detailRequestToken) return;
+
+    if (error) {
+      hasError.value = true;
+      errorMessage.value = toDetailErrorMessage(error);
+      return;
+    }
+
+    const _data = getApiResultValue<any>(data);
+    // 連得上但沒有這筆資料 — 屬於查無政策，跟連線失敗要講不一樣的話
+    if (!_data) return;
+
+    hasPolicy.value = true;
+    _welfareItem.id = _data.id;
+    _welfareItem.title = _data.title;
+    _welfareItem.area = _data.codeDomicile_LabelName ?? "";
+    _welfareItem.qualification = _data.qualification;
+    _welfareItem.evidence = _data.evidence;
+    _welfareItem.remark = _data.remark ?? "";
+    _welfareItem.welfareInfo = normalizeWelfareHtml(_data.welfareInfo);
+    _welfareItem.welfareTel = _data.officeUnitTel
+      ? _data.officeUnitTel.indexOf("分機") >= 0
+        ? `${_data.officeUnitTel.replace("分機", ",")}%23`
+        : _data.officeUnitTel
+      : "";
+    _welfareItem.welfareTelStr = _data.officeUnitTel ?? "";
+    _welfareItem.releaseTime = _data.releaseTime;
+    _welfareItem.discontinuedTime = _data.discontinuedTime;
+    _welfareItem.updateTime = _data.updateTime;
+    _welfareItem.officeUnitInfo = _data.officeUnitInfo ?? "";
+    _welfareItem.officeUnitID = _data.iFareOfficeUnitID ?? 0;
+    _welfareItem.codeDomicileID = _data.codeDomicile_ID ?? 0;
+    _welfareItem.codePolicyID = _data.codePolicy_ID ?? 0;
+    _welfareItem.codeIdentityIDs = Array.isArray(_data.codeIdentityList) ? _data.codeIdentityList.map((p: any) => Number(p.id)) : [];
+    _welfareItem.codeIncomeIDs = Array.isArray(_data.codeIncomeList) ? _data.codeIncomeList.map((p: any) => Number(p.id)) : [];
+    _welfareItem.codeRecipientIDs = Array.isArray(_data.codeRecipientList) ? _data.codeRecipientList.map((p: any) => Number(p.id)) : [];
+  } catch (e) {
+    // 解析回應時炸掉也算載入失敗 — 至少講清楚並讓使用者能重試，別卡在轉不完的載入中
+    console.warn("[ifare/info] load detail failed:", e);
+    if (requestToken !== detailRequestToken) return;
+    hasError.value = true;
+    hasPolicy.value = false;
+    errorMessage.value = DETAIL_ERROR_MESSAGE;
+  } finally {
+    // 只有最新的那次請求有資格收掉載入狀態，否則舊請求會提前把畫面放行
+    if (requestToken === detailRequestToken) isLoading.value = false;
+  }
 }
 
 function getPolicyId(item: any) {
@@ -408,36 +479,48 @@ async function loadRelationList(infoID: number) {
   iFarePolicyList.splice(0, iFarePolicyList.length);
   if (!infoID) return;
 
-  const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyRelation", {
-    farePolicyID: infoID,
-  });
-  const _data = getApiResultValue<any>(res);
-  if (!Array.isArray(_data) || requestToken !== relationRequestToken) return;
+  // 相關福利只是加值資訊，載不到就安靜收起這一區即可，不該讓整頁政策內容跟著陪葬
+  try {
+    const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyRelation", {
+      farePolicyID: infoID,
+    });
+    const _data = getApiResultValue<any>(res);
+    if (!Array.isArray(_data) || requestToken !== relationRequestToken) return;
 
-  const nextItems = _data
-    .map((item: any) => ({
-      id: getPolicyId(item),
-      title: item.title,
-      qualification: `${(item.qualification ?? "").slice(0, QUALIFICATION_PREVIEW_LENGTH)}...`,
-      area: item.codeDomicile_LabelName ?? "",
-      hasIndentity: hasSpecificCode(item.codeIdentityList),
-      hasIncome: hasSpecificCode(item.codeIncomeList),
-      hasRecipient: hasSpecificCode(item.codeRecipientList),
-      codeDomicileID: item.codeDomicile_ID ?? 0,
-      codePolicyID: item.codePolicy_ID ?? 0,
-      codeIdentityIDs: getCodeList(item.codeIdentityList).map((p: any) => Number(p.id)),
-      codeIncomeIDs: getCodeList(item.codeIncomeList).map((p: any) => Number(p.id)),
-      codeRecipientIDs: getCodeList(item.codeRecipientList).map((p: any) => Number(p.id)),
-    }))
-    .filter((item: iFarePolicyItem) => item.id > 0 && item.title);
+    const nextItems = _data
+      .map((item: any) => ({
+        id: getPolicyId(item),
+        title: item.title,
+        qualification: `${(item.qualification ?? "").slice(0, QUALIFICATION_PREVIEW_LENGTH)}...`,
+        area: item.codeDomicile_LabelName ?? "",
+        hasIndentity: hasSpecificCode(item.codeIdentityList),
+        hasIncome: hasSpecificCode(item.codeIncomeList),
+        hasRecipient: hasSpecificCode(item.codeRecipientList),
+        codeDomicileID: item.codeDomicile_ID ?? 0,
+        codePolicyID: item.codePolicy_ID ?? 0,
+        codeIdentityIDs: getCodeList(item.codeIdentityList).map((p: any) => Number(p.id)),
+        codeIncomeIDs: getCodeList(item.codeIncomeList).map((p: any) => Number(p.id)),
+        codeRecipientIDs: getCodeList(item.codeRecipientList).map((p: any) => Number(p.id)),
+      }))
+      .filter((item: iFarePolicyItem) => item.id > 0 && item.title);
 
-  iFarePolicyList.push(...nextItems);
+    iFarePolicyList.push(...nextItems);
+  } catch (e) {
+    console.warn("[ifare/info] load relation failed:", e);
+  }
+}
+
+function retryLoad() {
+  // 相關福利多半跟主資料一起斷線，重試時一併補回來，使用者才不用再按第二次
+  const infoID = currentPolicyId.value;
+  loadPolicyDetail(infoID);
+  loadRelationList(infoID);
 }
 
 loadOfficeList();
 
 watch(
-  () => [Number(route.query.id || 0), String(route.query.reload ?? "")] as const,
+  () => [currentPolicyId.value, String(route.query.reload ?? "")] as const,
   async ([infoID]) => {
     await Promise.all([loadPolicyDetail(infoID), loadRelationList(infoID)]);
   },
