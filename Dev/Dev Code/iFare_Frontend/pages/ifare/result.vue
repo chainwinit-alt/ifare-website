@@ -247,6 +247,7 @@ import IfareSummaryCard from "~/components/IfareSummaryCard.vue";
 import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
 import {
   buildRelevanceQuery,
+  expandSituationVocabulary,
   extractExplicitSearchConditions,
   isAreaOnlySegment,
   matchPolicyCategory,
@@ -1827,6 +1828,17 @@ async function SetDataInit() {
         weight: 0.3,
       }))
     : [];
+  // 處境描述（「我爸爸中風了沒辦法自己吃飯洗澡」）打不中站內用語——政策寫的是失能、
+  // 長期照顧、無法自理。補過詞的查詢另外查一次，權重低於字面命中，只負責在字面
+  // 幾乎查不到時把對的政策撈進來。
+  const situationQuery = expandSituationVocabulary(originalQuery);
+  const situationPlans: PolicySearchRequestPlan[] = situationQuery !== originalQuery
+    ? buildFarePolicyApiQueries(situationQuery).map((query) => ({
+        query,
+        source: "ai" as const,
+        weight: 0.35,
+      }))
+    : [];
   // 複數關鍵字：每個分段各自查一次，字面命中權重高於 AI 擴充
   const segmentPlans: PolicySearchRequestPlan[] = splitQuerySegments(originalQuery)
     .flatMap((segment) => buildFarePolicyApiQueries(segment))
@@ -1837,7 +1849,7 @@ async function SetDataInit() {
     }));
 
   try {
-    const extraPlans = [...segmentPlans, ...aiPlans];
+    const extraPlans = [...segmentPlans, ...aiPlans, ...situationPlans];
     const [originalResponses, extraResponses] = await Promise.all([
       originalResponsePromise,
       Promise.all(
@@ -1850,7 +1862,13 @@ async function SetDataInit() {
     const plans = [...requestPlans, ...extraPlans];
     const responseItems = responses.flatMap(getPolicyResponseItems);
     const rawItems = originalQuery
-      ? mergeRankedPolicySearchResults(plans, responses, originalQuery, resolvedQuery)
+      // 排序也要看得到補上的站內用語，否則撈回來的長照政策全部算 0 分
+      ? mergeRankedPolicySearchResults(
+          plans,
+          responses,
+          originalQuery,
+          expandSituationVocabulary(resolvedQuery, originalQuery)
+        )
       : sortPolicyResultsByNewest(responseItems);
     const _data = getUniquePolicySearchResults(rawItems);
     const _newsList = mapPolicySearchItems(_data);

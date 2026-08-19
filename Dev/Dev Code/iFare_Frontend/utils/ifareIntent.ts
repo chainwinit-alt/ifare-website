@@ -193,6 +193,56 @@ const SITE_VOCABULARY_REPLACEMENTS: Array<[RegExp, string]> = [
   [/孩童|幼童|小孩/gu, "兒童"],
 ];
 
+// ---------------------------------------------------------------------------
+// 處境用語 → 站內政策用語
+//
+// 不知道補助叫什麼名字的人，打進來的是自己的處境：「我爸爸中風了沒辦法自己吃飯洗澡」。
+// 但站內政策一筆都沒寫「中風」（實測 2 筆），寫的是「失能」「長期照顧」「無法自理」，
+// 所以照字面查等於查不到——最需要幫助的人反而看到空白。
+//
+// 右邊的詞都先確認過站內真的查得到（失能 85 筆、長期照顧 172 筆、無法自理 70 筆、
+// 失智 44 筆、早產 30 筆、發展遲緩 66 筆、生育 190 筆、失業 82 筆、急難 65 筆）。
+// 這裡只補「政策實際會用的詞」，不推測使用者的身分、年齡或經濟狀況——那些條件
+// 仍然只認使用者自己打出來的字（見 extractExplicitSearchConditions）。
+// ---------------------------------------------------------------------------
+const SITUATION_VOCABULARY: Array<[RegExp, string]> = [
+  [/腦中風|中風|癱瘓|半身不遂|臥床|插鼻胃管|無法自理|不能自理|生活不能自理|沒辦法自己(?:吃飯|洗澡|穿衣|上廁所|走路)|需要人(?:照顧|看護)|行動不便/u, "失能 長期照顧 無法自理"],
+  [/失智|阿茲海默|老年痴呆|記憶力(?:變差|退化|越來越差|不好)|忘東忘西|認知退化/u, "失智 長期照顧"],
+  [/失業|被裁員|遭資遣|丟了工作|沒有工作|待業|找不到工作/u, "失業 非自願離職"],
+  [/保溫箱|巴掌仙子|早產兒/u, "早產"],
+  [/慢半拍|發展比較慢|說話(?:比較)?慢|不太會說話|遲緩/u, "發展遲緩 早期療育"],
+  [/懷孕|坐月子|生小孩|生產|待產|新生兒/u, "生育"],
+  [/繳不出(?:房租|租金)|租不起|沒地方住|房租太貴/u, "租金 住宅"],
+  [/快沒錢|沒錢(?:吃飯|生活|看病)|生活過不下去|撐不下去|經濟困難|家裡沒收入|付不出醫藥費/u, "急難 生活扶助"],
+  [/獨居|沒人照顧|一個人住/u, "獨居"],
+  [/往生|過世|辦後事|喪事/u, "喪葬"],
+];
+
+/**
+ * 把處境描述補上站內政策會用的詞，原文保留。
+ *
+ * 保留原文是刻意的：萬一站內真的有寫「中風」的政策（實測 2 筆），那幾筆仍然要找得到。
+ * 補上的詞只用來擴大搜尋與排序，不會顯示在搜尋框裡，也不會變成篩選條件。
+ *
+ * sourceText：比對處境用語時要看的原文。意圖解析會把長句濃縮成「中風」，
+ * 處境的線索（沒辦法自己吃飯洗澡）就不見了，所以比對要回頭看使用者真正打的字。
+ */
+export function expandSituationVocabulary(value: unknown, sourceText?: unknown) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  const source = String(sourceText ?? "").trim() || text;
+
+  const additions: string[] = [];
+  for (const [pattern, siteTerms] of SITUATION_VOCABULARY) {
+    if (!pattern.test(source)) continue;
+    for (const term of siteTerms.split(" ")) {
+      if (term && !text.includes(term) && !additions.includes(term)) additions.push(term);
+    }
+  }
+
+  return additions.length ? `${text} ${additions.join(" ")}` : text;
+}
+
 /**
  * 相關性排序專用的關鍵字：拿掉縣市名，再把訪客用語換成站內政策實際使用的詞。
  * 只影響排序，不影響顯示給使用者的搜尋詞，也不影響送去後端的查詢字串。
@@ -202,7 +252,9 @@ export function buildRelevanceQuery(value: unknown) {
   for (const [pattern, replacement] of SITE_VOCABULARY_REPLACEMENTS) {
     text = text.replace(pattern, replacement);
   }
-  return text;
+  // 處境描述（「中風」「臥床」）在站內政策裡幾乎不存在，不補上「失能」「長期照顧」
+  // 這些政策實際用的詞，相關性一律算成 0，摘要卡會判定站內查無資料。
+  return expandSituationVocabulary(text, value);
 }
 
 // ---------------------------------------------------------------------------
