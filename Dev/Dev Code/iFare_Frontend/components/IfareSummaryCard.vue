@@ -167,11 +167,11 @@
 
     <div v-if="actualReferenceCases.length" class="summary-references">
       <div class="reference-head">
-        <span class="reference-label">摘要引用政策</span>
+        <span class="reference-label">最相符的 3 筆政策</span>
       </div>
       <div class="reference-card-list">
         <NuxtLink
-          v-for="item in actualReferenceCases"
+          v-for="item in recommendedCases"
           :key="item.id"
           class="reference-card-link"
           :to="buildCaseLink(item.id)"
@@ -180,8 +180,12 @@
             <div class="top-case-rank">0{{ item.referenceNo }}</div>
             <div class="top-case-copy">
               <h4 class="top-case-title">{{ item.title }}</h4>
+              <!-- 為什麼是這三筆：對上了哪些條件、還剩哪些門檻 -->
+              <p class="top-case-reasons">
+                <span v-for="reason in item.reasons" :key="reason">{{ reason }}</span>
+              </p>
               <div class="top-case-bottom">
-                <p class="top-case-area">{{ item.area }}</p>
+                <p v-if="item.showArea" class="top-case-area">{{ item.area }}</p>
                 <div class="top-case-flags">
                   <span :class="{ active: item.hasRecipient }">受補助對象</span>
                   <span :class="{ active: item.hasIncome }">收入資格</span>
@@ -220,6 +224,11 @@ type SummaryCaseItem = {
   competentAuthority?: string;
   remark?: string;
   sourceSummary?: string;
+  /** 這筆政策實際標記的條件（後端代碼表的名稱），「全選」代表沒有限制 */
+  policyCategory?: string;
+  recipientNames?: string[];
+  incomeNames?: string[];
+  identityNames?: string[];
 };
 
 type ProviderName = "groq";
@@ -455,10 +464,78 @@ function splitQueryTokens(query: string) {
  * 才符合「我選了高雄市」的期待；分數有差距時（例如台北市的長照在地政策根本沒提到
  * 長照）仍然由相關性決定，不會把不相關的東西推上來。
  */
+const UNSET_CONDITION_VALUES = ["", "未指定", "全部", "全選", "不限", "全國"];
+
+function isUnsetCondition(value?: string) {
+  return UNSET_CONDITION_VALUES.includes(String(value ?? "").trim());
+}
+
+/** 政策標記的某一項條件裡，有沒有使用者選的那個值（「全選」是沒有限制，不算符合） */
+function policyDeclares(names: string[] | undefined, wanted?: string) {
+  const target = normalizeText(wanted || "");
+  if (!target) return false;
+  return (names || [])
+    .filter((name) => name !== "全選")
+    .some((name) => {
+      const normalized = normalizeText(name);
+      return normalized === target || normalized.includes(target) || target.includes(normalized);
+    });
+}
+
+/**
+ * 條件符合度：這筆政策跟使用者「說出口的條件」有多對得上。
+ *
+ * 原本沒打關鍵字時的排序是 6×有年齡限制 + 4×有經濟限制 + 4×有身分限制 + 資格字數，
+ * 等於限制越多、字越長的排越前面——推薦邏輯剛好反了。實測台東縣＋中低收入戶推出來的
+ * 第一名是「身心障礙者房屋租金補助」，但使用者從沒說過自己是身心障礙者。
+ *
+ * 改成兩件事一起看：
+ * - 使用者已經說了的條件，政策明確列出那個值 → 真的對得上，加分。
+ * - 使用者沒說的條件，政策卻另外要求（要某年齡、某經濟身分、某特殊身分）→ 多半用不上，扣分。
+ * 地區則是在地優先，全國次之——全國性政策設籍當地同樣能申請，只是沒那麼貼身。
+ */
+function scoreConditionFit(item: SummaryCaseItem, context?: SummarySearchContext) {
+  if (!context) return 0;
+
+  let score = 0;
+  const area = String(context.area || "").trim();
+  if (area && area !== "全國") {
+    const itemArea = normalizeText(item.area || "");
+    if (itemArea && itemArea === normalizeText(area)) score += 6;
+    else if (String(item.area || "").trim() === "全國") score += 3;
+  }
+
+  if (!isUnsetCondition(context.recipient)) {
+    if (policyDeclares(item.recipientNames, context.recipient)) score += 5;
+  } else if (item.hasRecipient) {
+    score -= 3;
+  }
+
+  if (!isUnsetCondition(context.income)) {
+    if (policyDeclares(item.incomeNames, context.income)) score += 5;
+  } else if (item.hasIncome) {
+    score -= 3;
+  }
+
+  if (!isUnsetCondition(context.identity)) {
+    if (policyDeclares(item.identityNames, context.identity)) score += 5;
+  } else if (item.hasIndentity) {
+    // 身分門檻最難臨時具備，沒宣告就更不該推薦
+    score -= 4;
+  }
+
+  if (!isUnsetCondition(context.policy) && item.policyCategory) {
+    if (normalizeText(item.policyCategory) === normalizeText(context.policy)) score += 4;
+  }
+
+  return score;
+}
+
 function rankCases(
   query: string,
   cases: SummaryCaseItem[],
-  localArea = ""
+  localArea = "",
+  context?: SummarySearchContext
 ): RankedSummaryCaseItem[] {
   const tokens = splitQueryTokens(query);
   const normalizedQuery = normalizeText(query);
@@ -511,22 +588,15 @@ function rankCases(
         }
 
         score += matchedTokenCount * 4;
-
-        if (matchedTokenCount > 0) {
-          score += (item.hasRecipient ? 2 : 0) + (item.hasIncome ? 1 : 0) + (item.hasIndentity ? 1 : 0);
-        } else {
-          score += (item.hasRecipient ? 0.2 : 0) + (item.hasIncome ? 0.15 : 0) + (item.hasIndentity ? 0.15 : 0);
-        }
+        // 條件符合度是次要訊號，不能蓋過關鍵字相關性——打了字的人要的是那個主題。
+        score += scoreConditionFit(item, context) * 0.6;
 
         if (isOverSpecificCaseForIntent(item, query)) {
           score -= 80;
         }
       } else {
-        score =
-          (item.hasRecipient ? 6 : 0) +
-          (item.hasIncome ? 4 : 0) +
-          (item.hasIndentity ? 4 : 0) +
-          Math.min(qualificationText.length / 60, 5);
+        // 純篩選搜尋沒有關鍵字可比，條件符合度就是唯一的排序依據
+        score = scoreConditionFit(item, context) * 4;
       }
 
       return {
@@ -709,7 +779,7 @@ const localAreaName = computed(() => {
   return area === "全國" || area === "未指定" ? "" : area;
 });
 const rankedCases = computed(() =>
-  rankCases(rankQuery.value, props.cases, localAreaName.value)
+  rankCases(rankQuery.value, props.cases, localAreaName.value, props.searchContext)
 );
 const fallbackText = computed(() => {
   if (!hasKeyword.value) return "";
@@ -891,6 +961,56 @@ const actualReferenceCases = computed(() => {
   if (props.resultsLoading || !hasKeyword.value) return [];
   return referenceCases.value;
 });
+
+/**
+ * 為什麼推薦這一筆。
+ *
+ * 只講使用者自己說過的條件對上了什麼，並且如實標出「還有哪些他沒提過的門檻」——
+ * 那一項比稱讚更重要，不然點進去才發現要身心障礙手冊，等於白跑一趟。
+ */
+function buildRecommendReasons(item: SummaryCaseItem) {
+  const context = props.searchContext || {};
+  const reasons: string[] = [];
+  const area = String(context.area || "").trim();
+
+  if (area && area !== "全國") {
+    if (normalizeText(item.area || "") === normalizeText(area)) reasons.push(`${area}在地`);
+    else if (String(item.area || "").trim() === "全國") reasons.push("全國適用");
+  }
+
+  if (!isUnsetCondition(context.income) && policyDeclares(item.incomeNames, context.income)) {
+    reasons.push(`符合${context.income}`);
+  }
+  if (!isUnsetCondition(context.recipient) && policyDeclares(item.recipientNames, context.recipient)) {
+    reasons.push(`符合${context.recipient}`);
+  }
+  if (!isUnsetCondition(context.identity) && policyDeclares(item.identityNames, context.identity)) {
+    reasons.push(`符合${context.identity}`);
+  }
+
+  const remaining: string[] = [];
+  if (isUnsetCondition(context.identity) && item.hasIndentity) remaining.push("特殊身分");
+  if (isUnsetCondition(context.recipient) && item.hasRecipient) remaining.push("年齡");
+  if (isUnsetCondition(context.income) && item.hasIncome) remaining.push("經濟條件");
+  reasons.push(remaining.length ? `另有${remaining.join("、")}限制` : "無其他條件限制");
+
+  return reasons.slice(0, 3);
+}
+
+/**
+ * 給版面用的推薦卡：帶上理由，並標記還需不需要單獨列地區。
+ * 理由開頭已經是「台東縣在地」時再列一次「台東縣」只是重複。
+ */
+const recommendedCases = computed(() =>
+  referenceCases.value.map((item) => {
+    const reasons = buildRecommendReasons(item);
+    return {
+      ...item,
+      reasons,
+      showArea: !reasons.some((reason) => reason.endsWith("在地") || reason === "全國適用"),
+    };
+  })
+);
 
 // [參考 N] 的 N 對應送給後端 prompt 的「政策 N」編號，
 // 也就是 referenceCases 的排列順序（referenceNo），不是全清單的名次。
@@ -1731,6 +1851,23 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: 2px 0 2px 14px;
   border-left: 3px solid rgba(244, 90, 8, 0.4);
+}
+
+/* 推薦理由：小字、以「・」串起來，不搶政策名稱的視線 */
+.top-case-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #8a6a3a;
+}
+
+.top-case-reasons span + span::before {
+  content: "・";
+  margin-right: 8px;
+  color: #c2a97f;
 }
 
 .summary-answer-action {
