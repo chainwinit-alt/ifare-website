@@ -48,6 +48,10 @@ export default defineNuxtPlugin(() => {
     context?: SummarySearchContext;
     cases: SummaryCaseItem[];
     conversation?: Array<{ role: "user" | "assistant"; content: string }>;
+    /** 追問問到目前條件以外的範圍時，前端查回來的真實筆數 */
+    scopeHint?: { field: string; label: string; value: string; count: number } | null;
+    /** 使用者按了「重新摘要」：跳過伺服器端快取 */
+    refresh?: boolean;
     provider?: ProviderName;
   }) => {
     return await $fetch("/api/llm/summarize", {

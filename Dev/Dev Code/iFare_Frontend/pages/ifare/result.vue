@@ -175,6 +175,7 @@
           :summary-reset-key="summaryResetKey"
           :summary-cache-key="summaryCacheKey"
           :conversation-search="searchSummaryConversationPolicies"
+          :conversation-scope-probe="probeSummaryScopeShift"
           :quick-options="summaryQuickOptions"
           :active-filters="summaryActiveFilters"
           :result-breakdown="summaryResultBreakdown"
@@ -244,7 +245,13 @@ import CompSelectElse from "~/components/CompSelectElse.vue";
 import CompPage from "~/components/CompPage.vue"
 import IfareSummaryCard from "~/components/IfareSummaryCard.vue";
 import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
-import { buildRelevanceQuery, isAreaOnlySegment } from "~/utils/ifareIntent";
+import {
+  buildRelevanceQuery,
+  extractExplicitSearchConditions,
+  isAreaOnlySegment,
+  matchPolicyCategory,
+} from "~/utils/ifareIntent";
+import { clearIFareSummaryCaches, consumeReloadNavigation } from "~/utils/ifareSummaryCache";
 
 const isOpts = ref(false);
 
@@ -279,7 +286,10 @@ const incomeSelectList = reactive<Array<selectItem>>([]);
 const codeSelectIncomes = ref<string[]>([]);
 const identitySelectList = reactive<Array<selectItem>>([]);
 const codeSelectIdentity = ref<string[]>([]);
-const isLoading = ref(false);
+// 一進頁面就一定會搜尋（onMounted → SetDataInit），所以初始值就是「搜尋中」。
+// 之前預設 false，重新整理後會先顯示「找到 0 筆福利政策」約半秒才切成搜尋中——
+// 看起來就像重整沒作用、或這組條件真的查不到東西。
+const isLoading = ref(true);
 const summarySectionRef = ref<HTMLElement | null>(null);
 const resultSectionRef = ref<HTMLElement | null>(null);
 const summaryTriggerKey = ref(0);
@@ -338,27 +348,42 @@ function getSpecificArea(value = codeSelectArea.value) {
 
 /**
  * omitField：組查詢時刻意略過某一項條件，用來算「放寬這一項會有幾筆」。
+ * override：把某一項換成別的值，用來算「改成台北市會有幾筆」。
  * 一律走同一個組裝流程，避免建議的筆數跟實際搜尋結果對不上。
  */
-function buildFarePolicyApiQueries(keywordOverride?: string, omitField = "") {
+function buildFarePolicyApiQueries(
+  keywordOverride?: string,
+  omitField = "",
+  override?: { field: string; val: string },
+) {
+  const overrideOf = (field: string) =>
+    override && override.field === field ? override.val : "";
   const baseQuery: Record<string, any> = {};
-  const selectedPolicy = codeSelect_policy.value || ALL_POLICY_VALUE;
+  const selectedPolicy = overrideOf("policy") || codeSelect_policy.value || ALL_POLICY_VALUE;
+  const selectedRecipient = overrideOf("recipient") || codeSelectRecipient.value;
+  const selectedIdentities = overrideOf("identity")
+    ? [overrideOf("identity")]
+    : codeSelectIdentity.value;
 
   if (omitField !== "policy" && !isAllPolicyValue(selectedPolicy)) baseQuery.CodePolicy = selectedPolicy;
-  if (omitField !== "recipient" && codeSelectRecipient.value) baseQuery.CodeRecipient = codeSelectRecipient.value;
+  if (omitField !== "recipient" && selectedRecipient) baseQuery.CodeRecipient = selectedRecipient;
   const keywordSource = keywordOverride === undefined ? searchQuery.value : keywordOverride;
   const keyword = normalizeSummaryKeyword(keywordSource);
   if (keyword) baseQuery.Query = keyword;
-  if (omitField !== "identity" && codeSelectIdentity.value.length > 0) {
-    baseQuery.CodeIdentities = [...codeSelectIdentity.value];
+  if (omitField !== "identity" && selectedIdentities.length > 0) {
+    baseQuery.CodeIdentities = [...selectedIdentities];
   }
 
-  const selectedIncomes = omitField === "income" ? [] : codeSelectIncomes.value;
+  const selectedIncomes = omitField === "income"
+    ? []
+    : (overrideOf("income") ? [overrideOf("income")] : codeSelectIncomes.value);
   const incomeQueries: Array<string | undefined> = selectedIncomes.length > 0
     ? [...selectedIncomes]
     : [undefined];
 
-  const area = omitField === "area" ? undefined : getSpecificArea();
+  const area = omitField === "area"
+    ? undefined
+    : getSpecificArea(overrideOf("area") || codeSelectArea.value);
   return incomeQueries.map((income) => ({
     ...baseQuery,
     ...(area ? { CodeDomicile: area } : {}),
@@ -440,6 +465,9 @@ const summaryQuery = computed(
   () =>
     normalizeSummaryKeyword(resolvedPolicySearchQuery.value) ||
     normalizeSummaryKeyword(activeSummaryState.query) ||
+    // 這裡刻意不補 searchQuery（網址上的關鍵字，更早就讀得到）。補了摘要卡會提早
+    // 一秒掛載，但那會落在 SetDataInit 重置之前——卡片剛從快取還原的摘要與對話串，
+    // 會馬上被 summaryResetKey 的 watcher 清掉，重新整理就接不回上一輪的問答了。
     conditionSummaryQuery.value
 );
 // PRD 移植版保留摘要程式碼，只透過建置設定暫時關閉掛載。
@@ -470,7 +498,11 @@ const summaryCacheKey = computed(() =>
     incomes: activeSummaryState.incomes,
     identities: activeSummaryState.identities,
     query: activeSummaryState.query.trim(),
-    count: storageiFarePolicyList.length,
+    // 刻意不放結果總筆數。搜尋除了原始關鍵字還會跑一次 AI 擴充查詢，合併後的總數
+    // 每次會差個一兩筆（實測同一組條件 127 / 128），把它放進 key 等於每次重新整理
+    // 都算出不同的 key——摘要一定重跑、對話串也一定接不回來。
+    // 排序前 5 筆的 id 才是摘要真正的輸入，而且穩定；總筆數只出現在另外即時算的
+    // 結果組成說明裡，不影響快取內容。
     resultIds: storageiFarePolicyList.slice(0, 5).map((item) => item.id),
   })
 );
@@ -653,6 +685,89 @@ function applySummaryQuickOption(payload: { field: string; val: string }) {
   Search();
 }
 
+/**
+ * 條件標籤對到站上篩選器實際存在的選項。
+ *
+ * 一定要先找完全相同的：包含式比對會讓「低收入戶」先命中「中低收入戶」
+ * （選單順序是經濟弱勢、中低收入戶、低收入戶），套下去就變成套錯條件。
+ * 找不到完全相同的才退回包含式，讓「兒童」還是能對到「兒童＆青少年」。
+ */
+function findFilterOption(list: Array<selectItem>, label: string) {
+  if (!label) return null;
+  const wanted = normalizeFilterLabel(label);
+  return (
+    list.find((item) => normalizeFilterLabel(item.name) === wanted)
+    || list.find((item) => matchFilterLabel(item.name, label))
+    || null
+  );
+}
+
+/**
+ * 追問問到目前條件以外的範圍（「台北市也有可以申請嗎」），就去查那個範圍在本站有幾筆。
+ *
+ * 站上明明有台北市的政策，卻因為條件鎖在台東縣、候選政策裡一筆台北市的都沒有，
+ * 回答只能說「站內資料未載明」——對訪客來說跟「本站沒有」沒兩樣，是最糟的答案。
+ * 這裡把真實筆數查回來，讓回答說得出實話，也讓卡片能給一個直接切過去的按鈕。
+ * 筆數是查回來的，不是估的也不是 AI 猜的。
+ */
+async function probeSummaryScopeShift(userText: string) {
+  const explicit = extractExplicitSearchConditions(userText);
+  const candidates: Array<{ field: string; label: string; value: string; val: string }> = [];
+
+  const areaOption = findFilterOption(areaSelectList, explicit.area);
+  if (areaOption && String(areaOption.val) !== String(codeSelectArea.value)) {
+    candidates.push({ field: "area", label: "地區", value: areaOption.name, val: String(areaOption.val) });
+  }
+  const recipientOption = findFilterOption(recipientSelectList, explicit.recipient);
+  if (recipientOption && String(recipientOption.val) !== String(codeSelectRecipient.value)) {
+    candidates.push({ field: "recipient", label: "年齡", value: recipientOption.name, val: String(recipientOption.val) });
+  }
+  const incomeOption = findFilterOption(incomeSelectList, explicit.income);
+  if (incomeOption && !codeSelectIncomes.value.includes(String(incomeOption.val))) {
+    candidates.push({ field: "income", label: "經濟條件", value: incomeOption.name, val: String(incomeOption.val) });
+  }
+  for (const identity of explicit.identities) {
+    const option = findFilterOption(identitySelectList, identity);
+    if (option && !codeSelectIdentity.value.includes(String(option.val))) {
+      candidates.push({ field: "identity", label: "身分", value: option.name, val: String(option.val) });
+      break;
+    }
+  }
+  // 政策類別放最後。它的關鍵字表比較寬，「低收入戶可以嗎」也會被判成社會救助，
+  // 但那句話真正提到的是經濟條件——前面幾項先命中時就該用前面那個。
+  const policyOption = findFilterOption(policySelectList, matchPolicyCategory(userText));
+  if (
+    policyOption
+    && !isAllPolicyValue(policyOption.val)
+    && String(policyOption.val) !== String(codeSelect_policy.value)
+  ) {
+    candidates.push({ field: "policy", label: "政策類別", value: policyOption.name, val: String(policyOption.val) });
+  }
+
+  const target = candidates[0];
+  if (!target) return null;
+
+  try {
+    const responses = await Promise.all(
+      buildFarePolicyApiQueries(undefined, "", { field: target.field, val: target.val }).map((query) =>
+        $WebApiGet("/FarePolicy/GetIFarePolicyList", query)
+      )
+    );
+    const ids = new Set<string>();
+    responses.forEach((response) => {
+      getPolicyResponseItems(response).forEach((item: any) => {
+        const id = String(item?.id ?? item?.ID ?? "");
+        if (id) ids.add(id);
+      });
+    });
+    if (ids.size === 0) return null;
+    return { ...target, count: ids.size };
+  } catch (error) {
+    console.warn("[iFare][scope-probe]", error);
+    return null;
+  }
+}
+
 let summaryPinTimers: number[] = [];
 let resultPinTimers: number[] = [];
 
@@ -687,10 +802,19 @@ function scrollToSummary() {
   });
 }
 
+/**
+ * 重新整理清空之後，這一輪不要自動捲畫面。
+ *
+ * 沒有摘要卡時 pinFirstResultViewport 會把畫面捲到第一筆政策，於是使用者按完
+ * 重新整理，看到的還是一片政策清單——欄位其實已經清空了，但畫面跟剛剛長得一樣，
+ * 只會覺得「按了沒反應」。清空那一輪要停在最上面，讓乾淨的搜尋表單真的出現。
+ */
+let skipViewportPinOnce = false;
+
 function pinSummaryViewport() {
   if (!process.client) return;
   clearSummaryPinTimers();
-  if (!hasSummaryCard.value) return;
+  if (skipViewportPinOnce || !hasSummaryCard.value) return;
   scrollToSummary();
   summaryPinTimers = [120, 420].map((delay) =>
     window.setTimeout(() => scrollToSummary(), delay)
@@ -717,8 +841,29 @@ function scrollToFirstResult() {
   });
 }
 
+/**
+ * 捲回頁面最上面，並在 120 / 420ms 再補兩次。
+ *
+ * 只捲一次沒用：瀏覽器的捲軸還原與結果渲染都在後面才發生，會把畫面again 拉回去。
+ * 這裡沿用本頁 pin 系列函式對付同一個問題的做法。
+ */
+function pinPageTopViewport() {
+  if (!process.client) return;
+  clearResultPinTimers();
+  const toTop = () => window.scrollTo({ top: 0, behavior: "auto" });
+  toTop();
+  resultPinTimers = [120, 420, 900].map((delay) => window.setTimeout(toTop, delay));
+}
+
 function pinFirstResultViewport() {
-  if (!process.client || hasSummaryCard.value || storageiFarePolicyList.length === 0) return;
+  if (!process.client) return;
+  if (skipViewportPinOnce) {
+    skipViewportPinOnce = false;
+    // 清空那一輪：結果渲染完才捲回最上面，才蓋得掉瀏覽器的捲軸還原
+    pinPageTopViewport();
+    return;
+  }
+  if (hasSummaryCard.value || storageiFarePolicyList.length === 0) return;
   clearResultPinTimers();
   scrollToFirstResult();
   resultPinTimers = [120, 420].map((delay) =>
@@ -1349,6 +1494,18 @@ function mergeRankedPolicySearchResults(
 }
 
 onMounted(() => {
+  // 按重新整理＝重新開始：把欄位、摘要與問答全部清掉，讓使用者從乾淨的表單重查。
+  // 只認 reload；分享連結與從政策明細按上一頁回來都會保留原本的條件。
+  if (consumeReloadNavigation()) {
+    ResetParam();
+    clearIFareSummaryCaches();
+    void $router.replace({ query: {} });
+    // 瀏覽器會還原重整前的捲軸位置，畫面會停在政策清單中間——欄位明明已經清空，
+    // 看到的卻跟剛剛一樣。擋掉這一輪自動捲到結果的行為，改成捲回最上面
+    // （實際的捲動在結果渲染完後才做，見 pinFirstResultViewport）。
+    skipViewportPinOnce = true;
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
   void SetDataInit();
 });
 
@@ -1424,14 +1581,17 @@ async function resolvePolicySearchIntent(
   }
 }
 
-/** 篩選選項標籤比對：容忍「＆、及、和」與繁簡寫差異 */
+/** 篩選選項標籤正規化：容忍「＆、及、和」與繁簡寫差異 */
+function normalizeFilterLabel(value: string) {
+  return String(value || "")
+    .replace(/臺/gu, "台")
+    .replace(/[＆&及和\s　]/gu, "");
+}
+
+/** 篩選選項標籤比對（包含式）：「兒童」要能對到「兒童＆青少年」 */
 function matchFilterLabel(optionName: string, target: string) {
-  const normalize = (value: string) =>
-    String(value || "")
-      .replace(/臺/gu, "台")
-      .replace(/[＆&及和\s　]/gu, "");
-  const option = normalize(optionName);
-  const wanted = normalize(target);
+  const option = normalizeFilterLabel(optionName);
+  const wanted = normalizeFilterLabel(target);
   if (!option || !wanted) return false;
   return option === wanted || option.includes(wanted) || wanted.includes(option);
 }
@@ -1446,7 +1606,7 @@ async function applyResolvedSearchFilters(intent: ResolvedPolicySearchIntent) {
 
   if (intent.recipient && !codeSelectRecipient.value) {
     await codeRecipient.catch(() => undefined);
-    const item = recipientSelectList.find((entry) => matchFilterLabel(entry.name, intent.recipient));
+    const item = findFilterOption(recipientSelectList, intent.recipient);
     if (item) {
       SwitchRecipient(item.val);
       activeSummaryState.recipient = codeSelectRecipient.value;
@@ -1456,7 +1616,7 @@ async function applyResolvedSearchFilters(intent: ResolvedPolicySearchIntent) {
 
   if (intent.income && codeSelectIncomes.value.length === 0) {
     await codeIncome.catch(() => undefined);
-    const item = incomeSelectList.find((entry) => matchFilterLabel(entry.name, intent.income));
+    const item = findFilterOption(incomeSelectList, intent.income);
     if (item) {
       SwitchIncome(item.val);
       activeSummaryState.incomes = [...codeSelectIncomes.value];
@@ -1468,7 +1628,7 @@ async function applyResolvedSearchFilters(intent: ResolvedPolicySearchIntent) {
     await codeIdentity.catch(() => undefined);
     let identityChanged = false;
     for (const label of intent.identities) {
-      const item = identitySelectList.find((entry) => matchFilterLabel(entry.name, label));
+      const item = findFilterOption(identitySelectList, label);
       if (item && !codeSelectIdentity.value.includes(item.val)) {
         SwitchIdentity(item.val);
         identityChanged = true;

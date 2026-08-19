@@ -26,6 +26,21 @@ export interface LlmSummarySearchContext {
   query?: string;
 }
 
+/**
+ * 追問問到目前條件以外的範圍時，前端查回來的真實筆數。
+ * 有這個東西，回答才能說「本站確實有台北市的 68 筆」而不是「站內資料未載明」。
+ */
+export interface LlmSummaryScopeHint {
+  /** area | recipient | income | identity | policy */
+  field: string;
+  /** 給人看的欄位名稱，例如「地區」 */
+  label: string;
+  /** 目標值，例如「台北市」 */
+  value: string;
+  /** 換成這個值以後符合的政策筆數（查回來的，不是估的） */
+  count: number;
+}
+
 export interface LlmSummaryConversationMessage {
   role: "user" | "assistant";
   content: string;
@@ -34,9 +49,10 @@ export interface LlmSummaryConversationMessage {
 /**
  * overview：首次搜尋且站內有相符政策時，輸出 Google AI 摘要式的結構化 Markdown 總覽（含 [參考 N] 引用）。
  * overview_general：首次搜尋但站內查無政策時，輸出「清楚標示為一般資訊」的保守科普總覽（無引用、附免責說明）。
- * guidance：一句話循序引導（追問對話使用；也可用環境變數關閉 general 後作為查無資料的回覆）。
+ * answer：追問框裡問了問題（要準備什麼文件、補助多少錢、怎麼申請…）時，直接回答那個問題。
+ * guidance：一句話循序引導（追問補充條件時使用；也可用環境變數關閉 general 後作為查無資料的回覆）。
  */
-export type LlmSummaryMode = "overview" | "overview_general" | "guidance";
+export type LlmSummaryMode = "overview" | "overview_general" | "answer" | "guidance";
 
 export interface LlmSummaryInput {
   query?: string;
@@ -44,6 +60,7 @@ export interface LlmSummaryInput {
   cases: LlmSummaryCaseItem[];
   conversation?: LlmSummaryConversationMessage[];
   mode?: LlmSummaryMode;
+  scopeHint?: LlmSummaryScopeHint | null;
 }
 
 export interface LlmClient {

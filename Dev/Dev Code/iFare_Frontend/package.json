@@ -11,6 +11,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "check": "node scripts/check-syntax.mjs",
     "build_iis_node": "nuxt build --preset=iis_node"
   },
   "devDependencies": {

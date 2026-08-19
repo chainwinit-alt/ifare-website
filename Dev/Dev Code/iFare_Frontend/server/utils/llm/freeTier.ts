@@ -58,6 +58,7 @@ function buildCacheKey(input: LlmSummaryInput) {
     context: input.context || {},
     cases: input.cases.map(item => ({ id: item.id, title: item.title })),
     conversation: input.conversation || [],
+    scopeHint: input.scopeHint || null,
   });
 }
 
@@ -121,9 +122,12 @@ function isCoolingDown(candidateKey: string) {
 
 export async function summarizeWithFreeTier(
   input: LlmSummaryInput,
-  config: FreeTierLlmConfig
+  config: FreeTierLlmConfig,
+  // 使用者按「重新摘要」時要跳過這層快取。不跳的話同樣的條件會拿回一模一樣的
+  // 字，按了等於沒事發生——那顆按鈕的意義就沒了。產生後照樣寫回快取。
+  options?: { skipCache?: boolean }
 ): Promise<FreeTierSummaryResult> {
-  const cached = getCachedSummary(input);
+  const cached = options?.skipCache ? null : getCachedSummary(input);
   if (cached) return cached;
 
   const candidates = [
@@ -149,9 +153,12 @@ export async function summarizeWithFreeTier(
 
     try {
       const rawSummary = await candidate.client.summarize(input);
-      // overview / overview_general 是多段 Markdown，換行就是版面結構，只能收斂行內空白；
-      // guidance 維持原本的單行輸出。
-      const summary = input.mode === "overview" || input.mode === "overview_general"
+      // overview / overview_general / answer 是多段 Markdown，換行就是版面結構，
+      // 只能收斂行內空白；guidance 維持原本的單行輸出。
+      const isMarkdownMode = input.mode === "overview"
+        || input.mode === "overview_general"
+        || input.mode === "answer";
+      const summary = isMarkdownMode
         ? rawSummary.replace(/[ \t]+/g, " ").trim()
         : rawSummary.replace(/\s+/g, " ").trim();
       if (!summary) throw new Error("LLM returned an empty summary.");

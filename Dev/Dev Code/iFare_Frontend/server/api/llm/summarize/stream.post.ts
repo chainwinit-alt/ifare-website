@@ -3,9 +3,11 @@ import {
   buildFallbackSummary,
   getSummaryGuidanceField,
   hasResolvedTopic,
+  isSummaryAnswerTurn,
   normalizeSummaryQuery,
   sanitizeSummaryCases,
   sanitizeSummaryConversation,
+  sanitizeSummaryScopeHint,
 } from "../../../utils/llm/shared";
 import { enrichSummaryCases } from "../../../utils/llm/enrich";
 import type {
@@ -20,6 +22,9 @@ interface SummaryPayload {
   context?: LlmSummarySearchContext;
   cases?: LlmSummaryCaseItem[];
   conversation?: LlmSummaryConversationMessage[];
+  scopeHint?: unknown;
+  /** 使用者按了「重新摘要」：跳過伺服器端快取，真的重跑一次 */
+  refresh?: boolean;
   provider?: string;
 }
 
@@ -113,24 +118,36 @@ export default defineEventHandler(async (event) => {
     cases: enrichedCases,
     conversation,
   });
-  const mode: LlmSummaryMode = conversation.length > 0
-    ? topicResolved && enrichedCases.length > 0
-      ? "overview"
-      : "guidance"
-    : enrichedCases.length > 0
-      ? "overview"
-      : generalFallbackEnabled
-        ? "overview_general"
-        : "guidance";
+  // 追問框裡問了問題（「需要準備甚麼文件」「補助多少錢」）→ 直接回答那個問題。
+  // 這一段以前不存在：問句和補充條件都走總覽，而總覽的提示詞根本沒帶上對話，
+  // 使用者的問題等於沒被送出去，畫面上只會換回一份長得一樣的摘要。
+  const answerTurn = conversation.length > 0
+    && isSummaryAnswerTurn(conversation)
+    && enrichedCases.length > 0;
+  const mode: LlmSummaryMode = answerTurn
+    ? "answer"
+    : conversation.length > 0
+      ? topicResolved && enrichedCases.length > 0
+        ? "overview"
+        : "guidance"
+      : enrichedCases.length > 0
+        ? "overview"
+        : generalFallbackEnabled
+          ? "overview_general"
+          : "guidance";
+  // 只有回答問題時用得到：使用者問到目前條件以外的範圍，前端查回了那個範圍的真實筆數。
+  const scopeHint = mode === "answer" ? sanitizeSummaryScopeHint(body.scopeHint) : null;
   const input = {
     query,
     context: body.context,
     cases: enrichedCases,
     conversation,
     mode,
+    scopeHint,
   };
   // 前端要靠這個把快捷鈕對齊結尾的引導問題（問戶籍地就給縣市鈕、問年齡就給年齡鈕）。
-  const guidanceField = getSummaryGuidanceField(input);
+  // answer 模式的結尾是答案不是問句，沒有可對齊的問題，就不要掛快捷鈕。
+  const guidanceField = mode === "answer" ? "" : getSummaryGuidanceField(input);
 
   return createSseResponse(async (push) => {
     const startedAt = Date.now();
@@ -146,13 +163,17 @@ export default defineEventHandler(async (event) => {
     });
 
     try {
-      const result = await summarizeWithFreeTier(input, {
-        geminiApiKey: llmConfig.geminiApiKey || "",
-        geminiModels: llmConfig.geminiModels || llmConfig.geminiModel || "",
-        groqApiKey: llmConfig.groqApiKey || "",
-        groqModels: llmConfig.groqModels || llmConfig.groqModel || "",
-        summaryCacheTtlMs: llmConfig.summaryCacheTtlMs,
-      });
+      const result = await summarizeWithFreeTier(
+        input,
+        {
+          geminiApiKey: llmConfig.geminiApiKey || "",
+          geminiModels: llmConfig.geminiModels || llmConfig.geminiModel || "",
+          groqApiKey: llmConfig.groqApiKey || "",
+          groqModels: llmConfig.groqModels || llmConfig.groqModel || "",
+          summaryCacheTtlMs: llmConfig.summaryCacheTtlMs,
+        },
+        { skipCache: body.refresh === true }
+      );
       const responseBytes = getUtf8Bytes(result.summary);
       const durationMs = Date.now() - startedAt;
 

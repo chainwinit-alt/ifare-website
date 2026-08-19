@@ -7,6 +7,7 @@
       </div>
 
       <div class="summary-tools">
+        <!-- 供應商切換是開發時用的，維持關閉 -->
         <!-- <div class="provider-switch">
           <button
             v-for="option in providerOptions"
@@ -18,10 +19,20 @@
           >
             {{ option.label }}
           </button>
-        </div>
-        <button class="summary-retry" type="button" @click="loadSummary(true)" :disabled="isSummaryBusy">
+        </div> -->
+        <!--
+          摘要存在 sessionStorage（30 分鐘），重新整理只會撈回同一份，不會重跑。
+          想換一份就按這顆：清掉快取重新產生，之前的問答也一起收掉——
+          摘要都換了，那些問答已經不對應現在這一份。
+        -->
+        <button
+          class="summary-retry"
+          type="button"
+          :disabled="isSummaryBusy"
+          @click="regenerateSummary"
+        >
           {{ isSummaryBusy ? "判斷中" : "重新摘要" }}
-        </button> -->
+        </button>
       </div>
     </div>
 
@@ -96,23 +107,37 @@
 
     <div v-if="canContinueConversation" class="summary-conversation">
       <!--
-        只列使用者自己說過的話。AI 的回覆不另外開泡泡——它會直接取代上面那份摘要，
-        整張卡永遠只有一份最新的摘要，才不會變成「摘要」和「對話」兩個各講各的東西。
+        對話由上往下長：您說的在上、AI 的回答緊接在下面。
+        只有「問問題」的回答會留在這裡；補條件的回合改的是上方那份摘要，
+        不會同時在下面再講一次，免得一張卡出現兩份互相打架的內容。
       -->
-      <div v-if="userMessages.length || isFollowUpLoading" class="summary-message-list" aria-live="polite">
-        <div
-          v-for="(message, index) in userMessages"
-          :key="`user-${index}`"
-          class="summary-message is-user"
-        >
-          <span class="summary-message-label">您說</span>
-          <p>{{ message.content }}</p>
-        </div>
-        <p v-if="isFollowUpLoading" class="summary-message-pending">正在依照您的補充重新整理摘要…</p>
+      <div v-if="threadItems.length || isFollowUpLoading" class="summary-message-list" aria-live="polite">
+        <template v-for="(item, index) in threadItems" :key="`thread-${index}`">
+          <div v-if="item.role === 'user'" class="summary-message is-user">
+            <span class="summary-message-label">您說</span>
+            <p>{{ item.content }}</p>
+          </div>
+          <div v-else class="summary-answer">
+            <span class="summary-answer-label">AI 回覆</span>
+            <div class="summary-markdown" v-html="renderThreadAnswer(item.content)"></div>
+            <!-- 回答說「改成台北市就看得到」時，直接給一顆按鈕，不用自己回上面改篩選 -->
+            <div v-if="item.action" class="summary-answer-action">
+              <button
+                type="button"
+                class="summary-policy-chip"
+                @click="emit('selectQuickOption', { field: item.action.field, val: item.action.val })"
+              >
+                改看{{ item.action.label }}：{{ item.action.value }}
+                <strong>{{ item.action.count }} 筆</strong>
+              </button>
+            </div>
+          </div>
+        </template>
+        <p v-if="isFollowUpLoading" class="summary-message-pending">{{ followUpPendingText }}</p>
       </div>
 
       <form class="summary-followup-form" @submit.prevent="submitFollowUp">
-        <label class="summary-followup-label" for="ifare-summary-followup">回覆摘要提問</label>
+        <label class="summary-followup-label" for="ifare-summary-followup">回覆或提問</label>
         <div class="summary-followup-controls">
           <input
             id="ifare-summary-followup"
@@ -120,14 +145,23 @@
             type="text"
             maxlength="120"
             autocomplete="off"
-            placeholder="回覆上面的問題..."
+            placeholder="回覆上面的問題，或直接問我（例如：要準備什麼文件？）"
             :disabled="isFollowUpLoading"
           />
           <button type="submit" :disabled="!canSubmitFollowUp">
             {{ isFollowUpLoading ? "整理中" : "送出" }}
           </button>
         </div>
-        <p v-if="followUpError" class="summary-followup-error">{{ followUpError }}</p>
+        <p v-if="followUpError" class="summary-followup-error">
+          {{ followUpError }}
+          <!-- 失敗時您那句話還留在對話串上，重試不用自己再打一次 -->
+          <button
+            v-if="failedFollowUpText"
+            type="button"
+            class="summary-followup-retry"
+            @click="retryFollowUp"
+          >重試</button>
+        </p>
       </form>
     </div>
 
@@ -166,8 +200,10 @@
 import {
   buildFallbackIntentSummary,
   buildRelevanceQuery,
+  isFollowUpQuestion,
   normalizeFallbackIntentTopic,
 } from "~/utils/ifareIntent";
+import { IFARE_SUMMARY_CACHE_PREFIX } from "~/utils/ifareSummaryCache";
 
 type SummaryCaseItem = {
   id: number;
@@ -213,6 +249,15 @@ type SummaryConversationMessage = {
   content: string;
 };
 
+/** 追問問到目前條件以外的範圍時，頁面查回來的「換過去會有幾筆」 */
+type SummaryScopeShift = {
+  field: string;
+  label: string;
+  value: string;
+  val: string;
+  count: number;
+};
+
 type SummaryConversationSearchResult = {
   query: string;
   cases: SummaryCaseItem[];
@@ -254,6 +299,8 @@ const props = withDefaults(
     summaryCacheKey?: string;
     summaryResetKey?: number;
     conversationSearch?: SummaryConversationSearch;
+    /** 追問提到別的範圍時，去查那個範圍在本站有幾筆（查不到或沒提到就回 null） */
+    conversationScopeProbe?: (userText: string) => Promise<SummaryScopeShift | null>;
     /** 各條件可選的快捷選項，key 是 policy / area / recipient / income / identity */
     quickOptions?: Record<string, SummaryQuickOption[]>;
     /** 目前生效的限縮條件，顯示在摘要卡頂端 */
@@ -288,6 +335,8 @@ const conversationMessages = ref<SummaryConversationMessage[]>([]);
 const followUpInput = ref("");
 const followUpDraft = ref("");
 const followUpError = ref("");
+// 送出失敗時保留那句話，讓使用者按一下就能重送，不用自己再打一次
+const failedFollowUpText = ref("");
 const isFollowUpLoading = ref(false);
 const followUpController = shallowRef<AbortController | null>(null);
 const conversationSearchQuery = ref("");
@@ -312,6 +361,12 @@ const canContinueConversation = computed(
 const canSubmitFollowUp = computed(
   () => Boolean(followUpInput.value.trim()) && !isFollowUpLoading.value
 );
+// 追問可以是「補充條件」也可以是「問問題」，兩件事等待中要講的話不一樣：
+// 補條件是重寫摘要，問問題是去翻政策明細找答案。
+const isAnswerTurn = ref(false);
+const followUpPendingText = computed(() =>
+  isAnswerTurn.value ? "正在翻找政策內容，為您回答…" : "正在依照您的補充重新整理摘要…"
+);
 // 伺服器算出的「這輪在問哪一項條件」。快捷鈕只呈現對應那一項的選項，
 // 判斷邏輯不在前端重算，否則兩邊會各自算出不同答案。
 const guidanceField = ref("");
@@ -329,15 +384,21 @@ const showQuickOptions = computed(
     && !isFollowUpLoading.value
     && Boolean(summaryDisplayText.value.trim())
 );
-/** 只顯示使用者自己說過的話；AI 的回覆會直接取代摘要 */
-const userMessages = computed(() =>
-  conversationMessages.value.filter((message) => message.role === "user")
-);
+// 卡片下半部的對話串。問問題的回合會把「您說」與「AI 回覆」依序往下接，
+// 補條件的回合則是改上方那份摘要，只留下這次說的那句話。
+type SummaryThreadItem = {
+  role: "user" | "assistant";
+  content: string;
+  /** 回答裡提到「改成台北市就看得到」時，附一顆直接切過去的按鈕 */
+  action?: SummaryScopeShift;
+};
+const threadItems = ref<SummaryThreadItem[]>([]);
 // v40：引導階梯新增「政策類別」這一階、追問回合改成主題明確時給推薦，
 // 舊快取的結尾問句與模式都不一樣，必須整批失效。
 // v42：摘要提示詞新增「全國性政策設籍該縣市同樣適用」的說明規則
-const SUMMARY_CACHE_VERSION = "v42-nationwide-note";
-const SUMMARY_CACHE_KEY_PREFIX = "ifare-summary-cache:";
+// v43：福利內容欄位改成先解 percent-encoding 再送進模型，摘要內容會不一樣
+const SUMMARY_CACHE_VERSION = "v43-decoded-welfare-info";
+const SUMMARY_CACHE_KEY_PREFIX = IFARE_SUMMARY_CACHE_PREFIX;
 const SUMMARY_CACHE_TTL_MS = 30 * 60 * 1000;
 
 const providerOptions: Array<{ value: ProviderName; label: string }> = [
@@ -345,7 +406,12 @@ const providerOptions: Array<{ value: ProviderName; label: string }> = [
 ];
 
 const referenceTokenPattern = /\[參考\s*(\d+)\]/g;
-const groupedReferenceTokenPattern = /\[參考\s*([\d\s,，]+)\]/g;
+// 模型偶爾把引用寫成 [參考 1, 參考 2, 參考 3]（每個編號都再寫一次「參考」）。
+// 舊樣式只收數字與逗號，遇到這種寫法整串會以原文顯示在畫面上，所以改成
+// 先抓出整段引用，再從裡面把編號撈出來。
+// 中間不准出現換行或另一個 [：否則遇到落單的左括號會從那裡一路吃到下一個
+// [參考 N]，把中間整個段落標題與列點吞掉。
+const groupedReferenceTokenPattern = /\[[^\[\]\n]*參考[^\[\]\n]*\]/g;
 
 function normalizeText(value: string) {
   return (value || "")
@@ -669,10 +735,10 @@ function escapeHtml(value: string) {
 /** 追問對話的種子訊息要用純文字：把總覽的 Markdown 標記與引用符號拆掉 */
 function toPlainSummaryText(value: string) {
   return (value || "")
-    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^(?:#{1,6}\s+)+/gm, "")
     .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, "")
     .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/\[參考\s*[\d\s,，、]*\]/g, "")
+    .replace(/\[[^\[\]\n]*參考[^\[\]\n]*\]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 400);
@@ -687,13 +753,12 @@ function buildCaseLink(id: number) {
 
 function normalizeReferenceNotation(text: string) {
   groupedReferenceTokenPattern.lastIndex = 0;
-  return (text || "").replace(groupedReferenceTokenPattern, (_token, refGroupText) => {
-    const refNumbers = String(refGroupText)
-      .split(/[,\s，]+/)
-      .map((item) => Number(item.trim()))
+  return (text || "").replace(groupedReferenceTokenPattern, (token) => {
+    const refNumbers = (token.match(/\d+/g) || [])
+      .map((item) => Number(item))
       .filter((value) => Number.isInteger(value) && value > 0);
 
-    if (!refNumbers.length) return _token;
+    if (!refNumbers.length) return token;
     return refNumbers.map((value) => `[參考 ${value}]`).join("");
   });
 }
@@ -779,7 +844,10 @@ function renderMarkdown(text: string) {
     if (heading) {
       flushParagraph();
       flushList();
-      blocks.push(`<h4 class="summary-section-title">${applyInlineMarkdown(heading[1])}</h4>`);
+      // 模型偶爾會寫成「### ### 站內相符的福利」，多出來的記號要拆掉，
+      // 不然標題會連 ### 一起顯示出來。已經存進快取的舊內容也靠這一步救回來。
+      const headingText = heading[1].replace(/^(?:#{1,6}\s*)+/u, "");
+      blocks.push(`<h4 class="summary-section-title">${applyInlineMarkdown(headingText)}</h4>`);
       continue;
     }
 
@@ -834,12 +902,50 @@ const summaryHtml = computed(() => {
   return useSanitize(renderMarkdown(summaryDisplayText.value));
 });
 
+/** 對話串裡的回答走同一套 Markdown 渲染，[參考 N] 一樣會變成政策連結 */
+function renderThreadAnswer(text: string) {
+  return useSanitize(renderMarkdown(text));
+}
+
 function buildSummaryCacheKey() {
   return `${SUMMARY_CACHE_KEY_PREFIX}${JSON.stringify({
     version: SUMMARY_CACHE_VERSION,
     provider: selectedProvider.value,
     searchKey: props.summaryCacheKey || normalizeSummaryKeyword(props.query),
   })}`;
+}
+
+/** 從 sessionStorage 讀回來的東西不能直接信，形狀不對就整批丟掉 */
+function sanitizeCachedThread(value: unknown): SummaryThreadItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item: any) =>
+      item
+      && (item.role === "user" || item.role === "assistant")
+      && typeof item.content === "string"
+      && item.content
+    )
+    .slice(-8)
+    .map((item: any) => ({
+      role: item.role,
+      content: item.content,
+      ...(item.action && typeof item.action.field === "string" && typeof item.action.val === "string"
+        ? { action: item.action as SummaryScopeShift }
+        : {}),
+    }));
+}
+
+function sanitizeCachedConversation(value: unknown): SummaryConversationMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item: any) =>
+      item
+      && (item.role === "user" || item.role === "assistant")
+      && typeof item.content === "string"
+      && item.content
+    )
+    .slice(-8)
+    .map((item: any) => ({ role: item.role, content: item.content }));
 }
 
 function readSummaryCache() {
@@ -853,6 +959,8 @@ function readSummaryCache() {
       savedAt?: number;
       summary?: string;
       guidanceField?: string;
+      thread?: unknown;
+      conversation?: unknown;
     };
 
     if (!parsed?.savedAt || Date.now() - parsed.savedAt > SUMMARY_CACHE_TTL_MS) {
@@ -862,13 +970,25 @@ function readSummaryCache() {
 
     if (typeof parsed.summary !== "string" || !parsed.summary) return null;
     // guidanceField 也要一起存：走快取時不會有 meta 事件，沒存的話快捷鈕就消失了
-    return { summary: parsed.summary, guidanceField: parsed.guidanceField || "" };
+    return {
+      summary: parsed.summary,
+      guidanceField: parsed.guidanceField || "",
+      thread: sanitizeCachedThread(parsed.thread),
+      conversation: sanitizeCachedConversation(parsed.conversation),
+    };
   } catch {
     sessionStorage.removeItem(buildSummaryCacheKey());
     return null;
   }
 }
 
+/**
+ * 摘要與那一輪的問答一起存。
+ *
+ * 快取 key 是依篩選條件算的，所以換條件就是另一筆，不會互相汙染；
+ * sessionStorage 又是單一分頁的，也不會影響到別人。這樣重新整理才不會
+ * 把使用者問過的東西整批弄丟——那是最容易讓人以為「頁面壞了」的地方。
+ */
 function writeSummaryCache(summary: string) {
   if (!process.client || !summary) return;
 
@@ -878,8 +998,15 @@ function writeSummaryCache(summary: string) {
       savedAt: Date.now(),
       summary,
       guidanceField: guidanceField.value,
+      thread: threadItems.value,
+      conversation: conversationMessages.value,
     })
   );
+}
+
+function clearSummaryCache() {
+  if (!process.client) return;
+  sessionStorage.removeItem(buildSummaryCacheKey());
 }
 
 function restoreCachedSummary() {
@@ -888,9 +1015,19 @@ function restoreCachedSummary() {
 
   summaryText.value = cached.summary;
   guidanceField.value = cached.guidanceField;
+  threadItems.value = cached.thread;
+  conversationMessages.value = cached.conversation;
   streamError.value = "";
   isLoading.value = false;
   return true;
+}
+
+/** 使用者主動要一份新的摘要：清快取重跑，舊的問答一起收掉 */
+function regenerateSummary() {
+  if (isSummaryBusy.value) return;
+  clearSummaryCache();
+  resetFollowUpConversation();
+  void loadSummary(true);
 }
 
 function emitSummaryComplete() {
@@ -928,6 +1065,8 @@ async function loadSummary(forceRefresh = false) {
 
   try {
     await $llm.streamSummarizeCases({
+      // 按了「重新摘要」就連伺服器端那層快取也一起跳過，不然會拿回一模一樣的字
+      refresh: forceRefresh,
       query: normalizeSummaryKeyword(props.query),
       context: props.searchContext,
       cases: referenceCases.value,
@@ -970,10 +1109,13 @@ function resetFollowUpConversation() {
   followUpController.value?.abort();
   followUpController.value = null;
   conversationMessages.value = [];
+  threadItems.value = [];
   followUpInput.value = "";
   followUpDraft.value = "";
   followUpError.value = "";
+  failedFollowUpText.value = "";
   conversationSearchQuery.value = "";
+  isAnswerTurn.value = false;
   // 新的搜尋會重新算引導問題，先清掉舊的，避免短暫顯示上一輪的快捷鈕
   guidanceField.value = "";
   isFollowUpLoading.value = false;
@@ -995,15 +1137,25 @@ async function submitFollowUp() {
     });
   }
   conversationMessages.value.push({ role: "user", content: userReply });
+  threadItems.value.push({ role: "user", content: userReply });
+  isAnswerTurn.value = isFollowUpQuestion(userReply);
   followUpInput.value = "";
   followUpDraft.value = "";
   followUpError.value = "";
+  failedFollowUpText.value = "";
   isFollowUpLoading.value = true;
 
   const conversation: SummaryConversationMessage[] = conversationMessages.value.slice(-8);
+  // 回覆要放哪裡由伺服器回報的 mode 決定，不在前端重算一次——
+  // 兩邊各算一次就會出現「前端當成回答、後端其實只回了一句引導」的錯位。
+  let replyMode = "";
+  let scopeShift: SummaryScopeShift | null = null;
 
   try {
-    if (props.conversationSearch) {
+    // 問問題的回合不重新搜尋。您問的是畫面上這幾筆政策，重搜會換掉引用的政策卡，
+    // 上方那份摘要的 [參考 N] 就會指到別筆去。補條件才需要重新搜尋。
+    // 順帶省下一次意圖解析與數次政策查詢，回答也快得多。
+    if (props.conversationSearch && !isAnswerTurn.value) {
       const searchResult = await props.conversationSearch({
         query: normalizeSummaryKeyword(props.query),
         conversation,
@@ -1013,11 +1165,27 @@ async function submitFollowUp() {
       await nextTick();
     }
 
+    // 「台北市也有可以申請嗎」這種問題問的是目前條件以外的範圍。候選政策裡一筆
+    // 台北市的都沒有，硬答只會答出「站內資料未載明」——但本站其實有。先把那個
+    // 範圍的真實筆數查回來，回答才講得出實話，也才給得出可以直接切過去的按鈕。
+    if (isAnswerTurn.value && props.conversationScopeProbe) {
+      scopeShift = await props.conversationScopeProbe(userReply);
+      if (currentRequestId !== followUpRequestId) return;
+    }
+
     await $llm.streamSummarizeCases({
       query: conversationSearchQuery.value || normalizeSummaryKeyword(props.query),
       context: props.searchContext,
       cases: referenceCases.value,
       conversation,
+      scopeHint: scopeShift
+        ? {
+            field: scopeShift.field,
+            label: scopeShift.label,
+            value: scopeShift.value,
+            count: scopeShift.count,
+          }
+        : null,
       provider: selectedProvider.value,
       signal: controller.signal,
       onChunk: (_delta, fullText) => {
@@ -1026,7 +1194,12 @@ async function submitFollowUp() {
       },
       onMeta: (meta) => {
         if (currentRequestId !== followUpRequestId) return;
-        if (meta?.guidanceField !== undefined) guidanceField.value = meta.guidanceField || "";
+        if (meta?.mode) replyMode = String(meta.mode);
+        // answer 回合不動上方摘要，那份摘要結尾的引導問題還在，
+        // 對應的快捷鈕就不能跟著被清掉。
+        if (meta?.mode !== "answer" && meta?.guidanceField !== undefined) {
+          guidanceField.value = meta.guidanceField || "";
+        }
       },
     });
 
@@ -1035,23 +1208,56 @@ async function submitFollowUp() {
     if (reply) {
       conversationMessages.value.push({ role: "assistant", content: reply });
       conversationMessages.value = conversationMessages.value.slice(-8);
-      // 回覆本身就是「更新後的摘要」：直接取代上面那份，才會套到 Markdown 渲染，
-      // 也才不會變成一張卡裡「舊摘要」和「一串對話」兩套各講各的內容。
-      // 不寫進快取——快取 key 是依篩選條件算的，而追問並不會改篩選條件。
-      summaryText.value = reply;
+      if (replyMode === "answer") {
+        // 問題的答案接在您那句話下面，由上往下讀才順；上方摘要不動，
+        // 因為這一輪沒有改變搜尋條件，那份總覽仍然成立。
+        threadItems.value.push({
+          role: "assistant",
+          content: reply,
+          ...(scopeShift ? { action: scopeShift } : {}),
+        });
+        threadItems.value = threadItems.value.slice(-8);
+      } else {
+        // 補條件的回覆本身就是「更新後的摘要」：直接取代上面那份。
+        // 政策集跟著換了，舊的問答不再對應現在的結果，只留這次說的那句話。
+        // 不寫進快取——快取 key 是依篩選條件算的，而追問並不會改篩選條件。
+        summaryText.value = reply;
+        threadItems.value = threadItems.value.slice(-1);
+      }
     } else {
       followUpError.value = "目前暫時無法繼續整理，請稍後再試。";
+      failedFollowUpText.value = userReply;
     }
   } catch (error: any) {
     if (currentRequestId !== followUpRequestId || error?.name === "AbortError") return;
     console.warn("[IFareSummaryCard][follow-up]", error);
     followUpError.value = "目前暫時無法繼續整理，請稍後再試。";
+    failedFollowUpText.value = userReply;
   } finally {
     if (currentRequestId !== followUpRequestId) return;
     followUpDraft.value = "";
     isFollowUpLoading.value = false;
     followUpController.value = null;
+    // 摘要與對話串一起寫回快取，重新整理才接得下去
+    writeSummaryCache(summaryText.value);
   }
+}
+
+/** 重送上一句沒收到回覆的話。先把那顆孤零零的泡泡收回來，避免對話串出現兩句一樣的 */
+function retryFollowUp() {
+  const text = failedFollowUpText.value;
+  if (!text || isFollowUpLoading.value) return;
+
+  if (threadItems.value[threadItems.value.length - 1]?.role === "user") {
+    threadItems.value.pop();
+  }
+  if (conversationMessages.value[conversationMessages.value.length - 1]?.role === "user") {
+    conversationMessages.value.pop();
+  }
+  followUpError.value = "";
+  failedFollowUpText.value = "";
+  followUpInput.value = text;
+  submitFollowUp();
 }
 
 function setProvider(provider: ProviderName) {
@@ -1515,6 +1721,40 @@ onBeforeUnmount(() => {
   opacity: 0.84;
 }
 
+/*
+  AI 的回答不做成泡泡：裡面是段落標題、列點與 [參考 N] 連結的完整版面，
+  塞進氣泡會擠成一團。改成整欄寬度、左側一道色條標示這是回覆。
+*/
+.summary-answer {
+  justify-self: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid rgba(244, 90, 8, 0.4);
+}
+
+.summary-answer-action {
+  margin-top: 12px;
+}
+
+.summary-answer-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #a2622a;
+}
+
+.summary-answer .summary-markdown :deep(p),
+.summary-answer .summary-markdown :deep(li) {
+  font-size: 15px;
+}
+
+/* 回答是摘要的下一層，段落標題要比上面那份小一階，層級才讀得出來 */
+.summary-answer .summary-markdown :deep(h4.summary-section-title) {
+  font-size: 16px;
+}
+
 .summary-message-label {
   display: block;
   margin-bottom: 3px;
@@ -1540,6 +1780,22 @@ onBeforeUnmount(() => {
   margin: 0;
   color: #8a7a63;
   font-size: 13px;
+}
+
+.summary-followup-retry {
+  margin-left: 8px;
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.summary-followup-retry:hover {
+  background: rgba(214, 62, 20, 0.08);
 }
 
 .summary-followup-label {
