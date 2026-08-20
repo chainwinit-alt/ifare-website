@@ -26,7 +26,8 @@ export function normalizeSummaryQuery(value?: string) {
 type SummaryGuidanceField = "policy" | "area" | "recipient" | "income" | "identity";
 
 const SUMMARY_GUIDANCE_QUESTIONS: Record<SummaryGuidanceField, string> = {
-  policy: "想先確認方向：您要找的比較接近哪一類福利呢？例如長期照顧、兒少福利、老人福利、社會救助。",
+  // policy 的問句改由 buildPolicyGuidanceQuestion 依實際結果組出來，這裡只留不含例子的版本
+  policy: "想先確認方向：您要找的比較接近哪一類福利呢？",
   area: "方便告訴我受助者的戶籍地嗎？",
   recipient: "接著想確認，受助者大約是哪個年齡區間呢？",
   income: "這些政策有限制經濟條件，方便告訴我目前屬於哪一類嗎？",
@@ -40,6 +41,12 @@ const SUMMARY_GUIDANCE_PATTERNS: Record<SummaryGuidanceField, RegExp> = {
   income: /經濟條件|低收入|中低收入|經濟弱勢|收入資格/u,
   identity: /特殊身分|身心障礙|身障|原住民|新住民|特殊境遇|重大傷病/u,
 };
+
+// 戶籍地下拉「不篩選」那一項叫「不限地區」——原本它也叫「全國」，跟政策資料上
+// 代表中央政策的「全國」是同一個詞，兩者拆開命名之後伺服器這邊沒跟著改。
+// 少了這個字，沒選縣市的人一律被判成「已經指定戶籍地」：引導階梯的地區那一階
+// 從來走不到，摘要的提示詞還會告訴模型使用者的戶籍地就是「不限地區」。
+const UNSET_AREA_VALUES = ["全國", "全部", "不限地區"];
 
 function isProvidedContextValue(value: unknown, defaults: string[]) {
   const text = String(value ?? "").trim();
@@ -113,54 +120,141 @@ export function hasResolvedTopic(input: LlmSummaryInput) {
 
 export type SummaryGuidanceFieldName = SummaryGuidanceField;
 
-/**
- * 這一輪的引導問題問的是哪一項條件。
- *
- * 前端需要知道這件事才能把快捷鈕對齊問題——問戶籍地就給縣市鈕、問年齡就給年齡鈕。
- * 判斷邏輯只能有一份（伺服器這份），否則兩邊會各自算出不同答案，
- * 就會出現「問句問戶籍地、按鈕卻給類別」那種不一致。
- */
-export function getSummaryGuidanceField(input: LlmSummaryInput) {
-  return getNextSummaryGuidanceField(input);
-}
+/** 摘要卡的推薦區一次最多列幾項條件 */
+export const SUMMARY_GUIDANCE_FIELD_LIMIT = 3;
 
-function getNextSummaryGuidanceField(input: LlmSummaryInput): SummaryGuidanceField | null {
+// 類別排最前面：它是把結果縮到可讀範圍最有效的一刀，使用者也最容易回答。
+const SUMMARY_GUIDANCE_ORDER: SummaryGuidanceField[] = [
+  "policy",
+  "area",
+  "recipient",
+  "income",
+  "identity",
+];
+
+type SummaryFieldFlags = Record<SummaryGuidanceField, boolean>;
+
+/**
+ * 每一項條件現在的狀態，分成三件問法完全不同的事：
+ *
+ * applied   ── 篩選器上真的套了這一項，結果集已經被它收窄
+ * mentioned ── 使用者自己講過（打在關鍵字裡，或回答過引導問題）
+ * useful    ── 候選政策真的有這項限制，收窄得動才值得列出來
+ */
+function getSummaryFieldStates(input: LlmSummaryInput) {
   const conversation = sanitizeSummaryConversation(input.conversation);
   const explicitUserText = [
     normalizeSummaryQuery(input.query),
     ...conversation.filter(item => item.role === "user").map(item => item.content),
   ].join(" ");
   const context = input.context || {};
-  const hasPolicyCategory =
-    isProvidedContextValue(context.policy, ["全部", "全部類別"]) ||
-    hasExplicitPolicyCategory(explicitUserText) ||
-    wasAnsweredInConversation("policy", conversation);
-  const hasArea =
-    isProvidedContextValue(context.area, ["全國", "全部"]) ||
-    hasExplicitArea(explicitUserText) ||
-    wasAnsweredInConversation("area", conversation);
-  const hasRecipient =
-    isProvidedContextValue(context.recipient, ["全部"]) ||
-    hasExplicitRecipient(explicitUserText) ||
-    wasAnsweredInConversation("recipient", conversation);
-  const hasIncome =
-    isProvidedContextValue(context.income, ["全部"]) ||
-    hasExplicitIncome(explicitUserText) ||
-    wasAnsweredInConversation("income", conversation);
-  const hasIdentity =
-    isProvidedContextValue(context.identity, ["全部"]) ||
-    hasExplicitIdentity(explicitUserText) ||
-    wasAnsweredInConversation("identity", conversation);
 
-  // 類別排最前面：它是把結果縮到可讀範圍最有效的一刀，使用者也最容易回答。
-  if (!hasPolicyCategory) return "policy";
-  if (!hasArea) return "area";
-  // 跟經濟／身分同一個守則：候選政策真的有這項限制才值得問。
-  // 否則會問出「長照要找嬰幼兒還是兒少」這種對結果沒有鑑別度的問題。
-  if (!hasRecipient && input.cases.some(item => item.hasRecipient)) return "recipient";
-  if (!hasIncome && input.cases.some(item => item.hasIncome)) return "income";
-  if (!hasIdentity && input.cases.some(item => item.hasIndentity)) return "identity";
-  return null;
+  const applied: SummaryFieldFlags = {
+    policy: isProvidedContextValue(context.policy, ["全部", "全部類別"]),
+    area: isProvidedContextValue(context.area, UNSET_AREA_VALUES),
+    recipient: isProvidedContextValue(context.recipient, ["全部"]),
+    income: isProvidedContextValue(context.income, ["全部"]),
+    identity: isProvidedContextValue(context.identity, ["全部"]),
+  };
+  const mentioned: SummaryFieldFlags = {
+    policy:
+      hasExplicitPolicyCategory(explicitUserText) ||
+      wasAnsweredInConversation("policy", conversation),
+    area:
+      hasExplicitArea(explicitUserText) ||
+      wasAnsweredInConversation("area", conversation),
+    recipient:
+      hasExplicitRecipient(explicitUserText) ||
+      wasAnsweredInConversation("recipient", conversation),
+    income:
+      hasExplicitIncome(explicitUserText) ||
+      wasAnsweredInConversation("income", conversation),
+    identity:
+      hasExplicitIdentity(explicitUserText) ||
+      wasAnsweredInConversation("identity", conversation),
+  };
+  // 不看這一項的話會問出「長照要找嬰幼兒還是兒少」這種對結果沒有鑑別度的問題。
+  const useful: SummaryFieldFlags = {
+    policy: true,
+    area: true,
+    recipient: input.cases.some(item => item.hasRecipient),
+    income: input.cases.some(item => item.hasIncome),
+    identity: input.cases.some(item => item.hasIndentity),
+  };
+
+  return { applied, mentioned, useful };
+}
+
+/**
+ * 這一輪的引導問題問的是哪一項條件。
+ *
+ * 判斷邏輯只能有一份（伺服器這份），否則前後端會各自算出不同答案。
+ * 使用者自己已經講過的就不再問——把他剛說過的事再問一次最傷信任。
+ */
+export function getSummaryGuidanceField(input: LlmSummaryInput) {
+  return getNextSummaryGuidanceField(input);
+}
+
+/**
+ * 摘要卡推薦區要列的幾項條件，依「縮小範圍最有效」的順序排，最多三項。
+ *
+ * 跟結尾問句問的不是同一件事：問句問「還有什麼沒講」，推薦區問「還能怎麼縮小」。
+ * 使用者打了「我要找失業補助」而類別篩選還停在「全部」時，問句不該再問他一次類別，
+ * 但推薦區該把「類別：勞工福利」列進去——他已經表達過了，站上卻還沒篩，
+ * 勾下去馬上有效，而且是最高把握的一項。
+ *
+ * 結尾問句剛好問到的那一項排第一，讀完問句往下看就是它，不會對不上。
+ */
+export function getSummaryGuidanceFields(input: LlmSummaryInput) {
+  const { applied, mentioned, useful } = getSummaryFieldStates(input);
+  const unset = SUMMARY_GUIDANCE_ORDER.filter(field => !applied[field] && useful[field]);
+  const asked = unset.find(field => !mentioned[field]);
+
+  return (asked ? [asked, ...unset.filter(field => field !== asked)] : unset).slice(
+    0,
+    SUMMARY_GUIDANCE_FIELD_LIMIT
+  );
+}
+
+function getNextSummaryGuidanceField(input: LlmSummaryInput): SummaryGuidanceField | null {
+  const { applied, mentioned, useful } = getSummaryFieldStates(input);
+  return (
+    SUMMARY_GUIDANCE_ORDER.find(
+      field => !applied[field] && !mentioned[field] && useful[field]
+    ) || null
+  );
+}
+
+/**
+ * 「哪一類福利」的問句 —— 例子要照這次真的查到的類別寫，不能寫死。
+ *
+ * 原本固定寫「例如長期照顧、兒少福利、老人福利、社會救助」，跟查到什麼無關。
+ * 實測搜「家裡有人跌倒」，站內最相關的是老人福利（住屋修繕）與身心障礙福利（輔具），
+ * 但問句把長期照顧排第一。使用者照著選下去，桃園市＋老人的 28 筆被砍成 3 筆，
+ * 而砍掉的第一名正是【桃園市】中低收入老人住屋修繕補助——跌倒最需要的那一筆，
+ * 因為它歸在「老人福利」而不是「長期照顧」。
+ *
+ * 建議一個會讓結果變差的條件，比不建議更糟。舉不出例子時就只問問題，不亂舉。
+ */
+function buildPolicyGuidanceQuestion(input: LlmSummaryInput) {
+  const categories = [
+    ...new Set(
+      (input.cases || [])
+        .map((item) => String(item.policyCategory || "").trim())
+        .filter((name) => name && !["全選", "全部"].includes(name))
+    ),
+  ].slice(0, 4);
+
+  return categories.length
+    ? `想先確認方向：您要找的比較接近哪一類福利呢？例如${categories.join("、")}。`
+    : SUMMARY_GUIDANCE_QUESTIONS.policy;
+}
+
+/** 這一輪要問的那句話。policy 走動態版本，其餘用固定文案 */
+function getGuidanceQuestion(field: SummaryGuidanceField, input: LlmSummaryInput) {
+  return field === "policy"
+    ? buildPolicyGuidanceQuestion(input)
+    : SUMMARY_GUIDANCE_QUESTIONS[field];
 }
 
 function stripTrailingQuestions(value: string) {
@@ -208,7 +302,7 @@ export function ensureProgressiveSummaryGuidance(text: string, input: LlmSummary
     return statement || "目前條件已能縮小本站結果，可以先從下方排序較前的政策開始查看。";
   }
 
-  const question = SUMMARY_GUIDANCE_QUESTIONS[nextField];
+  const question = getGuidanceQuestion(nextField, input);
   const statementLimit = Math.max(30, 72 - Array.from(question).length);
   return `${truncateGuidanceStatement(statement, statementLimit)}${question}`;
 }
@@ -241,6 +335,7 @@ export function sanitizeSummaryCases(value: unknown, take = 5): LlmSummaryCaseIt
       competentAuthority: sanitizeSummaryField(item?.competentAuthority, 200),
       remark: sanitizeSummaryField(item?.remark, 500),
       sourceSummary: sanitizeSummaryField(item?.sourceSummary, 1400),
+      policyCategory: sanitizeSummaryField(item?.policyCategory, 40),
     }))
     .filter(item => Number.isFinite(item.id) && item.id > 0 && Boolean(item.title));
 }
@@ -432,7 +527,7 @@ function buildProvidedContextText(context?: LlmSummarySearchContext) {
   if (hasContextValue(context?.recipient, ["全部"])) {
     parts.push(`年齡區間「${cleanContextText(context?.recipient)}」`);
   }
-  if (hasContextValue(context?.area, ["全國", "全部"])) {
+  if (hasContextValue(context?.area, UNSET_AREA_VALUES)) {
     parts.push(`戶籍地「${cleanContextText(context?.area)}」`);
   }
   if (hasContextValue(context?.income, ["全部"])) {
@@ -450,7 +545,7 @@ function buildMissingContextText(context?: LlmSummarySearchContext) {
 
   if (!hasContextValue(context?.policy, ["全部"])) missing.push("受助者情況");
   if (!hasContextValue(context?.recipient, ["全部"])) missing.push("年齡區間");
-  if (!hasContextValue(context?.area, ["全國", "全部"])) missing.push("戶籍地");
+  if (!hasContextValue(context?.area, UNSET_AREA_VALUES)) missing.push("戶籍地");
   if (!hasContextValue(context?.income, ["全部"])) missing.push("經濟條件");
   if (!hasContextValue(context?.identity, ["全部"])) missing.push("特殊身分");
 
@@ -479,7 +574,7 @@ function buildCompactContextText(context?: LlmSummarySearchContext) {
 
   if (hasContextValue(context?.policy, ["全部"])) values.push(cleanContextText(context?.policy));
   if (hasContextValue(context?.recipient, ["全部"])) values.push(cleanContextText(context?.recipient));
-  if (hasContextValue(context?.area, ["全國", "全部"])) values.push(cleanContextText(context?.area));
+  if (hasContextValue(context?.area, UNSET_AREA_VALUES)) values.push(cleanContextText(context?.area));
   if (hasContextValue(context?.income, ["全部"])) values.push(cleanContextText(context?.income));
   if (hasContextValue(context?.identity, ["全部"])) {
     const identity = normalizeIdentityContext(context?.identity);
@@ -854,7 +949,7 @@ export function ensureOverviewGuidance(markdown: string, input: LlmSummaryInput)
 
   const nextField = getNextSummaryGuidanceField(input);
   const closing = nextField
-    ? SUMMARY_GUIDANCE_QUESTIONS[nextField]
+    ? getGuidanceQuestion(nextField, input)
     : "目前條件已能縮小本站結果，可以先從下方排序較前的政策開始查看。";
   return `${body}\n\n${closing}`;
 }

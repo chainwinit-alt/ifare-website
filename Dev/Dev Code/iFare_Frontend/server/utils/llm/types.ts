@@ -15,6 +15,8 @@ export interface LlmSummaryCaseItem {
   competentAuthority?: string;
   remark?: string;
   sourceSummary?: string;
+  /** 這筆政策的類別名稱。引導問句要照實際查到的類別舉例，不能寫死 */
+  policyCategory?: string;
 }
 
 export interface LlmSummarySearchContext {

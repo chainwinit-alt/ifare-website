@@ -185,12 +185,17 @@
           :conversation-search="searchSummaryConversationPolicies"
           :conversation-scope-probe="probeSummaryScopeShift"
           :quick-options="summaryQuickOptions"
+          :area-options="summaryAreaOptions"
+          :condition-probe="probeSummaryConditionCounts"
+          :probe-baseline-count="policyProbeBaselineCount"
           :active-filters="summaryActiveFilters"
           :result-breakdown="summaryResultBreakdown"
           :relax-suggestions="relaxSuggestions"
           :search-failed="searchFailed"
           @summary-complete="handleSummaryComplete"
           @select-quick-option="applySummaryQuickOption"
+          @apply-conditions="applySummaryConditions"
+          @new-topic-search="applySummaryNewTopic"
           @clear-filter="clearSummaryFilter"
         />
       </section>
@@ -273,8 +278,16 @@ import {
   expandSituationVocabulary,
   extractExplicitSearchConditions,
   isAreaOnlySegment,
+  isConditionOnlyText,
   matchPolicyCategory,
 } from "~/utils/ifareIntent";
+import type { PolicyConditionContext, PolicyConditionFacts } from "~/utils/ifarePolicyFit";
+import {
+  buildPolicyIntentText,
+  isOverSpecificPolicyForIntent,
+  isUnsetPolicyCondition,
+  scorePolicyConditionFit,
+} from "~/utils/ifarePolicyFit";
 import { clearIFareSummaryCaches, consumeReloadNavigation } from "~/utils/ifareSummaryCache";
 
 const isOpts = ref(false);
@@ -291,7 +304,13 @@ interface selectItem {
 }
 
 const ALL_POLICY_VALUE = "全部";
-const ALL_AREA_VALUE = "全國";
+// 下拉第一項＝不篩選地區。原本這一項就叫「全國」，跟政策資料上代表「中央政策」的
+// 「全國」是同一個詞，於是選了台北市卻看到一堆「全國」時，使用者無從分辨那是
+// 篩選沒生效還是中央政策。兩者拆開命名，並把真正的中央政策開成一個可選項。
+const ALL_AREA_VALUE = "不限地區";
+// 政策資料裡中央政策的地區名，以及後端對應的代碼（實測 CodeDomicile=1 回 151 筆全國政策）
+const NATIONWIDE_AREA_LABEL = "全國";
+const NATIONWIDE_AREA_VALUE = "1";
 const LEGACY_ALL_POLICY_VALUE = "__all_policy";
 const LEGACY_ALL_AREA_VALUE = "__all_area";
 
@@ -301,6 +320,8 @@ const policySelectList = reactive<Array<selectItem>>([
 const codeSelect_policy:Ref<string> = ref(ALL_POLICY_VALUE);
 const areaSelectList = reactive<Array<selectItem>>([
   { name: ALL_AREA_VALUE, val: ALL_AREA_VALUE, isActive: false },
+  // 中央政策本身也是一種選擇：想只看中央推的方案時不必再從 22 個縣市裡挑
+  { name: NATIONWIDE_AREA_LABEL, val: NATIONWIDE_AREA_VALUE, isActive: false },
 ]);
 const codeSelectArea = ref(ALL_AREA_VALUE);
 const searchQuery = ref("");
@@ -326,6 +347,19 @@ const summaryTriggerKey = ref(0);
 const summaryResetKey = ref(0);
 const latestSummaryText = ref("");
 const resolvedPolicySearchQuery = ref("");
+/**
+ * 推薦區探測筆數時要用的關鍵字，以及它的基準筆數。
+ *
+ * 一次搜尋會用好幾個關鍵字變體各查一次再取聯集（原句、AI 擴充、處境補詞、分段），
+ * 但探測不可能把每個變體都再跑一遍——選項最多九個，那會變成二十幾次請求。
+ *
+ * 實測聯集幾乎等於「撈到最多筆的那一個變體」：搜「長照」時原句 52 筆、處境補詞後
+ * 122 筆、聯集 123 筆。所以只用那一個變體去探測就夠準。
+ * 用原句去探測則會差很遠——「長照＋老人」原句只有 46 筆，實際套用後是 106 筆，
+ * 畫面上寫 46 等於給了一個錯的承諾。
+ */
+const policyProbeKeyword = ref("");
+const policyProbeBaselineCount = ref(0);
 const activeSummaryState = reactive({
   policy: ALL_POLICY_VALUE,
   recipient: "",
@@ -368,7 +402,10 @@ function getRouteValues(value: any, fallback: string[] = []) {
     .flatMap((entry) => String(entry ?? "").split(","))
     .map((entry) => entry.trim())
     .filter(Boolean)
-    .map((entry) => entry == LEGACY_ALL_AREA_VALUE ? ALL_AREA_VALUE : entry);
+    // 舊網址的 area=全國 指的是「不篩選」，不是新的中央選項（那一項的值是 1）
+    .map((entry) => entry == LEGACY_ALL_AREA_VALUE || entry == NATIONWIDE_AREA_LABEL
+      ? ALL_AREA_VALUE
+      : entry);
   return routeValues.length > 0 ? [...new Set(routeValues)] : [...fallback];
 }
 
@@ -582,9 +619,11 @@ const summaryResultBreakdown = computed(() => {
 
   const areaLabel = activeAreaLabel.value;
   if (!areaLabel || areaLabel === ALL_AREA_VALUE) return "";
+  // 選的就是中央時整份結果都是中央政策，沒有「在地幾筆」可以拆
+  if (activeSummaryState.area === NATIONWIDE_AREA_VALUE) return "";
 
   const local = storageiFarePolicyList.filter(
-    (item) => item.area && item.area !== ALL_AREA_VALUE
+    (item) => item.area && item.area !== NATIONWIDE_AREA_LABEL
   ).length;
   const nationwide = storageiFarePolicyList.length - local;
   if (nationwide === 0) return "";
@@ -657,39 +696,74 @@ async function refreshRelaxSuggestions() {
     .sort((a, b) => b.count - a.count);
 }
 
-const summaryQuickOptions = computed<Record<string, Array<{ name: string; val: string }>>>(() => {
+const summaryQuickOptions = computed<Record<string, Array<{ name: string; val: string; count: number }>>>(() => {
   if (isLoading.value || storageiFarePolicyList.length === 0) return {};
 
-  const toOptions = (list: Array<selectItem>, keep?: (item: selectItem) => boolean) =>
-    list
-      .filter((item) => (keep ? keep(item) : true))
-      .map((item) => ({ name: item.name, val: String(item.val) }));
-
-  const presentCategories = new Set(
-    storageiFarePolicyList.map((item) => item.policyCategory).filter(Boolean)
-  );
-  const presentAreas = new Set(
-    storageiFarePolicyList.map((item) => item.area).filter(Boolean)
-  );
-  const presentIn = (
+  const total = storageiFarePolicyList.length;
+  const countBy = (match: (item: iFarePolicyItem) => boolean) =>
+    storageiFarePolicyList.filter(match).length;
+  const countIn = (
     key: "recipientNames" | "incomeNames" | "identityNames",
     name: string
-  ) => storageiFarePolicyList.some((item) => item[key]?.includes(name));
+  ) => countBy((item) => Boolean(item[key]?.includes(name)));
+
+  // count 是「目前這批結果裡有幾筆標記這個值」，只用來決定哪一個值最值得推薦。
+  // 摘要卡上顯示給使用者看的筆數是另外去查回來的（見 probeSummaryConditionCounts），
+  // 因為套用之後後端還會一併帶回沒有該項限制的政策，兩個數字本來就不一樣。
+  const toOptions = (
+    list: Array<selectItem>,
+    countOf: (item: selectItem) => number,
+    keep?: (item: selectItem) => boolean
+  ) =>
+    list
+      .filter((item) => (keep ? keep(item) : true))
+      .map((item) => ({ name: item.name, val: String(item.val), count: countOf(item) }))
+      // 目前每一筆結果都標了這個值的話，勾下去縮不掉任何東西——推薦它等於騙人。
+      // count 為 0 的則是本站這批結果裡根本沒有，勾了會查成空的。
+      .filter((item) => item.count > 0 && item.count < total);
+
+  // 「不限」「無」這種選項不會縮小任何範圍，拿來當推薦條件等於騙人
+  const isRestrictive = (item: selectItem) =>
+    !unrestrictedPolicyCodeNames.has(String(item.name).trim());
 
   return {
     policy: toOptions(
       policySelectList,
-      (item) => !isAllPolicyValue(item.val) && presentCategories.has(item.name)
+      (item) => countBy((policy) => policy.policyCategory === item.name),
+      (item) => !isAllPolicyValue(item.val)
     ),
-    area: toOptions(
-      areaSelectList,
-      (item) => item.val !== ALL_AREA_VALUE && presentAreas.has(item.name)
+    // 這裡不放 area：戶籍地在摘要卡是完整下拉選單，選項來自 summaryAreaOptions。
+    // 只列「結果裡真的有在地政策」的縣市會讓其他縣市的人以為本站沒有他那邊的資料。
+    recipient: toOptions(
+      recipientSelectList,
+      (item) => countIn("recipientNames", item.name),
+      isRestrictive
     ),
-    recipient: toOptions(recipientSelectList, (item) => presentIn("recipientNames", item.name)),
-    income: toOptions(incomeSelectList, (item) => presentIn("incomeNames", item.name)),
-    identity: toOptions(identitySelectList, (item) => presentIn("identityNames", item.name)),
+    income: toOptions(
+      incomeSelectList,
+      (item) => countIn("incomeNames", item.name),
+      isRestrictive
+    ),
+    identity: toOptions(
+      identitySelectList,
+      (item) => countIn("identityNames", item.name),
+      isRestrictive
+    ),
   };
 });
+
+/**
+ * 摘要卡「地區」下拉的選項：22 個縣市全列，不挑。
+ *
+ * 「不限地區」是不篩選、「全國」是中央政策，兩個都不是誰的戶籍地，所以拿掉。
+ * 其餘一律保留——就算某個縣市在這批結果裡一筆在地政策都沒有，設籍該縣市的人
+ * 照樣申請得到所有全國性政策，把他的縣市藏起來等於告訴他「這裡沒有你的份」。
+ */
+const summaryAreaOptions = computed(() =>
+  areaSelectList
+    .filter((item) => item.val !== ALL_AREA_VALUE && item.val !== NATIONWIDE_AREA_VALUE)
+    .map((item) => ({ name: item.name, val: String(item.val) }))
+);
 
 function applySummaryQuickOption(payload: { field: string; val: string }) {
   const { field, val } = payload;
@@ -715,6 +789,102 @@ function applySummaryQuickOption(payload: { field: string; val: string }) {
   }
 
   Search();
+}
+
+/**
+ * 追問框裡打了另一個主題：換掉關鍵字重新搜尋。
+ *
+ * 篩選條件（地區、年齡、經濟、身分）一律保留——使用者換的是「要找什麼」，
+ * 不是「他是誰」，住哪裡、幾歲這些沒有改變。搜尋框同步更新成新主題，
+ * 讓使用者看得出剛剛發生了什麼；不喜歡就自己改回來，不是不可逆的動作。
+ */
+function applySummaryNewTopic(topic: string) {
+  const next = normalizeSummaryKeyword(topic);
+  if (!next || next === searchQuery.value.trim()) return;
+  searchQuery.value = next;
+  Search();
+}
+
+/**
+ * 摘要卡推薦區「套用勾選的條件」：一次把勾好的幾項條件全部設好，只搜尋一次。
+ *
+ * 不重複用 applySummaryQuickOption 一項一項套，是因為那樣會連打好幾次搜尋，
+ * 畫面跳好幾次，而且第二項套下去時第一項已經改變了結果集。
+ */
+function applySummaryConditions(items: Array<{ field: string; val: string }>) {
+  let changed = false;
+
+  for (const { field, val } of items) {
+    if (!val) continue;
+
+    if (field === "policy") {
+      if (codeSelect_policy.value === val) continue;
+      codeSelect_policy.value = val;
+    } else if (field === "area") {
+      if (codeSelectArea.value === val) continue;
+      codeSelectArea.value = val;
+    } else if (field === "recipient") {
+      if (codeSelectRecipient.value === val) continue;
+      SwitchRecipient(val);
+    } else if (field === "income") {
+      if (codeSelectIncomes.value.includes(val)) continue;
+      SwitchIncome(val);
+    } else if (field === "identity") {
+      if (codeSelectIdentity.value.includes(val)) continue;
+      SwitchIdentity(val);
+    } else {
+      continue;
+    }
+
+    changed = true;
+  }
+
+  if (changed) Search();
+}
+
+// 推薦區最多三列：特殊身分最多 5 項、類別與地區各截到 4 項，所以上限抓 13。
+// 年齡（4 項）、經濟條件（3 項）是短的封閉集合，一律整組列出，也含在這個上限裡。
+const CONDITION_PROBE_LIMIT = 13;
+
+/**
+ * 推薦區每一項「套用之後會剩幾筆」。
+ *
+ * 跟放寬建議同一個守則：筆數是真的去查回來的，不是估的也不是 AI 猜的。
+ * 走的是跟正式搜尋同一套 buildFarePolicyApiQueries，只把那一項條件換掉，
+ * 關鍵字則用 policyProbeKeyword（這一輪撈到最多筆的那個變體）。
+ * 實測「長照」選老人：用原句探測寫 46 筆、用這個變體寫 105 筆、實際套用後 106 筆。
+ * 查失敗的那一項就不給數字——寧可不寫，也不要寫一個錯的。
+ */
+async function probeSummaryConditionCounts(items: Array<{ field: string; val: string }>) {
+  const counts: Record<string, number> = {};
+  if (searchFailed.value || items.length === 0) return counts;
+
+  const entries = await Promise.all(
+    items.slice(0, CONDITION_PROBE_LIMIT).map(async ({ field, val }) => {
+      try {
+        const responses = await Promise.all(
+          buildFarePolicyApiQueries(policyProbeKeyword.value, "", { field, val }).map((query) =>
+            $WebApiGet("/FarePolicy/GetIFarePolicyList", query)
+          )
+        );
+        const ids = new Set<string>();
+        responses.forEach((response) => {
+          getPolicyResponseItems(response).forEach((item: any) => {
+            const id = String(item?.id ?? item?.ID ?? "");
+            if (id) ids.add(id);
+          });
+        });
+        return [`${field}:${val}`, ids.size] as const;
+      } catch {
+        return [`${field}:${val}`, -1] as const;
+      }
+    })
+  );
+
+  entries.forEach(([key, count]) => {
+    if (count >= 0) counts[key] = count;
+  });
+  return counts;
 }
 
 /**
@@ -1253,7 +1423,32 @@ function getPolicyContentSignature(item: any) {
   ]);
 }
 
-function getUniquePolicySearchResults(rawItems: Array<any>) {
+/**
+ * 同名同縣市的政策只留一筆（留排序較前的那一筆）。
+ *
+ * 後端資料裡同一個政策可能因為被歸在兩個類別而存成兩列——實測
+ *【桃園市】失能者長照輔具租賃補助同時掛在「身心障礙福利」與「長期照顧」，
+ * 兩列的 id 與 codePolicy_ID 都不同，所以既躲過 id 去重、也躲過內容簽章去重。
+ * 摘要卡本來就用 title+area 擋掉了，下方清單沒有，於是同一筆連續出現兩次
+ *（實測搜「跌倒」選桃園市，清單第 2、3 名是同一個政策）。
+ *
+ * 只認「標題與縣市都相同」：同縣市又同名，就是同一個政策的重複資料。
+ */
+function dedupePolicyByTitleAndArea(rawItems: Array<any>) {
+  const seen = new Set<string>();
+  return rawItems.filter((item: any) => {
+    const title = normalizePolicySignatureText(item?.title);
+    if (!title) return true;
+    const key = `${title}|${normalizePolicySignatureText(item?.codeDomicile_LabelName)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function getUniquePolicySearchResults(inputItems: Array<any>) {
+  const rawItems = dedupePolicyByTitleAndArea(inputItems);
+
   if (!isAllAreaValue(codeSelectArea.value)) {
     const uniqueItems = new Map<string, any>();
     rawItems.forEach((item: any) => uniqueItems.set(String(item.id), item));
@@ -1368,8 +1563,24 @@ function comparePolicyRecency(a: any, b: any) {
   return Number(b?.id ?? 0) - Number(a?.id ?? 0);
 }
 
-function sortPolicyResultsByNewest(items: any[]) {
-  return [...items].sort(comparePolicyRecency);
+/**
+ * 沒打關鍵字、只選條件時的排序。
+ *
+ * 原本純粹照最新排，等於完全不看使用者選了什麼——實測只選「台北市＋老人＋低收入戶」，
+ * 排在最前面的是外縣市民間單位的喪葬補助與身心障礙者臨時照顧服務，
+ * 而台北市自己的低收入戶三節慰問金掉到後面。條件就是使用者唯一表達出來的需求，
+ * 這種時候它本來就該是主要排序依據（摘要卡的推薦一直是這樣做的）。
+ */
+function sortPolicyResultsByCondition(items: any[]) {
+  const context = buildPolicyConditionContext();
+  return [...items]
+    .map((item) => ({ item, fit: scorePolicyConditionFit(toPolicyConditionFacts(item), context) }))
+    .sort((a, b) => {
+      const fitDiff = b.fit - a.fit;
+      if (Math.abs(fitDiff) > Number.EPSILON) return fitDiff;
+      return comparePolicyRecency(a.item, b.item);
+    })
+    .map((entry) => entry.item);
 }
 
 const policySearchConceptPattern =
@@ -1457,18 +1668,35 @@ function getPolicyKeywordMatchMetrics(item: any, query: string): PolicyKeywordMa
   let matchedSpecificTerms = 0;
   let score = 0;
 
-  if (fullQuery.length >= 2) {
-    if (title.includes(fullQuery)) {
-      exactLevel = 3;
-      score += 24;
-    } else if (keywords.includes(fullQuery)) {
-      exactLevel = 2;
-      score += 16;
-    } else if (qualification.includes(fullQuery)) {
-      exactLevel = 1;
-      score += 6;
-    }
+  // 整句命中要認站內政策實際寫的詞，不只認訪客打的字。
+  //
+  // 訪客打「長照」，政策條文寫的是「長期照顧」。只比對原字面的話，標題就叫
+  // 「長期照顧機構安置補助計畫」的新北市政策 exactLevel=0，反而輸給只在資格說明裡
+  // 順口提到「長照」的政策——實測搜「長照」選新北市，那一筆掉到第 9 名，而
+  // exactLevel 是排序的第一道硬門檻，後面幾層根本救不回來。
+  //
+  // 詞的來源就是 buildRelevanceQuery，跟下面算 terms 用的是同一份，不另立一套規則。
+  // specificTerms 仍然只排除原字面：把展開詞也排掉的話，涵蓋率那一層會整批歸零。
+  const fullQueryVariants = [
+    ...new Set(
+      [query, ...buildRelevanceQuery(query).split(/\s+/u)]
+        .map((value) => normalizePolicySearchText(value))
+        .filter((value) => value.length >= 2)
+    ),
+  ];
+  for (const variant of fullQueryVariants) {
+    const level = title.includes(variant)
+      ? 3
+      : keywords.includes(variant)
+        ? 2
+        : qualification.includes(variant)
+          ? 1
+          : 0;
+    if (level > exactLevel) exactLevel = level;
   }
+  if (exactLevel === 3) score += 24;
+  else if (exactLevel === 2) score += 16;
+  else if (exactLevel === 1) score += 6;
 
   for (const term of terms) {
     const weight = genericPolicySearchTerms.has(term) ? 0.35 : 1;
@@ -1497,6 +1725,58 @@ function getPolicyKeywordMatchMetrics(item: any, query: string): PolicyKeywordMa
   };
 }
 
+/**
+ * 把後端原始政策資料轉成排序用的條件標記。
+ * 判斷方式跟 mapPolicySearchItems 一致，兩邊不會對同一筆政策得出不同結論。
+ */
+function toPolicyConditionFacts(item: any): PolicyConditionFacts {
+  const recipientList = Array.isArray(item?.codeRecipientList) ? item.codeRecipientList : [];
+  return {
+    area: item?.codeDomicile_LabelName ?? "",
+    policyCategory: item?.codePolicy_LabelName ?? "",
+    recipientNames: getPolicyCodeNameList(recipientList),
+    incomeNames: getPolicyCodeNameList(item?.codeIncomeList),
+    identityNames: getPolicyCodeNameList(item?.codeIdentityList),
+    hasRecipient: recipientList.findIndex((entry: any) => entry.id == 1) < 0,
+    hasIncome: hasPolicyRestriction(item?.codeIncomeList),
+    hasIndentity: hasPolicyRestriction(item?.codeIdentityList),
+  };
+}
+
+/**
+ * 排序用的「使用者說出口的條件」。
+ *
+ * 直接讀目前的篩選狀態，不走 activeSummaryState——意圖解析有機會在
+ * updateActiveSummaryState 之後才改動篩選，排序要看的是最後定案的那一組。
+ */
+function buildPolicyConditionContext(): PolicyConditionContext {
+  return {
+    policy: isAllPolicyValue(codeSelect_policy.value)
+      ? ""
+      : getSelectedLabel(policySelectList, codeSelect_policy.value, ""),
+    area: isAllAreaValue(codeSelectArea.value)
+      ? ""
+      : getSelectedLabel(areaSelectList, codeSelectArea.value, ""),
+    recipient: getSelectedLabel(recipientSelectList, codeSelectRecipient.value, ""),
+    income: getSelectedLabels(incomeSelectList, codeSelectIncomes.value, ""),
+    identity: getSelectedLabels(identitySelectList, codeSelectIdentity.value, ""),
+    query: searchQuery.value,
+  };
+}
+
+/**
+ * 條件符合度在排序裡的權重。
+ *
+ * 跟關鍵字分數相加，而不是「同分才比」——同分才比等於沒作用：實測搜「長照」選新北市，
+ * 11 筆的關鍵字分數幾乎筆筆不同，條件符合度一次都沒被拿出來比過，於是限原住民的
+ * 全國政策排在第 5，使用者從沒說過自己是原住民。
+ *
+ * 2 倍讓 ±3～7 的符合度差距（6～14 分）跟關鍵字分數的級距（8～24）等量齊觀，
+ * 但位置仍在 exactLevel、涵蓋率那幾層硬門檻之後，不相關的東西不會被推上來。
+ * 摘要卡的推薦早就是這樣算的（見 rankCases），這裡只是讓清單跟上。
+ */
+const CONDITION_FIT_WEIGHT = 2;
+
 function mergeRankedPolicySearchResults(
   plans: PolicySearchRequestPlan[],
   responses: any[],
@@ -1508,15 +1788,22 @@ function mergeRankedPolicySearchResults(
     score: number;
     keywordMatch: PolicyKeywordMatchMetrics;
     aiMatch: PolicyKeywordMatchMetrics;
+    conditionFit: number;
     isLocal: boolean;
+    needsUndeclaredIdentity: boolean;
+    isOverSpecific: boolean;
     bestOriginalRank: number;
     firstOrder: number;
   }>();
   let firstOrder = 0;
-  // 使用者選定的縣市，用於相關性同分時的排序（沒選特定縣市時為空字串）
-  const localAreaName = isAllAreaValue(codeSelectArea.value)
-    ? ""
-    : getSelectedLabel(areaSelectList, codeSelectArea.value, "");
+  // 使用者說出口的條件。什麼都沒選時仍然有作用：政策額外要求了使用者沒提過的
+  // 年齡、經濟或特殊身分就扣分，那種多半用不上。
+  const conditionContext = buildPolicyConditionContext();
+  const localAreaName = String(conditionContext.area || "").trim();
+  // 判斷「窄主題」時要看使用者自己打的字加上 AI 擴充後的查詢
+  const intentText = [originalQuery, resolvedQuery].filter(Boolean).join(" ");
+  const fitAdjustedScore = (entry: { keywordMatch: PolicyKeywordMatchMetrics; conditionFit: number }) =>
+    entry.keywordMatch.score + entry.conditionFit * CONDITION_FIT_WEIGHT;
 
   responses.forEach((response, responseIndex) => {
     const plan = plans[responseIndex];
@@ -1531,9 +1818,23 @@ function mergeRankedPolicySearchResults(
         score: 0,
         keywordMatch: getPolicyKeywordMatchMetrics(item, originalQuery),
         aiMatch: getPolicyKeywordMatchMetrics(item, resolvedQuery),
+        conditionFit: scorePolicyConditionFit(toPolicyConditionFacts(item), conditionContext),
         isLocal:
           Boolean(localAreaName) &&
           String(item?.codeDomicile_LabelName ?? "") === localAreaName,
+        // 這筆政策要求某種特殊身分，而使用者從沒說過自己有
+        needsUndeclaredIdentity:
+          hasPolicyRestriction(item?.codeIdentityList) &&
+          isUnsetPolicyCondition(conditionContext.identity),
+        // 專屬於某個窄主題（假牙、托育）而使用者沒提過那件事
+        isOverSpecific: isOverSpecificPolicyForIntent(
+          buildPolicyIntentText([
+            item?.title,
+            item?.qualification,
+            getPolicyCodeNames(item?.codeKeywordList),
+          ]),
+          intentText
+        ),
         bestOriginalRank: Number.POSITIVE_INFINITY,
         firstOrder: firstOrder++,
       };
@@ -1549,8 +1850,56 @@ function mergeRankedPolicySearchResults(
     });
   });
 
+  /**
+   * 使用者主動選了戶籍地時，在地政策排在前面。
+   *
+   * 那是他最明確的一次表態，排序理當反映——實測搜「跌倒」選桃園市，8 筆裡桃園市
+   * 在地只有 2 筆，卻只有 1 筆進得了前三名，看起來就像篩選沒生效。
+   *
+   * 但在地不能無條件插隊，要擋掉兩種：
+   *
+   * 一是跟主題無關的。程式碼原本刻意不做在地優先是有實測依據的：台北市有長照
+   * 在地政策整篇沒提到長照，無條件優先會把它推上第一名，蓋掉真正在講長照的全國政策。
+   *
+   * 二是要求使用者沒宣告過的特殊身分的。實測搜「跌倒」選桃園市，
+   *【桃園市】身心障礙者使用維生器材及必要生活輔具用電優惠被推到第三名，
+   * 但使用者從沒說過自己是身心障礙者——摘要卡本來就有這條規則（見 referenceCases），
+   * 清單少了它，兩邊就會又排出不同結果。
+   *
+   * 被擋下來的仍照原本的相關性排，也仍保有下面那層同分時的在地優先。
+   */
+  /**
+   * 「真的對上主題」要看具體詞，不能只看總分。
+   *
+   * 總分 > 0 的門檻太鬆：「補助」「老人」這種泛用詞也會加分（權重 0.35），
+   * 於是搜「跌倒」選桃園市時，【桃園市】65歲以上長者裝置活動假牙補助計畫
+   * 被當成相關的在地政策推到第三名——它跟跌倒毫無關係，摘要卡本來就擋掉了。
+   * 改成必須命中至少一個「具體詞」（跌倒／無障礙／修繕／輔具那一類）。
+   * 查詢本身沒有具體詞可比時（例如只打「長照」），才退回看總分。
+   */
+  const hasTopicMatch = (metrics: PolicyKeywordMatchMetrics) =>
+    metrics.hasSpecificTerms ? metrics.matchedSpecificTerms > 0 : metrics.score > 0;
+
+  const isRelevantLocal = (entry: {
+    isLocal: boolean;
+    needsUndeclaredIdentity: boolean;
+    isOverSpecific: boolean;
+    keywordMatch: PolicyKeywordMatchMetrics;
+    aiMatch: PolicyKeywordMatchMetrics;
+  }) =>
+    entry.isLocal
+    && !entry.needsUndeclaredIdentity
+    && !entry.isOverSpecific
+    && (hasTopicMatch(entry.keywordMatch) || hasTopicMatch(entry.aiMatch))
+      ? 1
+      : 0;
+
   return [...rankedItems.values()]
     .sort((a, b) => {
+      // 選了戶籍地時，對得上主題的在地政策先排；沒選地區時 isLocal 全是 false，這一層不作用
+      const relevantLocalDiff = isRelevantLocal(b) - isRelevantLocal(a);
+      if (relevantLocalDiff !== 0) return relevantLocalDiff;
+
       // Original wording always wins. AI intent only breaks ties between items
       // with the same direct keyword relevance.
       // 只有在查詢真的含具體詞時，客戶端比對才有判斷力。像「孩童補助」這種
@@ -1562,7 +1911,7 @@ function mergeRankedPolicySearchResults(
           b.keywordMatch.specificCoverage - a.keywordMatch.specificCoverage,
           b.keywordMatch.specificTitleMatches - a.keywordMatch.specificTitleMatches,
           b.keywordMatch.matchedSpecificTerms - a.keywordMatch.matchedSpecificTerms,
-          b.keywordMatch.score - a.keywordMatch.score,
+          fitAdjustedScore(b) - fitAdjustedScore(a),
         ];
         const originalDiff = originalComparisons.find(diff => Math.abs(diff) > Number.EPSILON);
         if (originalDiff !== undefined) return originalDiff;
@@ -1570,6 +1919,10 @@ function mergeRankedPolicySearchResults(
         // 沒有具體詞（例如只搜「長照」）時不做上面那幾層細分，但仍要用整體關鍵字分數
         // 區分「內文到底有沒有提到這個主題」——否則下面的在地優先會把完全沒提到長照的
         // 在地政策推到最前面（台北市的長照在地政策就是這種情況）。
+        //
+        // 這裡刻意不加條件符合度：查詢本身沒有可比對的具體詞時，每一筆的關鍵字分數
+        // 都是 0，加了符合度就等於「限制越少的排越前面」，完全蓋掉後端算好的相關性。
+        // 實測搜「家裡有人跌倒」（站內沒有「跌倒」這個詞）第一名會變成低收入戶喪葬補助。
         const rawDiff = b.keywordMatch.score - a.keywordMatch.score;
         if (Math.abs(rawDiff) > Number.EPSILON) return rawDiff;
       }
@@ -1591,6 +1944,11 @@ function mergeRankedPolicySearchResults(
 
       const scoreDiff = b.score - a.score;
       if (Math.abs(scoreDiff) > Number.EPSILON) return scoreDiff;
+
+      // 連後端的 RRF 分數都完全相同時，才用完整的條件符合度收尾。
+      // 主要作用在上面的 fitAdjustedScore；放這麼後面是因為它不該蓋過相關性。
+      const fitDiff = b.conditionFit - a.conditionFit;
+      if (Math.abs(fitDiff) > Number.EPSILON) return fitDiff;
 
       const originalRankDiff = Number.isFinite(a.bestOriginalRank) && Number.isFinite(b.bestOriginalRank)
         ? a.bestOriginalRank - b.bestOriginalRank
@@ -1715,16 +2073,28 @@ function matchFilterLabel(optionName: string, target: string) {
  * 原則：戶籍地沿用既有行為（明確地名可切換）；年齡／經濟／身分只在
  * 「使用者尚未自行選擇」時才自動帶入，絕不覆蓋使用者手動設定的條件。
  */
-async function applyResolvedSearchFilters(intent: ResolvedPolicySearchIntent) {
-  // 地區要跟年齡、經濟、身分一樣守門：使用者自己選過就不能被意圖解析覆蓋。
-  // 少了這一道，打關鍵字時解析回來的縣市會蓋掉使用者選的那個，連網址一起改寫，
-  // 而且畫面上完全沒有跡象——實測開 ?area=20（台東縣）再加關鍵字「長照」會變成
-  // 台中市、加「孩童補助」會變成桃園市，分享出去的連結也會被改掉。
-  let changed = isAllAreaValue(codeSelectArea.value)
-    ? await applyResolvedSearchArea(intent.area)
-    : false;
+/**
+ * 套用意圖解析出來的條件。
+ *
+ * literalText 是「使用者自己打的那句話」，用來分辨條件的來源：
+ * - 意圖解析自己推出來的 → 不能覆蓋使用者已經選好的條件。實測開 ?area=20（台東縣）
+ *   再加關鍵字「長照」會被改成台中市、加「孩童補助」變桃園市，連網址一起改寫。
+ * - 使用者這次自己打出來的 → 就該換過去。追問框第一次說「台北」、第二次說「高雄」
+ *   卻換不動，正是因為只看「有沒有選過」而不看來源。
+ */
+async function applyResolvedSearchFilters(
+  intent: ResolvedPolicySearchIntent,
+  literalText = "",
+) {
+  const literal = extractExplicitSearchConditions(literalText);
+  const literalMatches = (typed: string, resolved: string) =>
+    Boolean(typed) && normalizeAreaLabel(typed) === normalizeAreaLabel(resolved);
 
-  if (intent.recipient && !codeSelectRecipient.value) {
+  const canOverrideArea = isAllAreaValue(codeSelectArea.value)
+    || literalMatches(literal.area, intent.area);
+  let changed = canOverrideArea ? await applyResolvedSearchArea(intent.area) : false;
+
+  if (intent.recipient && (!codeSelectRecipient.value || literalMatches(literal.recipient, intent.recipient))) {
     await codeRecipient.catch(() => undefined);
     const item = findFilterOption(recipientSelectList, intent.recipient);
     if (item) {
@@ -1734,7 +2104,7 @@ async function applyResolvedSearchFilters(intent: ResolvedPolicySearchIntent) {
     }
   }
 
-  if (intent.income && codeSelectIncomes.value.length === 0) {
+  if (intent.income && (codeSelectIncomes.value.length === 0 || literalMatches(literal.income, intent.income))) {
     await codeIncome.catch(() => undefined);
     const item = findFilterOption(incomeSelectList, intent.income);
     if (item) {
@@ -1858,12 +2228,20 @@ async function searchSummaryConversationPolicies(
     .map(item => normalizeSummaryKeyword(item.content))
     .filter(Boolean);
   const literalMemoryQuery = [originalQuery, ...userMemory].join(" ").trim();
-  const resolvedIntent = await resolvePolicySearchIntent(originalQuery, payload.conversation);
+  // 「高雄」「台北的」這種只補條件的追問，主題沒有變，本地正則也抽得出縣市，
+  // 不必再叫一次意圖解析。實測那一次 LLM 要 1.3 秒，佔追問總耗時的四分之一以上。
+  const latestUserText = userMemory[userMemory.length - 1] || "";
+  const resolvedIntent = isConditionOnlyText(latestUserText)
+    ? {
+        query: normalizeSummaryKeyword(resolvedPolicySearchQuery.value) || originalQuery,
+        ...extractExplicitSearchConditions(latestUserText),
+      }
+    : await resolvePolicySearchIntent(originalQuery, payload.conversation);
   const resolvedQuery = resolvedIntent.query;
   if (requestId !== policySearchRequestId) {
     return { query: resolvedQuery || originalQuery, cases: [...storageiFarePolicyList] };
   }
-  await applyResolvedSearchFilters(resolvedIntent);
+  await applyResolvedSearchFilters(resolvedIntent, latestUserText);
   if (requestId !== policySearchRequestId) {
     return { query: resolvedQuery || originalQuery, cases: [...storageiFarePolicyList] };
   }
@@ -1924,7 +2302,7 @@ async function SetDataInit() {
   const resolvedIntent = await resolvePolicySearchIntent(originalQuery);
   const resolvedQuery = resolvedIntent.query;
   if (requestId !== policySearchRequestId) return;
-  const filtersChanged = await applyResolvedSearchFilters(resolvedIntent);
+  const filtersChanged = await applyResolvedSearchFilters(resolvedIntent, originalQuery);
   if (requestId !== policySearchRequestId) return;
   const originalQueries = filtersChanged
     ? buildFarePolicyApiQueries(originalQuery)
@@ -1992,6 +2370,19 @@ async function SetDataInit() {
     searchFailed.value = allOutcomes.length > 0 && responses.length === 0;
     if (searchFailed.value) return;
 
+    // 撈到最多筆的那個變體＝最接近聯集的單一查詢，推薦區的筆數探測就用它
+    let probeKeyword = originalQuery;
+    let probeBaseline = -1;
+    plans.forEach((plan, index) => {
+      const count = getPolicyResponseItems(responses[index]).length;
+      if (count > probeBaseline) {
+        probeBaseline = count;
+        probeKeyword = String(plan.query?.Query ?? "");
+      }
+    });
+    policyProbeKeyword.value = probeKeyword;
+    policyProbeBaselineCount.value = Math.max(probeBaseline, 0);
+
     const responseItems = responses.flatMap(getPolicyResponseItems);
     const rawItems = originalQuery
       // 排序也要看得到補上的站內用語，否則撈回來的長照政策全部算 0 分
@@ -2001,7 +2392,7 @@ async function SetDataInit() {
           originalQuery,
           expandSituationVocabulary(resolvedQuery, originalQuery)
         )
-      : sortPolicyResultsByNewest(responseItems);
+      : sortPolicyResultsByCondition(responseItems);
     const _data = getUniquePolicySearchResults(rawItems);
     const _newsList = mapPolicySearchItems(_data);
     replacePolicySearchItems(_newsList);

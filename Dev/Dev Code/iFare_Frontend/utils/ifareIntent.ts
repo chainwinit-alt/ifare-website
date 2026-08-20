@@ -206,8 +206,19 @@ const SITE_VOCABULARY_REPLACEMENTS: Array<[RegExp, string]> = [
 // 仍然只認使用者自己打出來的字（見 extractExplicitSearchConditions）。
 // ---------------------------------------------------------------------------
 const SITUATION_VOCABULARY: Array<[RegExp, string]> = [
+  // 同一件事的簡稱與全稱。訪客習慣打「長照」，但政策條文多半寫「長期照顧」——
+  // 實測站內含「長期照顧」172 筆、含「長照」只有 52 筆，只打簡稱會漏掉 120 筆。
+  // 台北市的「失能老人營養餐飲服務」寫的是「經長期照顧管理中心評估」，就是這樣
+  // 被判成與「長照」無關而排到第 9 名，使用者選了台北市卻一筆在地政策都看不到。
+  [/長照|長期照顧/u, "長照 長期照顧"],
+  [/早療|早期療育/u, "早療 早期療育"],
   [/腦中風|中風|癱瘓|半身不遂|臥床|插鼻胃管|無法自理|不能自理|生活不能自理|沒辦法自己(?:吃飯|洗澡|穿衣|上廁所|走路)|需要人(?:照顧|看護)|行動不便/u, "失能 長期照顧 無法自理"],
   [/失智|阿茲海默|老年痴呆|記憶力(?:變差|退化|越來越差|不好)|忘東忘西|認知退化/u, "失智 長期照顧"],
+  // 跌倒是長輩家屬最常見的求助起點，但站內政策幾乎沒人寫「跌倒」（實測 1 筆），
+  // 寫的是無障礙（435 筆）、修繕（29 筆）、輔具（63 筆）。不補這一條的話，
+  // 打「家裡有人跌倒」撈回來的是停車位補貼與喪葬補助——實測 20 筆，沒有一筆跟
+  // 居家安全有關，而站上其實有住屋修繕、無障礙環境改造、輔具租借這些政策。
+  [/跌倒|摔倒|跌傷|滑倒|防跌|居家安全|浴室很滑|怕再跌|站不穩/u, "無障礙 修繕 輔具"],
   [/失業|被裁員|遭資遣|丟了工作|沒有工作|待業|找不到工作/u, "失業 非自願離職"],
   [/保溫箱|巴掌仙子|早產兒/u, "早產"],
   [/慢半拍|發展比較慢|說話(?:比較)?慢|不太會說話|遲緩/u, "發展遲緩 早期療育"],
@@ -272,7 +283,8 @@ export const POLICY_CATEGORY_KEYWORDS: Array<[string, RegExp]> = [
   ["社會救助", /社會救助|低收入|中低收入|經濟弱勢|急難|生活扶助|喪葬/u],
   ["社會保險", /社會保險|健保|全民健康保險|勞保|勞工保險|國民年金|農保/u],
   ["勞工福利", /勞工|失業|就業|職業訓練|職訓|非自願離職/u],
-  ["住宅福利", /住宅|租屋|租金|包租代管|購屋|房屋/u],
+  // 「租房子」「租房」是口語常見說法，原本只收「租屋」會漏掉
+  ["住宅福利", /住宅|租屋|租房|房租|租金|包租代管|購屋|房屋/u],
   ["原民福利", /原住民|原民/u],
   ["家庭福利", /家庭福利|特殊境遇|單親|婦女/u],
 ];
@@ -313,4 +325,85 @@ export function isFollowUpQuestion(value: unknown) {
   const text = String(value ?? "").trim();
   if (!text) return false;
   return FOLLOW_UP_QUESTION_PATTERN.test(text) || FOLLOW_UP_DETAIL_PATTERN.test(text);
+}
+
+/**
+ * 這句話是不是「只講了條件」——只有縣市、年齡、經濟或身分，沒有帶新的主題。
+ *
+ * 追問框裡補一句「高雄」「台北的」時，主題並沒有改變，本地正則也抽得出條件，
+ * 不需要再叫一次意圖解析（實測那一次 LLM 要 1.3 秒）。
+ * 只要句子裡還剩下有意義的字（例如「長照 高雄」的「長照」），就不算，照常送去解析。
+ */
+const CONDITION_ONLY_RESIDUE = /低收入戶|中低收入戶|經濟弱勢|中低收|低收|嬰幼兒|幼兒|兒童|青少年|兒少|成人|老人|長者|長輩|高齡|身心障礙|身障|原住民|新住民|特殊境遇|重大傷病|[的了嗎呢喔啦我是有在住要想找看]|[\s，,。、！!？?]/gu;
+
+/**
+ * 這句追問是不是在「換一個主題」，而不是補條件或問問題。
+ *
+ * 追問框原本只分兩種：有疑問詞就直接回答，其餘一律當成補充條件疊到舊搜尋上。
+ * 「高雄」「低收入戶」疊上去是對的，但「孩童補助的政策」是換主題——實測搜「跌倒」
+ * 再打這句，兩個主題被合併成「跌倒導致受傷的孩童」，結果從 54 筆變成 151 筆，
+ * 搜尋框還停在「跌倒」。越補越大，跟使用者想做的事剛好相反。
+ *
+ * 判斷刻意保守：必須明確指向某一類福利（照 POLICY_CATEGORY_KEYWORDS）或某個
+ * 站內認得的處境詞，才算換主題。「我爸爸也需要」這種沒有主題的話抽不出東西，
+ * 會落回原本的補條件行為——誤判成補條件只是沒幫上忙，誤判成換主題卻會把
+ * 使用者辛苦收斂的搜尋整個清掉。
+ */
+/**
+ * 這段文字指向哪一個福利主題：先看政策類別，再看處境詞。指不出來回空字串。
+ * 只用來比對「跟現在搜的是不是同一件事」，不對外。
+ */
+function getTopicKey(value: unknown) {
+  const text = fixCommonTypos(normalizeRespectfulPolicyTerm(String(value ?? "")));
+  if (!text) return "";
+  const category = matchPolicyCategory(text);
+  if (category) return category;
+  const situation = SITUATION_VOCABULARY.find(([pattern]) => pattern.test(text));
+  return situation ? situation[1] : "";
+}
+
+/**
+ * 「孩童補助呢」這種用「呢」結尾的轉移話題問法。
+ *
+ * 中文裡「那 X 呢？」就是換一個對象問，不是在問眼前這幾筆政策。但「呢」也是
+ * 疑問詞，會先被 isFollowUpQuestion 攔下來——實測使用者打「孩童補助呢」，
+ * 系統當成提問去翻現有政策，回了一句「站內資料未載明孩童補助」，等於答非所問。
+ *
+ * 只認這一種寫法，而且句子裡不能有別的疑問詞：「要準備什麼文件呢？」含「什麼」，
+ * 那是在問眼前的政策，不能當成換主題。
+ */
+const TOPIC_SHIFT_PARTICLE_PATTERN = /^[^？?]{2,24}呢[？?]?$/u;
+const NON_SHIFT_QUESTION_WORDS =
+  /[?？]|嗎|什麼|甚麼|如何|怎麼|怎樣|哪|多少|多久|何時|幾|是否|能不能|可不可以|有沒有|要不要|為何|請問|符合|資格|文件|流程|金額/u;
+
+export function isNewTopicText(value: unknown, currentQuery?: unknown) {
+  const text = String(value ?? "").trim();
+  if (!text) return false;
+  if (isConditionOnlyText(text)) return false;
+
+  // 指不出主題，或講的就是現在這個主題（「長照要準備什麼文件」），都不是換主題
+  const topic = getTopicKey(text);
+  if (!topic || topic === getTopicKey(currentQuery)) return false;
+
+  // 完全沒有疑問詞 → 直接說了另一個主題（「孩童補助的政策」）
+  if (!isFollowUpQuestion(text)) return true;
+
+  // 有疑問詞時只放行「X 呢」這一種轉移問法
+  return (
+    TOPIC_SHIFT_PARTICLE_PATTERN.test(text) &&
+    !NON_SHIFT_QUESTION_WORDS.test(text.replace(/呢[？?]?$/u, ""))
+  );
+}
+
+export function isConditionOnlyText(value: unknown) {
+  const text = String(value ?? "").trim();
+  if (!text) return false;
+
+  const explicit = extractExplicitSearchConditions(text);
+  const hasCondition = Boolean(
+    explicit.area || explicit.recipient || explicit.income || explicit.identities.length
+  );
+  if (!hasCondition) return false;
+
+  return stripAreaTerms(text).replace(CONDITION_ONLY_RESIDUE, "").length === 0;
 }

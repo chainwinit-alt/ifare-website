@@ -4,6 +4,11 @@
       <div class="summary-head-copy">
         <span class="summary-kicker">AI 快速摘要</span>
         <h3 class="summary-title">關鍵字狀況判斷</h3>
+        <!--
+          這一份摘要是誰寫的。伺服器會依序試 Groq、Gemini 的多個模型（見 freeTier.ts），
+          實際跑到哪一個要看金鑰與當下的額度，不寫出來就只有 console 看得到。
+        -->
+        <p v-if="summaryModelLabel" class="summary-model">{{ summaryModelLabel }}</p>
       </div>
 
       <div class="summary-tools">
@@ -106,17 +111,107 @@
       </div>
     </div>
 
-    <!-- 快捷鈕：內容跟著結尾問句走。點了是去改上方對應的篩選並重新搜尋，不是聊天回合 -->
-    <div v-if="showQuickOptions" class="summary-policy-options">
-      <p class="summary-policy-label" id="ifare-summary-policy-label">{{ activeQuickOptionLabel }}</p>
-      <div class="summary-policy-list" role="group" aria-labelledby="ifare-summary-policy-label">
+    <!--
+      推薦鎖定範圍：完全不知道從哪查起的人，打進來的是一段話而不是條件。
+      這裡照「還沒問到的條件」一次列最多三種不同類型讓他勾，勾完按一次套用。
+      刻意做成選配：不勾也照樣看得到現在這批結果，勾了只是把範圍收得更準。
+    -->
+    <div
+      v-if="showConditionPicker"
+      class="summary-narrow"
+      :class="{ 'has-pending': pickedConditionList.length > 0 }"
+    >
+      <p class="summary-narrow-label" id="ifare-summary-narrow-label">
+        想更精準？勾選想鎖定的條件（不勾也可以）
+      </p>
+      <div class="summary-narrow-list" role="group" aria-labelledby="ifare-summary-narrow-label">
+        <template v-for="item in conditionSuggestions" :key="item.field">
+          <!-- 推得出唯一值（類別、年齡、經濟條件、身分）：直接給一個勾選框 -->
+          <label
+            v-if="item.mode === 'check'"
+            class="summary-narrow-check"
+            :class="{ 'is-picked': isConditionPicked(item.field, item.options[0].val) }"
+          >
+            <input
+              type="checkbox"
+              :checked="isConditionPicked(item.field, item.options[0].val)"
+              @change="toggleCondition(item.field, item.options[0].val)"
+            />
+            <span class="summary-narrow-kind">{{ item.label }}</span>
+            <span class="summary-narrow-value">{{ item.options[0].name }}</span>
+            <strong
+              v-if="conditionCountOf(item.field, item.options[0].val) !== null"
+              class="summary-narrow-count"
+            >{{ conditionCountOf(item.field, item.options[0].val) }} 筆</strong>
+          </label>
+          <!--
+            戶籍地：住哪裡只有使用者自己知道，而且 22 個縣市列成按鈕太長。
+            列滿在下拉裡，找不到自己縣市的人才不會誤以為本站沒有他那邊的資料。
+          -->
+          <div v-else-if="item.mode === 'select'" class="summary-narrow-pick">
+            <span class="summary-narrow-kind">{{ item.label }}</span>
+            <label class="sr-only" :for="`ifare-narrow-${item.field}`">選擇{{ item.label }}</label>
+            <select
+              :id="`ifare-narrow-${item.field}`"
+              class="summary-narrow-select"
+              :value="pickedConditions[item.field] || ''"
+              @change="onSelectCondition(item.field, $event)"
+            >
+              <option value="">請選擇{{ item.label }}</option>
+              <option v-for="option in item.options" :key="option.val" :value="option.val">
+                {{ option.name }}
+              </option>
+            </select>
+            <strong
+              v-if="pickedConditions[item.field]
+                && conditionCountOf(item.field, pickedConditions[item.field]) !== null"
+              class="summary-narrow-count"
+            >{{ conditionCountOf(item.field, pickedConditions[item.field]) }} 筆</strong>
+          </div>
+          <!--
+            推不出唯一值的（年齡、經濟條件、特殊身分）：把可選的列出來讓使用者自己點。
+          -->
+          <div v-else class="summary-narrow-pick">
+            <span class="summary-narrow-kind">{{ item.label }}</span>
+            <div class="summary-narrow-pick-list">
+              <button
+                v-for="option in item.options"
+                :key="option.val"
+                type="button"
+                class="summary-narrow-option"
+                :class="{ active: isConditionPicked(item.field, option.val) }"
+                :aria-pressed="isConditionPicked(item.field, option.val)"
+                @click="toggleCondition(item.field, option.val)"
+              >
+                <span
+                  v-if="isConditionPicked(item.field, option.val)"
+                  class="summary-narrow-tick"
+                  aria-hidden="true"
+                >✓</span>
+                <span>{{ option.name }}</span>
+                <strong v-if="conditionCountOf(item.field, option.val) !== null"
+                >{{ conditionCountOf(item.field, option.val) }} 筆</strong>
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div class="summary-narrow-actions">
         <button
-          v-for="option in activeQuickOptions"
-          :key="option.val"
           type="button"
-          class="summary-policy-chip"
-          @click="emit('selectQuickOption', { field: guidanceField, val: option.val })"
-        >{{ option.name }}</button>
+          class="summary-narrow-apply"
+          :disabled="!pickedConditionList.length"
+          @click="applyPickedConditions"
+        >{{ applyConditionsLabel }}</button>
+        <!--
+          勾了卻沒按套用時，畫面上的摘要與政策卡都還是原本那一批——選取樣式
+          看起來很像已經生效，不講的話會以為是篩選壞掉了。這一句只在有勾、
+          還沒套用時出現，講的就是當下唯一該做的動作。
+        -->
+        <span v-if="pickedConditionList.length" class="summary-narrow-pending" role="status">
+          這些條件還沒生效，按下按鈕才會重新搜尋
+        </span>
+        <span v-else-if="conditionNote" class="summary-narrow-note">{{ conditionNote }}</span>
       </div>
     </div>
 
@@ -223,9 +318,17 @@
 import {
   buildFallbackIntentSummary,
   buildRelevanceQuery,
+  extractExplicitSearchConditions,
   isFollowUpQuestion,
+  isNewTopicText,
+  matchPolicyCategory,
   normalizeFallbackIntentTopic,
 } from "~/utils/ifareIntent";
+import {
+  isUnsetPolicyCondition as isUnsetCondition,
+  policyDeclares,
+  scorePolicyConditionFit,
+} from "~/utils/ifarePolicyFit";
 import { IFARE_SUMMARY_CACHE_PREFIX } from "~/utils/ifareSummaryCache";
 
 type SummaryCaseItem = {
@@ -296,16 +399,41 @@ type SummaryConversationSearch = (payload: {
   conversation: SummaryConversationMessage[];
 }) => Promise<SummaryConversationSearchResult>;
 
-type SummaryQuickOption = { name: string; val: string };
+/** count 是「目前結果裡有幾筆標記這個值」，用來挑出最值得推薦的那一個 */
+type SummaryQuickOption = { name: string; val: string; count?: number };
 
-// 快捷鈕的標題要跟著問的條件走，不然會出現「問句問戶籍地、按鈕卻給類別」那種不一致。
-const QUICK_OPTION_LABELS: Record<string, string> = {
-  policy: "選一個方向，馬上縮小範圍",
-  area: "選一個縣市，馬上縮小範圍",
-  recipient: "選一個年齡區間，馬上縮小範圍",
-  income: "選一個經濟條件，馬上縮小範圍",
-  identity: "選一個身分，馬上縮小範圍",
+/** 推薦區的一列：一種條件類型，加上要讓使用者選的值 */
+type SummaryConditionSuggestion = {
+  field: string;
+  label: string;
+  /**
+   * check ── 使用者親口說了那個值，直接給勾選框
+   * pick  ── 推不出來，把可選的列出來讓他點（年齡、經濟條件、特殊身分）
+   * select ── 選項太多、而且答案只有他知道（戶籍地），給完整下拉選單
+   */
+  mode: "check" | "pick" | "select";
+  options: SummaryQuickOption[];
 };
+
+// 推薦列的類型名稱。跟結果頁「目前條件」用同一套字，
+// 勾完之後在卡片頂端看到的就是同一個詞，不會像兩個功能。
+const CONDITION_FIELD_LABELS: Record<string, string> = {
+  policy: "類別",
+  area: "地區",
+  recipient: "年齡",
+  income: "經濟條件",
+  identity: "特殊身分",
+};
+
+/**
+ * 選項很多的條件（類別 12 項、地區 22 項）一列最多列幾個。
+ *
+ * 年齡（4 項）、經濟條件（3 項）、特殊身分（5 項）都是短的封閉集合，一律全部列出。
+ * 截成三項的話，使用者要找的那一項剛好不在，這一列對他就等於不存在——
+ * 「家裡有人跌倒」問的是誰跌倒，只給「成人」一個選項是答非所問。
+ */
+const CONDITION_PICK_LIMIT = 4;
+const CONDITION_WIDE_FIELDS = new Set(["policy", "area"]);
 
 type SummaryActiveFilter = { field: string; label: string; value: string };
 type SummaryRelaxSuggestion = SummaryActiveFilter & { count: number };
@@ -313,6 +441,9 @@ type SummaryRelaxSuggestion = SummaryActiveFilter & { count: number };
 const emit = defineEmits<{
   summaryComplete: [payload: { summary: string; provider: ProviderName }];
   selectQuickOption: [payload: { field: string; val: string }];
+  applyConditions: [payload: Array<{ field: string; val: string }>];
+  /** 追問框裡打的是另一個主題，不是補條件：換掉關鍵字重新搜尋 */
+  newTopicSearch: [topic: string];
   clearFilter: [field: string];
 }>();
 
@@ -331,6 +462,26 @@ const props = withDefaults(
     conversationScopeProbe?: (userText: string) => Promise<SummaryScopeShift | null>;
     /** 各條件可選的快捷選項，key 是 policy / area / recipient / income / identity */
     quickOptions?: Record<string, SummaryQuickOption[]>;
+    /**
+     * 戶籍地的完整選項（22 個縣市）。
+     *
+     * 不從 quickOptions 取，是因為那一份只留「目前結果裡真的有在地政策」的縣市——
+     * 台東縣沒有在地長照政策就不會出現，設籍台東的人會以為本站沒有他那邊的資料，
+     * 但實際上他照樣能申請所有全國性政策。戶籍地要列滿，不能挑。
+     */
+    areaOptions?: SummaryQuickOption[];
+    /** 推薦區每一項「套用之後會剩幾筆」，回傳 key 是 `${field}:${val}`；查不到就不給那一項 */
+    conditionProbe?: (
+      items: Array<{ field: string; val: string }>
+    ) => Promise<Record<string, number>>;
+    /**
+     * 探測筆數的基準：跟 conditionProbe 用同一個關鍵字變體查回來的總筆數。
+     *
+     * 不能拿畫面上的總筆數來比——那是好幾個關鍵字變體聯集出來的，跟探測不同源。
+     * 兩者混著比會把「其實縮不動」的條件當成有效（例如 46 < 123 看起來有縮，
+     * 但那 46 是另一個基準底下的數字）。
+     */
+    probeBaselineCount?: number;
     /** 目前生效的限縮條件，顯示在摘要卡頂端 */
     activeFilters?: SummaryActiveFilter[];
     /** 選了縣市時的結果組成說明（在地幾筆、全國性幾筆） */
@@ -350,6 +501,8 @@ const props = withDefaults(
   {
     query: "",
     quickOptions: () => ({}),
+    areaOptions: () => [],
+    probeBaselineCount: 0,
     activeFilters: () => [],
     resultBreakdown: "",
     relaxSuggestions: () => [],
@@ -379,17 +532,46 @@ const failedFollowUpText = ref("");
 const isFollowUpLoading = ref(false);
 const followUpController = shallowRef<AbortController | null>(null);
 const conversationSearchQuery = ref("");
+// 這一份摘要實際是哪一個供應商、哪一個模型產生的（由伺服器的 meta 事件帶回來）
+const summaryProvider = ref("");
+const summaryModel = ref("");
 let requestId = 0;
 let followUpRequestId = 0;
+
+/**
+ * 摘要出處的說明文字。
+ *
+ * 供應商全部失敗時伺服器會回 provider=fallback、model=script，那是本地腳本拼出來的
+ * 句子，不是模型寫的——這種時候要講清楚，不然使用者會以為 AI 就是這樣回答的。
+ */
+const summaryModelLabel = computed(() => {
+  const provider = summaryProvider.value;
+  const model = summaryModel.value;
+  if (!provider && !model) return "";
+  if (provider === "fallback" || provider === "unavailable" || model === "script") {
+    return "本地判斷（AI 模型暫時無法使用）";
+  }
+  if (!model) return `模型：${provider}`;
+  return `模型：${provider} · ${model}`;
+});
 
 const hasKeyword = computed(() => Boolean(normalizeSummaryKeyword(props.query)));
 const isSummaryBusy = computed(() => props.resultsLoading || isLoading.value);
 const shouldShowSummaryLoading = computed(() => {
   // 搜尋沒查成功就不會再有摘要進來，轉圈圈只會讓人一直等
   if (props.searchFailed) return false;
+  // 補條件的那一輪會重新搜尋，政策卡當場換成新的一批，但摘要要等 LLM 回來才更新。
+  // 中間那幾秒若讓舊摘要留在畫面上，它的 [參考 N] 會指到新的卡片——實測補「高雄」時
+  // 文字還在講嘉義縣、新竹縣、雲林縣，下面三張卡卻已經是高雄市，等於指鹿為馬。
+  // 問問題的那一輪不動上方摘要，維持顯示。
+  if (isFollowUpLoading.value && !isAnswerTurn.value) return true;
   return props.resultsLoading || (isLoading.value && !summaryText.value.trim());
 });
 const summaryLoadingText = computed(() => {
+  if (isFollowUpLoading.value && !isAnswerTurn.value) {
+    return "正在依照您的補充重新整理摘要...";
+  }
+
   if (props.resultsLoading) {
     return "AI摘要判斷中...";
   }
@@ -408,23 +590,291 @@ const isAnswerTurn = ref(false);
 const followUpPendingText = computed(() =>
   isAnswerTurn.value ? "正在翻找政策內容，為您回答…" : "正在依照您的補充重新整理摘要…"
 );
-// 伺服器算出的「這輪在問哪一項條件」。快捷鈕只呈現對應那一項的選項，
-// 判斷邏輯不在前端重算，否則兩邊會各自算出不同答案。
-const guidanceField = ref("");
-const activeQuickOptions = computed<SummaryQuickOption[]>(
-  () => (guidanceField.value && props.quickOptions[guidanceField.value]) || []
+// 伺服器算出的「這輪還值得請使用者補哪幾項條件」，依縮小範圍最有效的順序排。
+// 判斷邏輯不在前端重算，否則兩邊會各自算出不同答案，就會出現
+// 「摘要結尾問戶籍地、下面卻推薦類別」那種不一致。
+const guidanceFields = ref<string[]>([]);
+// 使用者勾了哪些條件（field → val）。按下套用之前不會動到任何篩選。
+const pickedConditions = ref<Record<string, string>>({});
+// 每一項「套用之後會剩幾筆」，key 是 `${field}:${val}`。查不到的就不放進來。
+const conditionCounts = ref<Record<string, number>>({});
+// 筆數查完了沒（查失敗也算查完）。沒查完就先不顯示整區，避免列出來又抽掉。
+const conditionCountsReady = ref(false);
+let conditionProbeId = 0;
+
+/**
+ * 使用者自己打的原句，不做任何改寫。
+ *
+ * 不能用 buildIntentSource()：那份是排序用的，已經把縣市名拿掉、還補了站內同義詞，
+ * 拿去判斷「他有沒有親口說出這個條件」會判錯。
+ */
+function buildLiteralUserText() {
+  return [
+    normalizeSummaryKeyword(props.query),
+    normalizeSummaryKeyword(props.searchContext?.query),
+    ...conversationMessages.value
+      .filter((message) => message.role === "user")
+      .map((message) => message.content),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/** 使用者親口說出來的條件（字面抽取，絕不推測） */
+const literalConditions = computed(() => extractExplicitSearchConditions(buildLiteralUserText()));
+/** 使用者自己的用字有沒有指向某一類福利（「失業補助」→ 勞工福利） */
+const hintedPolicyCategory = computed(() => matchPolicyCategory(buildLiteralUserText()));
+
+/** 這一項條件，使用者自己講過的值是什麼；沒講過回空字串 */
+function spokenValueFor(field: string) {
+  const literal = literalConditions.value;
+  if (field === "policy") return hintedPolicyCategory.value;
+  if (field === "area") return literal.area;
+  if (field === "recipient") return literal.recipient;
+  if (field === "income") return literal.income;
+  if (field === "identity") return literal.identities[0] || "";
+  return "";
+}
+
+/**
+ * 使用者講的那個值對到站上的哪一個選項。
+ *
+ * 字面抽出來的詞跟選項名稱不一定一字不差（「兒童」要對到「兒童＆青少年」），
+ * 但放寬成包含式就會出事：「中低收入戶」含有「低收入戶」，說低收的人會被
+ * 配到中低收，那是完全不同的資格。改成只認前綴——「兒童＆青少年」開頭是
+ * 「兒童」所以配得上，「中低收入戶」開頭不是「低收入戶」所以配不上。
+ */
+function findSpokenOption(options: SummaryQuickOption[], spoken: string) {
+  if (!spoken) return undefined;
+  const exact = options.find((option) => option.name.trim() === spoken);
+  if (exact) return exact;
+  return options.find((option) => {
+    const name = option.name.trim();
+    return name.startsWith(spoken) || spoken.startsWith(name);
+  });
+}
+
+/**
+ * 推薦鎖定範圍的候選條件（還沒依查回來的筆數篩過）。
+ *
+ * 值一律從目前這批結果裡真的存在的選項來（見結果頁的 summaryQuickOptions），
+ * 不讓模型自由發想——推一個站內根本篩不出東西的條件，比不推更糟。
+ *
+ * 這一份刻意不看 conditionCounts：筆數是照這份清單去查的，兩邊互相依賴的話
+ * 會變成「查回筆數 → 清單變了 → 再查一次」的無窮迴圈。篩選在下面那個 computed。
+ */
+const conditionCandidates = computed<SummaryConditionSuggestion[]>(() => {
+  const suggestions: SummaryConditionSuggestion[] = [];
+
+  for (const field of guidanceFields.value) {
+    const label = CONDITION_FIELD_LABELS[field];
+    if (!label) continue;
+
+    // 戶籍地：22 個縣市全部列進下拉選單。
+    // 曾經只列「目前結果裡在地政策最多的前四名」，於是搜「長照」時列出桃園、金門、
+    // 新北、南投，其他縣市的人只能推論「我這邊沒有資料」——那是錯的，任何縣市套用後
+    // 至少都拿得到全國性政策。而且住哪裡只有他自己知道，本來就不是能推薦的事。
+    if (field === "area") {
+      const areaOptions = props.areaOptions.filter((option) => option.val && option.name);
+      if (areaOptions.length) suggestions.push({ field, label, mode: "select", options: areaOptions });
+      continue;
+    }
+
+    const options = [...(props.quickOptions[field] || [])]
+      .filter((option) => option.val && option.name)
+      .sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+    if (!options.length) continue;
+
+    // 直接給一個勾選框的唯一理由，是使用者自己講出了那個值。
+    //
+    // 曾經改用「結果裡哪個值最多」來挑，那是把政策庫的分布當成使用者的處境：
+    // 「家裡有人跌倒」查回來成人的政策最多，就推薦「年齡：成人」——但誰跌倒
+    // 這件事只有他知道，站上的筆數答不出來。推不出來就把選項列出來讓他自己選。
+    const matched = findSpokenOption(options, spokenValueFor(field));
+    const ordered = matched
+      ? [matched, ...options.filter((option) => option.val !== matched.val)]
+      : options;
+
+    suggestions.push({
+      field,
+      label,
+      mode: matched ? "check" : "pick",
+      options: CONDITION_WIDE_FIELDS.has(field)
+        ? ordered.slice(0, CONDITION_PICK_LIMIT)
+        : ordered,
+    });
+  }
+
+  return suggestions;
+});
+
+/**
+ * 這一項條件套下去，範圍真的會變小嗎。
+ *
+ * 只看查回來的真實筆數。後端的篩選會一併帶回「沒有這項限制」的政策，所以光看
+ * 目前結果裡有幾筆標記它是不夠的——實測「高雄市＋成人＋失業」的 16 筆裡只有幾筆
+ * 標了經濟弱勢，套下去卻還是 16 筆。推薦一個按了沒反應的條件，比不推更傷。
+ *
+ * 還沒查到筆數時一律回 true：那時候整區本來就還沒顯示（見 showConditionPicker），
+ * 查失敗時則是照樣列出來、只是不寫數字。
+ */
+function narrowsResults(field: string, val: string) {
+  const count = conditionCounts.value[`${field}:${val}`];
+  if (typeof count !== "number") return true;
+  const baseline = props.probeBaselineCount;
+  return count > 0 && (baseline > 0 ? count < baseline : true);
+}
+
+/** 真的要畫出來的那幾列：縮不動的值拿掉，整列都沒剩就不顯示這一列 */
+const conditionSuggestions = computed<SummaryConditionSuggestion[]>(() =>
+  conditionCandidates.value
+    .map((item) => {
+      // 戶籍地是選單不是推薦：住哪裡不能為了「縮小結果」而改，所以不做縮不縮得動的篩選
+      if (item.mode === "select") return item;
+
+      const kept = item.options.filter((option) => narrowsResults(item.field, option.val));
+      // 使用者講出來的那個值套下去縮不動的話，就別再單獨推薦它，
+      // 改成把這一項其餘可選的值列出來——整列消失等於少給一次機會。
+      if (item.mode === "check" && kept[0]?.val === item.options[0]?.val) {
+        return { ...item, options: kept.slice(0, 1) };
+      }
+      // 依查回來的真實筆數重排。原本的順序是照「目前結果裡標了幾筆」排的，
+      // 跟畫面上寫的數字不是同一個東西，並排看起來就像亂序。
+      const sorted = [...kept].sort(
+        (a, b) =>
+          (conditionCountOf(item.field, b.val) ?? b.count ?? 0) -
+          (conditionCountOf(item.field, a.val) ?? a.count ?? 0)
+      );
+      return { ...item, mode: "pick" as const, options: sorted };
+    })
+    .filter((item) => item.options.length > 0)
 );
-const activeQuickOptionLabel = computed(
-  () => QUICK_OPTION_LABELS[guidanceField.value] || "選一個條件，馬上縮小範圍"
+
+// 候選條件有沒有變。用字串比而不是比陣列參考，
+// 才不會每次重算 computed 都重查一次筆數。
+const conditionSignature = computed(() =>
+  conditionCandidates.value
+    .map((item) => `${item.field}=${item.options.map((option) => option.val).join("|")}`)
+    .join(",")
 );
-// 追問回覆會直接更新摘要，所以快捷鈕在對話開始之後仍然該留著——
-// 它問的是下一個還沒回答的條件，跟輸入框是同一條路的兩種走法。
-const showQuickOptions = computed(
-  () => activeQuickOptions.value.length > 0
+
+// 追問回覆會直接更新摘要，所以推薦區在對話開始之後仍然該留著——
+// 它問的是還沒回答的條件，跟輸入框是同一條路的兩種走法。
+const showConditionPicker = computed(
+  () => conditionSuggestions.value.length > 0
+    // 筆數查回來之前不顯示：先畫出來再抽掉縮不動的那幾列，看起來像畫面自己在跳。
+    // 探測是在摘要開始生成時就發動的，等於有整段 LLM 的時間可用，實務上不會等到。
+    && conditionCountsReady.value
+    && !props.searchFailed
     && !isSummaryBusy.value
     && !isFollowUpLoading.value
     && Boolean(summaryDisplayText.value.trim())
 );
+
+// 筆數那句只在真的查到數字時才寫——探測失敗時畫面上一個數字都沒有，
+// 這時候還寫「筆數是實際查回來的」等於在講一件畫面上看不到的事。
+const conditionNote = computed(() =>
+  Object.keys(conditionCounts.value).length > 0 ? "筆數是實際查回來的，不是估算" : ""
+);
+
+const pickedConditionList = computed(() =>
+  Object.entries(pickedConditions.value)
+    .filter(([, val]) => Boolean(val))
+    .map(([field, val]) => ({ field, val }))
+);
+
+const applyConditionsLabel = computed(() =>
+  pickedConditionList.value.length
+    ? `套用 ${pickedConditionList.value.length} 項條件並重新搜尋`
+    : "套用勾選的條件"
+);
+
+function isConditionPicked(field: string, val: string) {
+  return pickedConditions.value[field] === val;
+}
+
+/** 同一列只鎖一個值：再點一次就取消。整區都沒勾也是合法狀態，這是選配不是必填 */
+function toggleCondition(field: string, val: string) {
+  const next = { ...pickedConditions.value };
+  if (next[field] === val) delete next[field];
+  else next[field] = val;
+  pickedConditions.value = next;
+}
+
+/** 下拉選單選了值。跟勾選一樣只是記下來，按套用才會生效 */
+function onSelectCondition(field: string, event: Event) {
+  const val = (event.target as HTMLSelectElement).value;
+  const next = { ...pickedConditions.value };
+  if (val) next[field] = val;
+  else delete next[field];
+  pickedConditions.value = next;
+
+  if (val && conditionCountOf(field, val) === null) void probeSingleCondition(field, val);
+}
+
+/** 單獨查一個值會剩幾筆。戶籍地選單不預先全查，選到誰才查誰 */
+async function probeSingleCondition(field: string, val: string) {
+  const probe = props.conditionProbe;
+  if (!probe) return;
+
+  const currentProbeId = conditionProbeId;
+  try {
+    const counts = await probe([{ field, val }]);
+    // 中途換了一輪搜尋就丟掉，別把上一輪的數字併進新的清單
+    if (currentProbeId !== conditionProbeId) return;
+    conditionCounts.value = { ...conditionCounts.value, ...(counts || {}) };
+  } catch {
+    // 查不到就不顯示數字，寧可不寫也不要寫一個錯的
+  }
+}
+
+/** 查回來的筆數；還沒查到或那一項查失敗就回 null，畫面上那格不寫數字 */
+function conditionCountOf(field: string, val: string) {
+  const count = conditionCounts.value[`${field}:${val}`];
+  return typeof count === "number" ? count : null;
+}
+
+/** 勾好的條件一次全部套上去，只重新搜尋一次 */
+function applyPickedConditions() {
+  const picked = pickedConditionList.value;
+  if (!picked.length) return;
+  pickedConditions.value = {};
+  emit("applyConditions", picked);
+}
+
+/**
+ * 幫推薦區的每一項查「套用之後會剩幾筆」。
+ *
+ * 清單先畫出來，數字晚幾百毫秒再補上——為了一個數字讓整區空在那裡並不划算。
+ * 查失敗的那一項就不顯示數字，寧可不寫也不要寫一個錯的。
+ */
+async function refreshConditionCounts() {
+  const probe = props.conditionProbe;
+  const items = conditionCandidates.value
+    // 戶籍地選單有 22 個縣市，不可能一次全查；改成使用者選到哪一個才查那一個
+    .filter((item) => item.mode !== "select")
+    .flatMap((item) => item.options.map((option) => ({ field: item.field, val: option.val })));
+  conditionCounts.value = {};
+  if (!probe || !items.length) {
+    // 沒有要查的（例如這一輪只剩戶籍地選單）就直接顯示，
+    // 別卡在等一個不會來的結果，那會讓整區永遠不出現。
+    conditionCountsReady.value = conditionCandidates.value.length > 0;
+    return;
+  }
+
+  const currentProbeId = ++conditionProbeId;
+  conditionCountsReady.value = false;
+  try {
+    const counts = await probe(items);
+    if (currentProbeId !== conditionProbeId) return;
+    conditionCounts.value = counts || {};
+  } catch {
+    if (currentProbeId !== conditionProbeId) return;
+    conditionCounts.value = {};
+  } finally {
+    if (currentProbeId === conditionProbeId) conditionCountsReady.value = true;
+  }
+}
 // 卡片下半部的對話串。問問題的回合會把「您說」與「AI 回覆」依序往下接，
 // 補條件的回合則是改上方那份摘要，只留下這次說的那句話。
 type SummaryThreadItem = {
@@ -438,7 +888,10 @@ const threadItems = ref<SummaryThreadItem[]>([]);
 // 舊快取的結尾問句與模式都不一樣，必須整批失效。
 // v42：摘要提示詞新增「全國性政策設籍該縣市同樣適用」的說明規則
 // v43：福利內容欄位改成先解 percent-encoding 再送進模型，摘要內容會不一樣
-const SUMMARY_CACHE_VERSION = "v43-decoded-welfare-info";
+// v44：引導條件由單一 guidanceField 改成一次三項的 guidanceFields，舊快取存的形狀不同
+// v45：多存摘要的模型出處，舊快取沒有這兩個欄位，讀回來會少一行字
+// v46：「哪一類福利」的問句改成照實際查到的類別舉例，舊快取裡是寫死的那組例子
+const SUMMARY_CACHE_VERSION = "v46-dynamic-policy-question";
 const SUMMARY_CACHE_KEY_PREFIX = IFARE_SUMMARY_CACHE_PREFIX;
 const SUMMARY_CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -462,11 +915,12 @@ function normalizeText(value: string) {
 }
 
 function splitQueryTokens(query: string) {
-  const normalized = normalizeText(query);
-  if (!normalized) return [];
-
   const tokens = new Set<string>();
-  const segments = normalized.match(/[\p{Script=Han}]+|[a-z0-9]+/giu) ?? [];
+  // 先照空白與頓號切開，再逐段正規化。normalizeText 會把空白吃掉，整串一起處理時
+  // 「長照 長期照顧」會被當成一個六字詞，切出「照長」「期照」這種跨詞邊界的假詞。
+  const segments = String(query || "")
+    .split(/[\s、,，]+/)
+    .flatMap((part) => normalizeText(part).match(/[\p{Script=Han}]+|[a-z0-9]+/giu) ?? []);
 
   for (const segment of segments) {
     if (/^[\p{Script=Han}]+$/u.test(segment)) {
@@ -496,72 +950,9 @@ function splitQueryTokens(query: string) {
  * 才符合「我選了高雄市」的期待；分數有差距時（例如台北市的長照在地政策根本沒提到
  * 長照）仍然由相關性決定，不會把不相關的東西推上來。
  */
-const UNSET_CONDITION_VALUES = ["", "未指定", "全部", "全選", "不限", "全國"];
-
-function isUnsetCondition(value?: string) {
-  return UNSET_CONDITION_VALUES.includes(String(value ?? "").trim());
-}
-
-/** 政策標記的某一項條件裡，有沒有使用者選的那個值（「全選」是沒有限制，不算符合） */
-function policyDeclares(names: string[] | undefined, wanted?: string) {
-  const target = normalizeText(wanted || "");
-  if (!target) return false;
-  return (names || [])
-    .filter((name) => name !== "全選")
-    .some((name) => {
-      const normalized = normalizeText(name);
-      return normalized === target || normalized.includes(target) || target.includes(normalized);
-    });
-}
-
-/**
- * 條件符合度：這筆政策跟使用者「說出口的條件」有多對得上。
- *
- * 原本沒打關鍵字時的排序是 6×有年齡限制 + 4×有經濟限制 + 4×有身分限制 + 資格字數，
- * 等於限制越多、字越長的排越前面——推薦邏輯剛好反了。實測台東縣＋中低收入戶推出來的
- * 第一名是「身心障礙者房屋租金補助」，但使用者從沒說過自己是身心障礙者。
- *
- * 改成兩件事一起看：
- * - 使用者已經說了的條件，政策明確列出那個值 → 真的對得上，加分。
- * - 使用者沒說的條件，政策卻另外要求（要某年齡、某經濟身分、某特殊身分）→ 多半用不上，扣分。
- * 地區則是在地優先，全國次之——全國性政策設籍當地同樣能申請，只是沒那麼貼身。
- */
-function scoreConditionFit(item: SummaryCaseItem, context?: SummarySearchContext) {
-  if (!context) return 0;
-
-  let score = 0;
-  const area = String(context.area || "").trim();
-  if (area && area !== "全國") {
-    const itemArea = normalizeText(item.area || "");
-    if (itemArea && itemArea === normalizeText(area)) score += 6;
-    else if (String(item.area || "").trim() === "全國") score += 3;
-  }
-
-  if (!isUnsetCondition(context.recipient)) {
-    if (policyDeclares(item.recipientNames, context.recipient)) score += 5;
-  } else if (item.hasRecipient) {
-    score -= 3;
-  }
-
-  if (!isUnsetCondition(context.income)) {
-    if (policyDeclares(item.incomeNames, context.income)) score += 5;
-  } else if (item.hasIncome) {
-    score -= 3;
-  }
-
-  if (!isUnsetCondition(context.identity)) {
-    if (policyDeclares(item.identityNames, context.identity)) score += 5;
-  } else if (item.hasIndentity) {
-    // 身分門檻最難臨時具備，沒宣告就更不該推薦
-    score -= 4;
-  }
-
-  if (!isUnsetCondition(context.policy) && item.policyCategory) {
-    if (normalizeText(item.policyCategory) === normalizeText(context.policy)) score += 4;
-  }
-
-  return score;
-}
+// 條件符合度、「這一項算不算沒指定」、「政策有沒有標這個值」三支都搬到
+// utils/ifarePolicyFit.ts，跟下方結果清單的排序共用同一份實作——各算一套的話，
+// 卡片推薦的第 2、3 筆會出現在清單的第 8、9 名，同一份結果讀起來像兩個系統。
 
 function rankCases(
   query: string,
@@ -620,15 +1011,18 @@ function rankCases(
         }
 
         score += matchedTokenCount * 4;
-        // 條件符合度是次要訊號，不能蓋過關鍵字相關性——打了字的人要的是那個主題。
-        score += scoreConditionFit(item, context) * 0.6;
+        // 這三張卡是「精選前三名」而不是搜尋排序（下方清單有自己的排序），所以
+        // 「合不合用」要跟「主題對不對」等量齊觀。權重 0.6 時條件符合度形同無效：
+        // 關鍵字分數動輒 40 以上，±3 的差距排不動任何東西——實測選了台北市卻推薦
+        // 原住民限定政策，台北市自己的服務排在第 8 名之後。
+        score += scorePolicyConditionFit(item, context);
 
         if (isOverSpecificCaseForIntent(item, query)) {
           score -= 80;
         }
       } else {
         // 純篩選搜尋沒有關鍵字可比，條件符合度就是唯一的排序依據
-        score = scoreConditionFit(item, context) * 4;
+        score = scorePolicyConditionFit(item, context) * 4;
       }
 
       return {
@@ -686,7 +1080,7 @@ function buildProvidedContextText() {
   if (hasContextValue(context.recipient, ["全部"])) {
     parts.push(`年齡區間「${cleanContextValue(context.recipient)}」`);
   }
-  if (hasContextValue(context.area, ["全國", "全部"])) {
+  if (hasContextValue(context.area, ["全國", "全部", "不限地區"])) {
     parts.push(`戶籍地「${cleanContextValue(context.area)}」`);
   }
   if (hasContextValue(context.income, ["全部"])) {
@@ -705,7 +1099,7 @@ function buildMissingContextText() {
 
   if (!hasContextValue(context.policy, ["全部"])) missing.push("受助者情況");
   if (!hasContextValue(context.recipient, ["全部"])) missing.push("年齡區間");
-  if (!hasContextValue(context.area, ["全國", "全部"])) missing.push("戶籍地");
+  if (!hasContextValue(context.area, ["全國", "全部", "不限地區"])) missing.push("戶籍地");
   if (!hasContextValue(context.income, ["全部"])) missing.push("經濟條件");
   if (!hasContextValue(context.identity, ["全部"])) missing.push("特殊身分");
 
@@ -735,7 +1129,7 @@ function buildCompactContextText() {
 
   if (hasContextValue(context.policy, ["全部"])) values.push(cleanContextValue(context.policy));
   if (hasContextValue(context.recipient, ["全部"])) values.push(cleanContextValue(context.recipient));
-  if (hasContextValue(context.area, ["全國", "全部"])) values.push(cleanContextValue(context.area));
+  if (hasContextValue(context.area, ["全國", "全部", "不限地區"])) values.push(cleanContextValue(context.area));
   if (hasContextValue(context.income, ["全部"])) values.push(cleanContextValue(context.income));
   if (hasContextValue(context.identity, ["全部"])) {
     const identity = normalizeIdentityContext(context.identity);
@@ -808,11 +1202,28 @@ const hasTypedKeyword = computed(() =>
 // 選了特定縣市時才傳；「全國」「未指定」代表沒有在地偏好
 const localAreaName = computed(() => {
   const area = String(props.searchContext?.area || "").trim();
-  return area === "全國" || area === "未指定" ? "" : area;
+  return area === "全國" || area === "不限地區" || area === "未指定" ? "" : area;
 });
-const rankedCases = computed(() =>
-  rankCases(rankQuery.value, props.cases, localAreaName.value, props.searchContext)
-);
+/**
+ * 卡片推薦用的候選。
+ *
+ * 分數仍由 rankCases 算（下面要靠 similarityScore 濾掉零分、靠它判斷過度specific），
+ * 但「順序」回到下方清單的順序——卡片標題寫的是「最相符的 3 筆政策」，它就不該
+ * 跟下方清單各排各的。
+ *
+ * 實測「家裡有人跌倒＋桃園市＋老人＋長期照顧」共 8 筆：卡片第 3 名是
+ *【全國】住宿式服務機構使用者補助方案，在清單裡卻排第 6；而清單第 3、第 4 名
+ *（【全國】交通接送服務、【桃園市】失能老人接受長期照顧機構服務）在卡片上完全
+ * 沒出現。同一份結果讀起來像兩個系統各說各話。
+ *
+ * 清單那套排序資訊更多（後端 BM25 ＋ 多路查詢的 RRF 融合 ＋ 條件符合度），
+ * 卡片這套只看得到標題、地區、資格三個欄位，所以是卡片跟隨清單，不是反過來。
+ */
+const rankedCases = computed(() => {
+  const listOrder = new Map(props.cases.map((item, index) => [item.id, index]));
+  return rankCases(rankQuery.value, props.cases, localAreaName.value, props.searchContext)
+    .sort((a, b) => (listOrder.get(a.id) ?? 0) - (listOrder.get(b.id) ?? 0));
+});
 const fallbackText = computed(() => {
   // 連本地備援摘要也不給：那段文字寫的是「站內的情況」，但這次根本沒拿到站內資料。
   // 順帶讓 summaryDisplayText 保持空的，追問輸入框與快捷鈕都不會冒出來——
@@ -820,7 +1231,12 @@ const fallbackText = computed(() => {
   if (props.searchFailed) return "";
   if (!hasKeyword.value) return "";
 
-  const queryText = buildRankQuery();
+  // 這段是要顯示給使用者看的，必須用他自己打的字。buildRankQuery() 會補上站內用語
+  // （長照 → 長照 長期照顧），正規化又把空白吃掉，畫面上就會出現
+  // 「您提到的『長照長期照顧』」這種沒人打過的詞。補的詞只服務搜尋與排序。
+  const queryText = normalizeSummaryKeyword(conversationSearchQuery.value)
+    || normalizeSummaryKeyword(props.searchContext?.query)
+    || normalizeSummaryKeyword(props.query);
   return buildFallbackIntentSummary(queryText);
 });
 
@@ -991,6 +1407,11 @@ function renderMarkdown(text: string) {
   return blocks.join("");
 }
 
+/** 這筆政策要求某種特殊身分，而使用者沒宣告任何身分 */
+function needsUndeclaredIdentity(item: SummaryCaseItem) {
+  return Boolean(item.hasIndentity) && isUnsetCondition(props.searchContext?.identity);
+}
+
 const referenceCases = computed<ReferencedCaseItem[]>(() => {
   const usedPolicyKeys = new Set<string>();
 
@@ -1005,6 +1426,14 @@ const referenceCases = computed<ReferencedCaseItem[]>(() => {
       usedPolicyKeys.add(key);
       return true;
     })
+    // 需要「使用者沒宣告的特殊身分」的政策往後排，湊不滿三張才拿它們補。
+    //
+    // 這件事用扣分壓不住：實測「長照＋台北市」的原住民交通費補助，資格欄位裡
+    // 「長照」出現三次，關鍵字分數遠高於其他候選，扣 20 分仍排進前三。但使用者
+    // 從沒說過自己是原住民，推薦一筆他八成用不上的政策，比少推一筆更糟。
+    // 身分只有五種且很少適用，跟「幾乎每筆都有」的年齡限制性質不同，才適用這條規則；
+    // 候選全都有身分門檻時兩組合併後順序不變，不會把卡片變空。
+    .sort((a, b) => Number(needsUndeclaredIdentity(a)) - Number(needsUndeclaredIdentity(b)))
     .slice(0, 3)
     .map((item, index) => ({
       ...item,
@@ -1029,7 +1458,7 @@ function buildRecommendReasons(item: SummaryCaseItem) {
   const reasons: string[] = [];
   const area = String(context.area || "").trim();
 
-  if (area && area !== "全國") {
+  if (!isUnsetCondition(area)) {
     if (normalizeText(item.area || "") === normalizeText(area)) reasons.push(`${area}在地`);
     else if (String(item.area || "").trim() === "全國") reasons.push("全國適用");
   }
@@ -1111,6 +1540,14 @@ function sanitizeCachedThread(value: unknown): SummaryThreadItem[] {
     }));
 }
 
+/** 只收認得的條件名稱，避免舊快取或改壞的內容讓推薦區列出對不上的東西 */
+function sanitizeGuidanceFields(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string" && item in CONDITION_FIELD_LABELS)
+    .slice(0, CONDITION_PICK_LIMIT);
+}
+
 function sanitizeCachedConversation(value: unknown): SummaryConversationMessage[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -1134,7 +1571,9 @@ function readSummaryCache() {
     const parsed = JSON.parse(raw) as {
       savedAt?: number;
       summary?: string;
-      guidanceField?: string;
+      provider?: string;
+      model?: string;
+      guidanceFields?: unknown;
       thread?: unknown;
       conversation?: unknown;
     };
@@ -1145,10 +1584,13 @@ function readSummaryCache() {
     }
 
     if (typeof parsed.summary !== "string" || !parsed.summary) return null;
-    // guidanceField 也要一起存：走快取時不會有 meta 事件，沒存的話快捷鈕就消失了
+    // guidanceFields 也要一起存：走快取時不會有 meta 事件，沒存的話推薦區就消失了
     return {
       summary: parsed.summary,
-      guidanceField: parsed.guidanceField || "",
+      // 模型出處也要一起存：走快取時不會有 meta 事件，沒存的話那一行就消失了
+      provider: String(parsed.provider || ""),
+      model: String(parsed.model || ""),
+      guidanceFields: sanitizeGuidanceFields(parsed.guidanceFields),
       thread: sanitizeCachedThread(parsed.thread),
       conversation: sanitizeCachedConversation(parsed.conversation),
     };
@@ -1173,7 +1615,9 @@ function writeSummaryCache(summary: string) {
     JSON.stringify({
       savedAt: Date.now(),
       summary,
-      guidanceField: guidanceField.value,
+      provider: summaryProvider.value,
+      model: summaryModel.value,
+      guidanceFields: guidanceFields.value,
       thread: threadItems.value,
       conversation: conversationMessages.value,
     })
@@ -1190,7 +1634,9 @@ function restoreCachedSummary() {
   if (!cached) return false;
 
   summaryText.value = cached.summary;
-  guidanceField.value = cached.guidanceField;
+  summaryProvider.value = cached.provider;
+  summaryModel.value = cached.model;
+  guidanceFields.value = cached.guidanceFields;
   threadItems.value = cached.thread;
   conversationMessages.value = cached.conversation;
   streamError.value = "";
@@ -1248,6 +1694,8 @@ async function loadSummary(forceRefresh = false) {
   isLoading.value = true;
   streamError.value = "";
   summaryText.value = "";
+  summaryProvider.value = "";
+  summaryModel.value = "";
   let completedByStream = false;
 
   try {
@@ -1257,7 +1705,9 @@ async function loadSummary(forceRefresh = false) {
       query: normalizeSummaryKeyword(props.query),
       context: props.searchContext,
       cases: referenceCases.value,
-      provider: selectedProvider.value,
+      // 刻意不送 provider：伺服器現在會採信這個欄位並鎖死那一個供應商，
+      // 而這裡的值是寫死的 "groq"。送過去等於在沒有 Groq 金鑰的環境把摘要弄壞。
+      // 指定模型是開發時比較模型才用的，走另外的入口（見 freeTier 的 ModelOverride）。
       signal: controller.signal,
       onChunk: (_delta, fullText) => {
         if (currentRequestId !== requestId) return;
@@ -1265,7 +1715,14 @@ async function loadSummary(forceRefresh = false) {
       },
       onMeta: (meta) => {
         if (currentRequestId !== requestId) return;
-        if (meta?.guidanceField !== undefined) guidanceField.value = meta.guidanceField || "";
+        if (meta?.guidanceFields !== undefined) {
+          guidanceFields.value = sanitizeGuidanceFields(meta.guidanceFields);
+        }
+        // provider 一開始是佔位的 "auto"，真正跑完才知道是誰接的，那一次才採用
+        if (meta?.provider && meta.provider !== "auto") {
+          summaryProvider.value = String(meta.provider);
+          summaryModel.value = String(meta.model || "");
+        }
         console.log("[IFareSummaryCard][llm-meta]", meta);
       },
     });
@@ -1274,6 +1731,8 @@ async function loadSummary(forceRefresh = false) {
     if (currentRequestId !== requestId) return;
     console.warn("[IFareSummaryCard][llm]", error);
     streamError.value = "AI 判斷暫時忙碌，已切換成本地判斷。";
+    summaryProvider.value = "fallback";
+    summaryModel.value = "script";
     if (!summaryText.value.trim()) {
       summaryText.value = fallbackText.value;
     }
@@ -1303,14 +1762,32 @@ function resetFollowUpConversation() {
   failedFollowUpText.value = "";
   conversationSearchQuery.value = "";
   isAnswerTurn.value = false;
-  // 新的搜尋會重新算引導問題，先清掉舊的，避免短暫顯示上一輪的快捷鈕
-  guidanceField.value = "";
+  // 新的搜尋會重新算引導問題，先清掉舊的，避免短暫顯示上一輪的推薦條件與筆數
+  guidanceFields.value = [];
+  pickedConditions.value = {};
+  conditionCounts.value = {};
+  conditionCountsReady.value = false;
+  conditionProbeId += 1;
   isFollowUpLoading.value = false;
 }
 
 async function submitFollowUp() {
   const userReply = followUpInput.value.trim().slice(0, 120);
   if (!userReply || isFollowUpLoading.value) return;
+
+  // 打的是另一個主題（「孩童補助的政策」），不是補條件也不是問問題。
+  //
+  // 走原本那條路會把兩個主題疊在一起——實測搜「跌倒」再打這句，摘要變成
+  // 「跌倒導致受傷的孩童」，結果從 54 筆變成 151 筆，而搜尋框還停在「跌倒」。
+  // 改成換掉關鍵字重新搜尋，篩選條件（地區、年齡…）保留，因為那些沒有改變。
+  // 搜尋框會跟著更新成新主題，使用者看得出剛剛發生了什麼，也改得回去。
+  if (isNewTopicText(userReply, props.query)) {
+    followUpInput.value = "";
+    followUpError.value = "";
+    failedFollowUpText.value = "";
+    emit("newTopicSearch", userReply);
+    return;
+  }
 
   const currentRequestId = ++followUpRequestId;
   followUpController.value?.abort();
@@ -1373,7 +1850,7 @@ async function submitFollowUp() {
             count: scopeShift.count,
           }
         : null,
-      provider: selectedProvider.value,
+      // 同上：不指定供應商，讓伺服器照設定的候選順序退讓
       signal: controller.signal,
       onChunk: (_delta, fullText) => {
         if (currentRequestId !== followUpRequestId) return;
@@ -1383,9 +1860,14 @@ async function submitFollowUp() {
         if (currentRequestId !== followUpRequestId) return;
         if (meta?.mode) replyMode = String(meta.mode);
         // answer 回合不動上方摘要，那份摘要結尾的引導問題還在，
-        // 對應的快捷鈕就不能跟著被清掉。
-        if (meta?.mode !== "answer" && meta?.guidanceField !== undefined) {
-          guidanceField.value = meta.guidanceField || "";
+        // 對應的推薦條件就不能跟著被清掉。
+        if (meta?.mode !== "answer" && meta?.guidanceFields !== undefined) {
+          guidanceFields.value = sanitizeGuidanceFields(meta.guidanceFields);
+        }
+        // 追問可能落到別的模型（前一個額度用完就換下一個），出處要跟著換
+        if (meta?.provider && meta.provider !== "auto") {
+          summaryProvider.value = String(meta.provider);
+          summaryModel.value = String(meta.model || "");
         }
       },
     });
@@ -1481,6 +1963,15 @@ watch(
   }
 );
 
+// 推薦的條件組合一換（新的一輪搜尋、或追問補了條件），舊的筆數與勾選就不再對應，
+// 先清掉再重查。清單本身照樣先畫出來，不讓使用者為了一個數字等在那裡。
+watch(conditionSignature, (signature) => {
+  conditionCounts.value = {};
+  conditionCountsReady.value = false;
+  pickedConditions.value = {};
+  if (signature) void refreshConditionCounts();
+});
+
 watch(
   () => props.provider,
   () => {
@@ -1547,6 +2038,14 @@ onBeforeUnmount(() => {
 
 .summary-head-copy {
   max-width: 560px;
+}
+
+.summary-model {
+  margin: 4px 0 0;
+  color: #8a7a63;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
 }
 
 .summary-kicker {
@@ -2120,25 +2619,211 @@ onBeforeUnmount(() => {
   color: #ffd9a8;
 }
 
-.summary-policy-options {
+.summary-narrow {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px dashed rgba(92, 67, 31, 0.25);
 }
 
-.summary-policy-label {
+.summary-narrow-label {
   color: #5c431f;
   font-size: 13px;
   font-weight: 800;
   margin: 0;
 }
 
-.summary-policy-list {
+/* 勾了還沒套用時整區框起來：這一區的狀態跟畫面上其他地方不一致，要看得出來 */
+.summary-narrow.has-pending {
+  border: 1px solid #b3541e;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.summary-narrow-list {
+  display: grid;
+  gap: 8px;
+}
+
+.summary-narrow-check,
+.summary-narrow-pick {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+
+.summary-narrow-check {
+  border: 1px solid rgba(92, 67, 31, 0.3);
+  background: #fff;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.summary-narrow-check:hover,
+.summary-narrow-check:focus-within {
+  border-color: #5c431f;
+  background: #fffaf2;
+}
+
+/* 勾起來要整列看得出來，不然只有左邊一個小方塊在變，很容易以為沒點到 */
+.summary-narrow-check.is-picked {
+  border-color: #b3541e;
+  background: #fff3e6;
+  box-shadow: inset 0 0 0 1px #b3541e;
+}
+
+.summary-narrow-check input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #b3541e;
+  cursor: pointer;
+}
+
+/* 猜不到值的那一列（戶籍地）用虛線，跟「已經幫你挑好一個」的實線勾選框區隔 */
+.summary-narrow-pick {
+  border: 1px dashed rgba(92, 67, 31, 0.35);
+}
+
+.summary-narrow-kind {
+  flex: none;
+  color: #8a7a63;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.summary-narrow-value {
+  color: #5c431f;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.summary-narrow-count {
+  margin-left: auto;
+  color: #b3541e;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.summary-narrow-pick-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.summary-narrow-select {
+  flex: 1 1 180px;
+  min-width: 0;
+  max-width: 260px;
+  border: 1px solid rgba(92, 67, 31, 0.3);
+  border-radius: 999px;
+  background: #fff;
+  color: #5c431f;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.summary-narrow-select:hover,
+.summary-narrow-select:focus-visible {
+  border-color: #5c431f;
+}
+
+.summary-narrow-option {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid rgba(92, 67, 31, 0.3);
+  border-radius: 999px;
+  background: #fff;
+  color: #5c431f;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.summary-narrow-option strong {
+  color: #b3541e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.summary-narrow-option:hover,
+.summary-narrow-option:focus-visible {
+  border-color: #5c431f;
+  background: #fffaf2;
+}
+
+.summary-narrow-option.active {
+  background: #5c431f;
+  border-color: #5c431f;
+  color: #fff;
+}
+
+.summary-narrow-option.active strong {
+  color: #ffd9a8;
+}
+
+.summary-narrow-tick {
+  font-weight: 900;
+  line-height: 1;
+}
+
+.summary-narrow-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.summary-narrow-apply {
+  border: 0;
+  border-radius: 999px;
+  background: #b3541e;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 9px 22px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.summary-narrow-apply:hover:not(:disabled),
+.summary-narrow-apply:focus-visible:not(:disabled) {
+  background: #8f4116;
+}
+
+/* 一個都沒勾是合法狀態，按鈕停用但不該看起來像壞掉 */
+.summary-narrow-apply:disabled {
+  background: rgba(92, 67, 31, 0.25);
+  cursor: not-allowed;
+}
+
+.summary-narrow-note {
+  color: #8a7a63;
+  font-size: 12px;
+}
+
+/* 有東西被勾起來、卻還沒按套用時的提示。要比一般註記醒目，
+   因為那一刻畫面上的摘要與政策卡都還沒變，最容易被誤會成篩選壞掉。 */
+.summary-narrow-pending {
+  color: #b3541e;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-width: 768px) {
+  .summary-narrow-count {
+    margin-left: 0;
+  }
 }
 
 .summary-policy-chip {

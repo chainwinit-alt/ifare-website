@@ -2,6 +2,7 @@ import { summarizeWithFreeTier } from "../../../utils/llm/freeTier";
 import {
   buildFallbackSummary,
   getSummaryGuidanceField,
+  getSummaryGuidanceFields,
   hasResolvedTopic,
   isSummaryAnswerTurn,
   normalizeSummaryQuery,
@@ -25,7 +26,14 @@ interface SummaryPayload {
   scopeHint?: unknown;
   /** 使用者按了「重新摘要」：跳過伺服器端快取，真的重跑一次 */
   refresh?: boolean;
+  /**
+   * 指定要用哪一個供應商／型號。給了就不做候選退讓，也會用獨立的快取桶。
+   *
+   * 比較模型時最怕「以為在測 A、其實 A 掛了退到 B」，或是換了模型卻拿回
+   * 上一個模型寫好的快取——兩種都會得出相反的結論。這兩件事在 freeTier 處理。
+   */
   provider?: string;
+  model?: string;
 }
 
 type PushEvent = (event: string, data: unknown) => void;
@@ -145,9 +153,12 @@ export default defineEventHandler(async (event) => {
     mode,
     scopeHint,
   };
-  // 前端要靠這個把快捷鈕對齊結尾的引導問題（問戶籍地就給縣市鈕、問年齡就給年齡鈕）。
-  // answer 模式的結尾是答案不是問句，沒有可對齊的問題，就不要掛快捷鈕。
+  // 摘要結尾那句引導問題問的是哪一項條件。answer 模式的結尾是答案不是問句，
+  // 沒有可對齊的問題，就不要算。
   const guidanceField = mode === "answer" ? "" : getSummaryGuidanceField(input);
+  // 摘要卡推薦區要列的幾項條件。問的不是同一件事（見 getSummaryGuidanceFields），
+  // 但有問句時第一項一定就是它，讀完問句往下看不會對不上。
+  const guidanceFields = mode === "answer" ? [] : getSummaryGuidanceFields(input);
 
   return createSseResponse(async (push) => {
     const startedAt = Date.now();
@@ -157,6 +168,7 @@ export default defineEventHandler(async (event) => {
       model: "",
       mode,
       guidanceField,
+      guidanceFields,
       requestBytes,
       requestKilobytes: toKilobytes(requestBytes),
       streaming: false,
@@ -169,10 +181,17 @@ export default defineEventHandler(async (event) => {
           geminiApiKey: llmConfig.geminiApiKey || "",
           geminiModels: llmConfig.geminiModels || llmConfig.geminiModel || "",
           groqApiKey: llmConfig.groqApiKey || "",
-          groqModels: llmConfig.groqModels || llmConfig.groqModel || "",
+          // 摘要有自己的候選清單（見 nuxt.config.ts 的 groqSummaryModels）；
+          // 沒設定時才退回跟聊天機器人共用的那一份
+          groqModels:
+            llmConfig.groqSummaryModels || llmConfig.groqModels || llmConfig.groqModel || "",
           summaryCacheTtlMs: llmConfig.summaryCacheTtlMs,
         },
-        { skipCache: body.refresh === true }
+        {
+          skipCache: body.refresh === true,
+          provider: body.provider,
+          model: body.model,
+        }
       );
       const responseBytes = getUtf8Bytes(result.summary);
       const durationMs = Date.now() - startedAt;
@@ -182,6 +201,7 @@ export default defineEventHandler(async (event) => {
         model: result.model,
         mode,
         guidanceField,
+        guidanceFields,
         cached: result.cached,
         streaming: false,
       });
@@ -192,6 +212,7 @@ export default defineEventHandler(async (event) => {
         model: result.model,
         mode,
         guidanceField,
+        guidanceFields,
         cached: result.cached,
         fallback: false,
         requestBytes,

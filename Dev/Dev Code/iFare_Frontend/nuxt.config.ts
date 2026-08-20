@@ -104,6 +104,18 @@ export default defineNuxtConfig({
       groqModels:
         readEnv("NUXT_LLM_GROQ_MODELS") ||
         "openai/gpt-oss-20b,openai/gpt-oss-120b",
+      // AI 摘要獨立一份候選清單，跟聊天機器人（chatbot.post.ts 也吃 groqModels）分開。
+      //
+      // 2026-08-20 實測：同一份輸入餵 7 個模型跑 4 種情境，120b 在三件事上都贏 20b——
+      // 具體資訊密度 0.48 vs 0.42（每百字寫出幾個查得證的金額或門檻）、
+      // 平均字數 522 vs 652（20b 有一次把整份清單重複列了兩遍）、
+      // token 消耗 2,893 vs 4,267（免費方案 8000 TPM 下，每分鐘 2.8 次 vs 1.9 次）。
+      // 大的模型反而比較省，因為輸入提示詞一樣，差別在它寫得比較短。
+      //
+      // 20b 留第二順位：撞到額度時接手，品質只差一點，而且兩者的 TPM 額度是分開計算的。
+      groqSummaryModels:
+        readEnv("NUXT_LLM_GROQ_SUMMARY_MODELS") ||
+        "openai/gpt-oss-120b,openai/gpt-oss-20b",
       groqIntentModels:
         readEnv("NUXT_LLM_GROQ_INTENT_MODELS") ||
         "openai/gpt-oss-20b,openai/gpt-oss-120b",

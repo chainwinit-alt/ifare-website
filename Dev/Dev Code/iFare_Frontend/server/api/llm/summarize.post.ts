@@ -81,7 +81,9 @@ export default defineEventHandler(async (event) => {
         geminiApiKey: llmConfig.geminiApiKey || "",
         geminiModels: llmConfig.geminiModels || llmConfig.geminiModel || "",
         groqApiKey: llmConfig.groqApiKey || "",
-        groqModels: llmConfig.groqModels || llmConfig.groqModel || "",
+        // 跟串流版同源：摘要優先用 groqSummaryModels
+        groqModels:
+          llmConfig.groqSummaryModels || llmConfig.groqModels || llmConfig.groqModel || "",
         summaryCacheTtlMs: llmConfig.summaryCacheTtlMs,
       }
     );

@@ -340,10 +340,12 @@ export function createGroqClient(config: {
       const isGptOss = /^openai\/gpt-oss-/iu.test(config.model);
       const isQwen = /^qwen\//iu.test(config.model);
       const isOverview = isMarkdownSummaryMode(input);
-      // overview 是結構化多段輸出，token 上限需要比一句話引導高得多
-      const maxCompletionTokens = isOverview
-        ? (isGptOss ? 1400 : isQwen ? 1400 : 900)
-        : (isGptOss ? 300 : isQwen ? 500 : 160);
+      // overview 是結構化多段輸出，token 上限需要比一句話引導高得多。
+      //
+      // 沒認出來的型號以前給 900 / 160，比 gpt-oss 與 qwen 少了三成到一半。
+      // 那會讓「拿新模型跟現行模型比」一開始就不公平——輸出被截斷會被誤讀成
+      // 模型寫得比較差。除了 qwen 的一句話模式（實測需要 500）之外一律拉齊。
+      const maxCompletionTokens = isOverview ? 1400 : (isQwen ? 500 : 300);
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {

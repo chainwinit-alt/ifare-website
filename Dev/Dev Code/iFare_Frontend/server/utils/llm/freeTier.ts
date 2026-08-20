@@ -17,6 +17,33 @@ export const DEFAULT_GROQ_MODELS = [
   "openai/gpt-oss-120b",
 ];
 
+/**
+ * 指定要用哪一個模型（開發時比較模型用）。
+ *
+ * 指定之後就不做候選退讓——比較模型時最怕的是「以為在測 A，其實 A 掛了退到 B」，
+ * 那會得出完全相反的結論。指定的模型失敗就直接讓它失敗，看得見才修得掉。
+ */
+export interface ModelOverride {
+  provider?: string;
+  model?: string;
+}
+
+interface ResolvedModelOverride {
+  provider: LlmProviderName;
+  model: string;
+}
+
+/** 從型號名稱推供應商：gemini 開頭的是 Gemini，其餘走 Groq */
+function resolveModelOverride(override?: ModelOverride): ResolvedModelOverride | null {
+  const model = String(override?.model || "").trim();
+  const rawProvider = String(override?.provider || "").trim().toLowerCase();
+  const provider: LlmProviderName | "" =
+    rawProvider === "gemini" || rawProvider === "groq" ? rawProvider : "";
+
+  if (!model) return provider ? { provider, model: "" } : null;
+  return { provider: provider || (/^gemini/iu.test(model) ? "gemini" : "groq"), model };
+}
+
 export interface FreeTierLlmConfig {
   geminiApiKey?: string;
   geminiModels?: string | string[];
@@ -51,7 +78,14 @@ export function parseModelList(
   return [...new Set(normalized.length ? normalized : fallback)];
 }
 
-function buildCacheKey(input: LlmSummaryInput) {
+/**
+ * override：指定了供應商／型號時要獨立一個快取桶。
+ *
+ * 不分開的話，換一個模型重跑會直接拿回上一個模型寫好的字——比較模型時
+ * 兩邊看起來一模一樣，會誤以為模型沒有差別。沒指定時 key 與原本完全相同，
+ * 正常流量的快取命中率不受影響。
+ */
+function buildCacheKey(input: LlmSummaryInput, override?: ResolvedModelOverride) {
   return JSON.stringify({
     mode: input.mode || "guidance",
     query: (input.query || input.context?.query || "").trim().toLowerCase(),
@@ -59,6 +93,7 @@ function buildCacheKey(input: LlmSummaryInput) {
     cases: input.cases.map(item => ({ id: item.id, title: item.title })),
     conversation: input.conversation || [],
     scopeHint: input.scopeHint || null,
+    ...(override ? { override: `${override.provider}:${override.model}` } : {}),
   });
 }
 
@@ -75,8 +110,8 @@ function removeExpiredCacheEntries() {
   }
 }
 
-function getCachedSummary(input: LlmSummaryInput) {
-  const key = buildCacheKey(input);
+function getCachedSummary(input: LlmSummaryInput, override?: ResolvedModelOverride) {
+  const key = buildCacheKey(input, override);
   const item = summaryCache.get(key);
   if (!item) return null;
   if (item.expiresAt <= Date.now()) {
@@ -92,10 +127,11 @@ function getCachedSummary(input: LlmSummaryInput) {
 function setCachedSummary(
   input: LlmSummaryInput,
   result: FreeTierSummaryResult,
-  ttlMs: number
+  ttlMs: number,
+  override?: ResolvedModelOverride
 ) {
   removeExpiredCacheEntries();
-  summaryCache.set(buildCacheKey(input), {
+  summaryCache.set(buildCacheKey(input, override), {
     expiresAt: Date.now() + ttlMs,
     result: { ...result, cached: false },
   });
@@ -125,31 +161,50 @@ export async function summarizeWithFreeTier(
   config: FreeTierLlmConfig,
   // 使用者按「重新摘要」時要跳過這層快取。不跳的話同樣的條件會拿回一模一樣的
   // 字，按了等於沒事發生——那顆按鈕的意義就沒了。產生後照樣寫回快取。
-  options?: { skipCache?: boolean }
+  options?: { skipCache?: boolean } & ModelOverride
 ): Promise<FreeTierSummaryResult> {
-  const cached = options?.skipCache ? null : getCachedSummary(input);
+  const override = resolveModelOverride(options);
+  const cached = options?.skipCache ? null : getCachedSummary(input, override || undefined);
   if (cached) return cached;
 
-  const candidates = [
-    ...parseModelList(config.groqModels, DEFAULT_GROQ_MODELS).map((model) => ({
-      provider: "groq" as const,
-      model,
-      apiKey: config.groqApiKey || "",
-      client: createGroqClient({ apiKey: config.groqApiKey || "", model }),
-    })),
-    ...parseModelList(config.geminiModels, DEFAULT_GEMINI_MODELS).map((model) => ({
-      provider: "gemini" as const,
-      model,
-      apiKey: config.geminiApiKey || "",
-      client: createGeminiClient({ apiKey: config.geminiApiKey || "", model }),
-    })),
+  const makeCandidate = (provider: LlmProviderName, model: string) =>
+    provider === "gemini"
+      ? {
+          provider: "gemini" as const,
+          model,
+          apiKey: config.geminiApiKey || "",
+          client: createGeminiClient({ apiKey: config.geminiApiKey || "", model }),
+        }
+      : {
+          provider: "groq" as const,
+          model,
+          apiKey: config.groqApiKey || "",
+          client: createGroqClient({ apiKey: config.groqApiKey || "", model }),
+        };
+
+  const allCandidates = [
+    ...parseModelList(config.groqModels, DEFAULT_GROQ_MODELS).map((model) =>
+      makeCandidate("groq", model)
+    ),
+    ...parseModelList(config.geminiModels, DEFAULT_GEMINI_MODELS).map((model) =>
+      makeCandidate("gemini", model)
+    ),
   ];
+
+  // 指定了型號就只跑那一個（型號不在設定清單裡也照跑，才測得到還沒設定的新模型）；
+  // 只指定供應商則在該供應商的清單內照原本的順序退讓。
+  const candidates = override?.model
+    ? [makeCandidate(override.provider, override.model)]
+    : override?.provider
+      ? allCandidates.filter((candidate) => candidate.provider === override.provider)
+      : allCandidates;
 
   const errors: string[] = [];
   for (const candidate of candidates) {
     if (!candidate.apiKey) continue;
     const candidateKey = `${candidate.provider}:${candidate.model}`;
-    if (isCoolingDown(candidateKey)) continue;
+    // 指定型號時不看冷卻：要測的就是它，被跳過會讓人以為測過了
+    if (!override?.model && isCoolingDown(candidateKey)) continue;
 
     try {
       const rawSummary = await candidate.client.summarize(input);
@@ -172,7 +227,8 @@ export async function summarizeWithFreeTier(
       setCachedSummary(
         input,
         result,
-        Number(config.summaryCacheTtlMs) || DEFAULT_CACHE_TTL_MS
+        Number(config.summaryCacheTtlMs) || DEFAULT_CACHE_TTL_MS,
+        override || undefined
       );
       return result;
     } catch (error: any) {
