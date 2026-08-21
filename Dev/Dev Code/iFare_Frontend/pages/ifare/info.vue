@@ -169,6 +169,104 @@ const errorMessage = ref(DETAIL_ERROR_MESSAGE);
 const hasPolicy = ref(false);
 const currentPolicyId = computed(() => Number(route.query.id || 0));
 
+/**
+ * 轉傳預覽與搜尋結果用的中繼資料，必須在伺服器算繪時就備好。
+ *
+ * LINE 與 Facebook 的爬蟲不執行 JavaScript——實測用它們的 User-Agent 抓這一頁，
+ * 拿回來的是骨架，政策標題出現 0 次。所以標籤光寫在元件裡沒有用：底下那個
+ * watch(immediate) 是裸露的 async 副作用，Nuxt 在 SSR 階段不會等它。
+ * useAsyncData 會被 await，資料才進得了伺服器吐出去的 HTML。
+ *
+ * 這裡刻意只取三個欄位、與底下的 loadPolicyDetail 分開跑：
+ * 那支函式同時管載入狀態、錯誤分類、相關福利與競態控制，
+ * 為了 meta 去動它風險太高。明細 API 實測 12–16ms，多打一次可以接受，
+ * 而且 useAsyncData 的結果會隨 payload 帶到前端，hydration 時不會再打一次。
+ */
+// key 用固定字串：這個 Nuxt 版本的 useAsyncData 不接受函式 key（會丟
+// "key must be a string"）。換 id 時靠下方的 watch 重取，效果一樣。
+const { data: policyMeta } = await useAsyncData(
+  "ifare-policy-meta",
+  async () => {
+    const infoID = currentPolicyId.value;
+    if (!infoID) return null;
+
+    const { data } = await $WebApiGetDetailed("/FarePolicy/GetIFarePolicyDetail", {
+      farePolicyID: infoID,
+    });
+    const detail = getApiResultValue<any>(data);
+    if (!detail) return null;
+
+    return {
+      title: String(detail.title || "").trim(),
+      qualification: String(detail.qualification || "").trim(),
+      area: String(detail.codeDomicile_LabelName || "").trim(),
+    };
+  },
+  { watch: [currentPolicyId] }
+);
+
+const SITE_NAME = "i-Fare 福利好幫手";
+const SITE_DESCRIPTION = "長穩社福慈善基金會 i-Fare，整合全臺社會福利政策，用一句話描述您的處境就能找到適合的補助。";
+const runtimeConfigForMeta = useRuntimeConfig();
+const metaSiteUrl = String(runtimeConfigForMeta.public.siteUrl || "").replace(/\/+$/u, "");
+
+/** 說明文字取申請資格前 100 字。該欄位是純文字，不像 welfareInfo 需要解碼與去標籤 */
+const metaDescription = computed(() => {
+  const raw = String(policyMeta.value?.qualification || "").replace(/\s+/gu, " ").trim();
+  if (!raw) return SITE_DESCRIPTION;
+  return raw.length > 100 ? `${raw.slice(0, 100)}…` : raw;
+});
+
+/**
+ * 分頁標題（給搜尋引擎）：政策全名（已含縣市）在前，用途在後，站名收尾。
+ * 這是照台灣人的搜尋習慣排的——「縣市 + 對象 + 補助」，而搜尋結果頁夠寬，顯示得下。
+ */
+const metaTitle = computed(() => {
+  const title = String(policyMeta.value?.title || "").trim();
+  return title ? `${title}｜申請資格與補助內容 - ${SITE_NAME}` : `福利政策查詢 - ${SITE_NAME}`;
+});
+
+/**
+ * 轉傳卡片標題（給 LINE／Facebook）：只留政策全名。
+ *
+ * 跟上面刻意分開。轉傳卡片大約只顯示 30–40 字，把「申請資格與補助內容 - i-Fare 福利好幫手」
+ * 也塞進去的話，實際渲染出來會斷成兩行還被截掉，反而讓政策名稱看不完整。
+ * 站名交給 og:site_name 那一行去顯示就好。
+ */
+const shareTitle = computed(() => {
+  const title = String(policyMeta.value?.title || "").trim();
+  return title || `福利政策查詢 - ${SITE_NAME}`;
+});
+
+const metaUrl = computed(() =>
+  currentPolicyId.value && metaSiteUrl
+    ? `${metaSiteUrl}/ifare/info?id=${currentPolicyId.value}`
+    : metaSiteUrl
+);
+
+useHead(() => ({
+  title: metaTitle.value,
+  meta: [
+    { name: "description", content: metaDescription.value },
+    { property: "og:type", content: "article" },
+    { property: "og:site_name", content: SITE_NAME },
+    { property: "og:title", content: shareTitle.value },
+    { property: "og:description", content: metaDescription.value },
+    { property: "og:url", content: metaUrl.value },
+    // 全站共用的品牌圖。政策本身沒有圖，與其配一張不相干的照片讓人以為那是政策內容，
+    // 不如放一張說明本站是什麼的圖。之後若要做動態產圖（政策名 + 縣市），從這裡換掉即可。
+    { property: "og:image", content: metaSiteUrl ? `${metaSiteUrl}/og-ifare.png` : "/og-ifare.png" },
+    { property: "og:image:width", content: "1200" },
+    { property: "og:image:height", content: "630" },
+    { property: "og:image:alt", content: `${SITE_NAME}－整合全臺社會福利政策` },
+    { property: "og:locale", content: "zh_TW" },
+    { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:title", content: shareTitle.value },
+    { name: "twitter:description", content: metaDescription.value },
+  ],
+  link: metaUrl.value ? [{ rel: "canonical", href: metaUrl.value }] : [],
+}));
+
 function toDetailErrorMessage(error: any) {
   const message = getApiErrorMessage(error, DETAIL_ERROR_MESSAGE);
   // getApiErrorMessage 分不出類別時會原封不動回傳底層訊息（例如 "Failed to fetch"），
