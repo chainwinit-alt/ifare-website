@@ -34,6 +34,11 @@ interface SummaryPayload {
    */
   provider?: string;
   model?: string;
+  /**
+   * 政策明細頁的「問這筆政策」：畫面上只有這一筆，每一輪都當成在問它。
+   * 詳細理由見下方讀取 body.focusPolicy 之處。
+   */
+  focusPolicy?: boolean;
 }
 
 type PushEvent = (event: string, data: unknown) => void;
