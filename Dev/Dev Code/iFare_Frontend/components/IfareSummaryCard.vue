@@ -2,13 +2,17 @@
   <section class="ifare-summary-card" :data-provider="selectedProvider">
     <div class="summary-head">
       <div class="summary-head-copy">
-        <span class="summary-kicker">AI 快速摘要</span>
-        <h3 class="summary-title">關鍵字狀況判斷</h3>
+        <span class="summary-kicker" :title="summaryModelLabel || undefined">AI 快速摘要</span>
+        <h3 class="summary-title">為您整理的重點</h3>
         <!--
           這一份摘要是誰寫的。伺服器會依序試 Groq、Gemini 的多個模型（見 freeTier.ts），
-          實際跑到哪一個要看金鑰與當下的額度，不寫出來就只有 console 看得到。
+          實際跑到哪一個要看金鑰與當下的額度。
+
+          預設不印在畫面上：手機 390x844 實測，卡片首屏有 45% 被 kicker、標題、這一行
+          和「重新摘要」佔掉，民眾要捲過將近半個螢幕才讀得到第一句摘要，而型號對他們
+          沒有意義。改成掛在「AI 快速摘要」的 tooltip 上，比較模型時加 ?debug=1 就會印回來。
         -->
-        <p v-if="summaryModelLabel" class="summary-model">{{ summaryModelLabel }}</p>
+        <p v-if="summaryModelLabel && showSummaryModel" class="summary-model">{{ summaryModelLabel }}</p>
       </div>
 
       <div class="summary-tools">
@@ -255,9 +259,13 @@
         摘要結尾雖然會問一句引導問題，但輸入框是空的，使用者得自己想怎麼開口——
         對「不知道從哪查起」的人來說，那正是他最不擅長的一步。
         問過一次之後就收起來：那時他已經知道這個框能做什麼了，留著只是佔版面。
+
+        標籤刻意寫成「或直接問這幾筆政策」而不是「也可以直接問」：上面的推薦鎖定範圍
+        問的是「要不要再縮小」，這裡問的是「不縮了，我要看細節」，是兩條分岔而不是
+        兩顆並列的按鈕。原本的寫法沒交代這件事，讀起來像第三種不相干的選擇。
       -->
       <div v-if="showQuickAsk" class="summary-quick-ask">
-        <span class="summary-quick-ask-label">也可以直接問：</span>
+        <span class="summary-quick-ask-label">或直接問這幾筆政策：</span>
         <button
           v-for="question in QUICK_ASK_QUESTIONS"
           :key="question"
@@ -562,6 +570,10 @@ let followUpRequestId = 0;
  * 供應商全部失敗時伺服器會回 provider=fallback、model=script，那是本地腳本拼出來的
  * 句子，不是模型寫的——這種時候要講清楚，不然使用者會以為 AI 就是這樣回答的。
  */
+// 網址帶 ?debug=1 才把模型型號印在卡片上。比較模型時用得到，民眾看不需要。
+const summaryRoute = useRoute();
+const showSummaryModel = computed(() => String(summaryRoute.query.debug || "") === "1");
+
 const summaryModelLabel = computed(() => {
   const provider = summaryProvider.value;
   const model = summaryModel.value;
@@ -2127,16 +2139,31 @@ onBeforeUnmount(() => {
   transform: translateY(1px);
 }
 
+/*
+ * 這顆原本是漸層黑底的大藥丸，在手機首屏比摘要本身還搶眼——但它是「這份寫得不好，
+ * 再來一次」的補救動作，不是主要行為。降成文字連結，位置與可用性都不變。
+ */
 .summary-retry {
-  min-width: 96px;
-  padding: 10px 14px;
+  padding: 4px 0;
   border: 0;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #1c160f, #47321f);
-  color: #fff;
-  font-weight: 700;
+  background: none;
+  color: #8a7a63;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
-  align-self: center;
+  align-self: flex-start;
+}
+
+.summary-retry:hover:not(:disabled),
+.summary-retry:focus-visible:not(:disabled) {
+  color: #5c431f;
+}
+
+.summary-retry:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: none;
 }
 
 .summary-retry:disabled {
