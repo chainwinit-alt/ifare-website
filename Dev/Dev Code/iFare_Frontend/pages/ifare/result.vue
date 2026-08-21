@@ -187,6 +187,7 @@
           :quick-options="summaryQuickOptions"
           :area-options="summaryAreaOptions"
           :condition-probe="probeSummaryConditionCounts"
+          :auto-summarize="hasTypedSummaryKeyword"
           :probe-baseline-count="policyProbeBaselineCount"
           :active-filters="summaryActiveFilters"
           :result-breakdown="summaryResultBreakdown"
@@ -527,6 +528,22 @@ const conditionSummaryQuery = computed(() =>
   ]
     .filter(Boolean)
     .join(" ")
+);
+
+/**
+ * 這次搜尋是使用者自己打了關鍵字，還是只動了篩選？
+ *
+ * 打了字＝他明確說出要找什麼，摘要照常自動產生。
+ * 只動篩選則改成先給一顆按鈕：實測每一組不同的篩選組合各燒一次模型
+ *（約 3,786 tokens，Groq 連 max_completion_tokens 的保留量都算進當日用量），
+ * 免費額度 200,000/天 換算下來，一天約 17 位逐步縮小範圍的使用者就會把額度用完。
+ * 用完之後不是只有摘要不見——所有人都會被推到 fallback 鏈，最後整串失敗。
+ *
+ * 已經在這個分頁產過的那一組條件不受影響：卡片會先讀 sessionStorage 快取，
+ * 讀得到就直接顯示，那不花額度。
+ */
+const hasTypedSummaryKeyword = computed(() =>
+  Boolean(normalizeSummaryKeyword(activeSummaryState.query))
 );
 
 const summaryQuery = computed(

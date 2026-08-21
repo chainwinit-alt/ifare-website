@@ -66,7 +66,18 @@
     <!-- 選了縣市時，說明結果裡有多少是全國性政策（那些縣市民同樣能申請） -->
     <p v-if="resultBreakdown" class="summary-result-breakdown">{{ resultBreakdown }}</p>
     <div class="summary-body">
-      <div v-if="shouldShowSummaryLoading" class="summary-loading">
+      <!--
+        只動篩選、沒打關鍵字時停在這裡等使用者決定。詳細理由見 autoSummarize 這個 prop：
+        每一組篩選組合都要花一次模型額度，自動跑撐不到二十位使用者。
+      -->
+      <div v-if="showSummaryOptIn" class="summary-optin">
+        <p class="summary-optin-text">{{ summaryOptInText }}</p>
+        <button type="button" class="summary-optin-button" @click="startSummaryOnDemand">
+          幫我整理重點
+        </button>
+      </div>
+
+      <div v-else-if="shouldShowSummaryLoading" class="summary-loading">
         <span class="summary-spinner" aria-hidden="true"></span>
         <p class="summary-loading-text">{{ summaryLoadingText }}</p>
       </div>
@@ -486,6 +497,15 @@ const props = withDefaults(
     conversationSearch?: SummaryConversationSearch;
     /** 追問提到別的範圍時，去查那個範圍在本站有幾筆（查不到或沒提到就回 null） */
     conversationScopeProbe?: (userText: string) => Promise<SummaryScopeShift | null>;
+    /**
+     * 這次搜尋要不要自動產生摘要。
+     *
+     * 使用者自己打了關鍵字＝他明確表達了要找什麼，直接給他摘要。
+     * 只動篩選就不自動跑：實測每一組不同的篩選組合各燒一次模型（約 3,786 tokens），
+     * 免費額度 200,000/天 換算下來，一天約 17 位逐步縮小範圍的使用者就會把額度用完，
+     * 之後所有人都只能吃 fallback 或直接失敗。改成給一顆按鈕，想看的人點一下就有。
+     */
+    autoSummarize?: boolean;
     /** 各條件可選的快捷選項，key 是 policy / area / recipient / income / identity */
     quickOptions?: Record<string, SummaryQuickOption[]>;
     /**
@@ -1664,6 +1684,38 @@ function restoreCachedSummary() {
   return true;
 }
 
+/**
+ * 邀請文案。把使用者已經選的條件唸回去（「臺北市 · 長期照顧」），
+ * 他才知道按下去會整理什麼；什麼都沒選時就只講筆數。
+ */
+const summaryOptInText = computed(() => {
+  const picked = (props.activeFilters || []).map((chip) => chip.value).filter(Boolean);
+  const scope = picked.length ? picked.join(" · ") : "目前的搜尋條件";
+  return `要不要讓 AI 幫您整理「${scope}」這 ${props.cases.length} 筆的重點？`;
+});
+
+/**
+ * 沒自動跑時，使用者有沒有自己按下「幫我整理」。
+ * 換一次搜尋就歸零——上一次的同意不能延續到不同的條件組合。
+ */
+const hasOptedInSummary = ref(false);
+
+// 要不要顯示那顆邀請按鈕：不自動跑、使用者還沒點、而且快取裡也沒有現成的
+const showSummaryOptIn = computed(
+  () => props.autoSummarize === false
+    && !hasOptedInSummary.value
+    && !summaryText.value
+    && !isLoading.value
+    && !props.searchFailed
+);
+
+/** 按下邀請按鈕：這一次就照常跑 */
+function startSummaryOnDemand() {
+  if (isSummaryBusy.value) return;
+  hasOptedInSummary.value = true;
+  void loadSummary();
+}
+
 /** 使用者主動要一份新的摘要：清快取重跑，舊的問答一起收掉 */
 function regenerateSummary() {
   if (isSummaryBusy.value) return;
@@ -1959,6 +2011,16 @@ watch(
   () => [props.summaryTriggerKey],
   () => {
     resetFollowUpConversation();
+    hasOptedInSummary.value = false;
+    // 不自動跑的情況：先看這一組條件在分頁快取裡有沒有現成的，有就直接顯示——
+    // 那不花額度，沒有理由還要使用者多按一下。沒有才停在邀請畫面等他決定。
+    if (props.autoSummarize === false) {
+      activeController.value?.abort();
+      streamError.value = "";
+      isLoading.value = false;
+      if (!restoreCachedSummary()) summaryText.value = "";
+      return;
+    }
     if (!hasKeyword.value) {
       activeController.value?.abort();
       summaryText.value = "";
@@ -2244,6 +2306,39 @@ onBeforeUnmount(() => {
 
 .summary-body {
   padding: 18px 2px 8px;
+}
+
+.summary-optin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.summary-optin-text {
+  margin: 0;
+  flex: 1 1 260px;
+  color: #4a3b28;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.summary-optin-button {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 22px;
+  background: linear-gradient(135deg, #1c160f, #47321f);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.summary-optin-button:hover,
+.summary-optin-button:focus-visible {
+  filter: brightness(1.15);
 }
 
 .summary-loading {
