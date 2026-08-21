@@ -280,6 +280,7 @@ import {
   isAreaOnlySegment,
   isConditionOnlyText,
   matchPolicyCategory,
+  stripTrailingParticles,
 } from "~/utils/ifareIntent";
 import type { PolicyConditionContext, PolicyConditionFacts } from "~/utils/ifarePolicyFit";
 import {
@@ -799,7 +800,11 @@ function applySummaryQuickOption(payload: { field: string; val: string }) {
  * 讓使用者看得出剛剛發生了什麼；不喜歡就自己改回來，不是不可逆的動作。
  */
 function applySummaryNewTopic(topic: string) {
-  const next = normalizeSummaryKeyword(topic);
+  // 語尾助詞不能跟著寫進搜尋框：實測在追問框打「孩童補助呢」，搜尋框就顯示
+  // 「孩童補助呢」，一個「呢」卡在搜尋條件裡。整句話幾乎都是語助詞時
+  // stripTrailingParticles 回空字串，這裡就照原本的規則放棄替換——搜尋框停在
+  // 舊關鍵字，也好過被清成一片空白。
+  const next = normalizeSummaryKeyword(stripTrailingParticles(topic));
   if (!next || next === searchQuery.value.trim()) return;
   searchQuery.value = next;
   Search();

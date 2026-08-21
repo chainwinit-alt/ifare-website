@@ -395,6 +395,44 @@ export function isNewTopicText(value: unknown, currentQuery?: unknown) {
   );
 }
 
+/**
+ * 把句尾的語尾助詞與標點拿掉，只留真正要搜的那幾個字。
+ *
+ * 換主題時 applySummaryNewTopic 是把使用者打的整句話原封不動寫進搜尋框——
+ * 實測打「孩童補助呢」，搜尋框就顯示「孩童補助呢」，一個語助詞卡在搜尋條件裡。
+ * 沒有疑問詞的「孩童補助吧」「孩童補助喔」也會走到同一條路，狀況一樣。
+ *
+ * 不只是好不好看：這幾個字會跟著送去後端比對。實測直接查 API，「長照」52 筆、
+ * 「長照呢」只剩 28 筆，而且那 28 筆全都在原本的 52 筆裡面——多一個「呢」只會
+ * 漏掉政策，不會多撈到任何一筆。
+ *
+ * 砍句尾不會誤傷正常詞，這是查過站內資料才敢砍的：全站 1337 筆政策的標題、
+ * 資格條件與關鍵字裡，呢嗎吧喔啊呀啦囉嘛耶唷 加起來只出現 1 次（某筆資格寫
+ * 「符合2.3點喔~」），而且那本身也是語助詞——沒有一個福利詞以這些字結尾。
+ *
+ * 開頭的「那」刻意不動。句尾助詞一定是廢話，開頭的「那」不一定：高雄市那瑪夏區
+ * （原住民區）就以它開頭，砍掉會把「那瑪夏的原住民補助」變成查不到的
+ * 「瑪夏的原住民補助」。留著它的代價也很小——實測「長照呢」28 筆、「那長照呢」
+ * 27 筆，只差 1 筆。
+ */
+const TRAILING_PARTICLE_PATTERN = /[呢嗎吧喔啊呀啦囉嘛耶唷\s?？!！。．，,、~～…]+$/u;
+
+/** 砍完只剩代名詞或連接詞（「那我呢」→「那我」），那句話本來就沒有指出主題 */
+const FILLER_ONLY_TEXT = /^[那這我你妳他她它們的了還有是要想能會就也都再又和跟]+$/u;
+
+export function stripTrailingParticles(value: unknown) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+
+  const stripped = text.replace(TRAILING_PARTICLE_PATTERN, "").trim();
+  // 砍完剩不到兩個字，代表整句話幾乎都是語助詞（「呢？」「有嗎」「酒吧」）。
+  // 這時回空字串讓呼叫端放棄替換：搜尋框停在舊關鍵字，也好過被清成一片空白。
+  // 門檻只到兩個字，是因為站內最常被追問的主題本來就是兩個字——長照、失智、
+  // 托育、生育——要求三個字會把「長照呢」這個最典型的寫法一起擋掉。
+  if (stripped.length < 2 || FILLER_ONLY_TEXT.test(stripped)) return "";
+  return stripped;
+}
+
 export function isConditionOnlyText(value: unknown) {
   const text = String(value ?? "").trim();
   if (!text) return false;
