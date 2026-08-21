@@ -129,10 +129,14 @@ export default defineEventHandler(async (event) => {
   // 追問框裡問了問題（「需要準備甚麼文件」「補助多少錢」）→ 直接回答那個問題。
   // 這一段以前不存在：問句和補充條件都走總覽，而總覽的提示詞根本沒帶上對話，
   // 使用者的問題等於沒被送出去，畫面上只會換回一份長得一樣的摘要。
+  // 政策明細頁的「問這筆政策」：畫面上就只有這一筆，沒有東西可以再搜尋，
+  // 每一輪都是在問它。不強制的話，使用者打「我媽媽 80 歲」會被當成補充條件而落到
+  // guidance 模式——那會反問他一句，但明細頁沒有可以縮小的範圍，問了也沒有下一步。
+  const focusPolicy = body.focusPolicy === true && enrichedCases.length > 0;
   const answerTurn = conversation.length > 0
     && isSummaryAnswerTurn(conversation)
     && enrichedCases.length > 0;
-  const mode: LlmSummaryMode = answerTurn
+  const mode: LlmSummaryMode = focusPolicy || answerTurn
     ? "answer"
     : conversation.length > 0
       ? topicResolved && enrichedCases.length > 0
@@ -144,7 +148,9 @@ export default defineEventHandler(async (event) => {
           ? "overview_general"
           : "guidance";
   // 只有回答問題時用得到：使用者問到目前條件以外的範圍，前端查回了那個範圍的真實筆數。
-  const scopeHint = mode === "answer" ? sanitizeSummaryScopeHint(body.scopeHint) : null;
+  const scopeHint = mode === "answer" && !focusPolicy
+    ? sanitizeSummaryScopeHint(body.scopeHint)
+    : null;
   const input = {
     query,
     context: body.context,
@@ -163,6 +169,17 @@ export default defineEventHandler(async (event) => {
   return createSseResponse(async (push) => {
     const startedAt = Date.now();
     const requestBytes = getUtf8Bytes(JSON.stringify(input));
+    // 逐段把模型吐出來的字送給前端。摘要卡與 plugins/llm.ts 本來就會累積 chunk、
+    // 並在 done 事件用整理過的全文取代，所以這裡只要真的分段送就會有逐字長出來的效果。
+    //
+    // 實測 gpt-oss-120b 寫一份摘要：不串流要等 3,100ms 才看得到任何東西，
+    // 串流則 474ms 就出現第一個字。中間那段空白正是「沒有互動感」的來源。
+    let streamedAny = false;
+    const onDelta = (delta: string) => {
+      streamedAny = true;
+      push("chunk", { delta });
+    };
+
     push("meta", {
       provider: "auto",
       model: "",
@@ -171,7 +188,7 @@ export default defineEventHandler(async (event) => {
       guidanceFields,
       requestBytes,
       requestKilobytes: toKilobytes(requestBytes),
-      streaming: false,
+      streaming: true,
     });
 
     try {
@@ -191,6 +208,7 @@ export default defineEventHandler(async (event) => {
           skipCache: body.refresh === true,
           provider: body.provider,
           model: body.model,
+          onDelta,
         }
       );
       const responseBytes = getUtf8Bytes(result.summary);
@@ -203,9 +221,11 @@ export default defineEventHandler(async (event) => {
         guidanceField,
         guidanceFields,
         cached: result.cached,
-        streaming: false,
+        streaming: streamedAny,
       });
-      push("chunk", { delta: result.summary });
+      // 走快取或供應商不支援串流時沒有逐段送過，這裡補一次整篇。
+      // 已經串流過就不能再補——前端是累加的，補了會變成兩份疊在一起。
+      if (!streamedAny) push("chunk", { delta: result.summary });
       push("done", {
         summary: result.summary,
         provider: result.provider,

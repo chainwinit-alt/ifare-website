@@ -64,7 +64,11 @@ const MAX_REPLY_LENGTH = 65;
 // 改用 Production 模型：qwen/qwen3.6-27b 是 Preview，官方警告可能隨時下架，
 // 且價格為 gpt-oss-20b 的 8.3 倍、繁體中文 tokenizer 支援較弱。
 const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b';
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
+// 2026-08-21：原本指著 gemini-2.5-flash-lite，Google 已對新用戶下架（API 回 404）。
+// 這個常數平常碰不到（llmConfig.geminiModel 在 nuxt.config 有預設值），
+// 只有有人把 NUXT_GEMINI_MODEL 設成空字串時才會落到這裡——那時給一個已下架的
+// 型號等於讓聊天機器人直接失敗，所以一併更新。
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
 const LLM_TIMEOUT_MS = 15000;
 const ROUTE_TIMEOUT_MS = 8000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;

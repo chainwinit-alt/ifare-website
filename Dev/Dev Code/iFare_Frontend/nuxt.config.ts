@@ -90,9 +90,13 @@ export default defineNuxtConfig({
       ) || DEFAULT_GEMINI_API_KEY,
       geminiModel:
         readEnv("NUXT_GEMINI_MODEL", "GEMINI_MODEL") || "gemini-3.5-flash-lite",
+      // 2026-08-21：移除 gemini-2.5-flash-lite，Google 已對新用戶下架，API 直接回 404
+      //（no longer available to new users，要求改用 models/gemini-3.5-flash-lite）。
+      // 它是候選鏈最後一棒，前面全掛時只會多打一次註定失敗的請求才掉到本地腳本。
+      // 與 server/utils/llm/freeTier.ts 的 DEFAULT_GEMINI_MODELS 對齊。
       geminiModels:
         readEnv("NUXT_LLM_GEMINI_MODELS") ||
-        "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash-lite",
+        "gemini-3.5-flash-lite,gemini-3.1-flash-lite",
       groqApiKey:
         readEnv("NUXT_LLM_GROQ_API_KEY", "GROQ_API_KEY") || DEFAULT_GROQ_API_KEY,
       // 2026-08-12：qwen/qwen3.6-27b 是 Groq 的 Preview 模型，官方警告

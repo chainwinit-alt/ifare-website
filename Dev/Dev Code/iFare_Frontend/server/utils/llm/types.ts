@@ -65,6 +65,18 @@ export interface LlmSummaryInput {
   scopeHint?: LlmSummaryScopeHint | null;
 }
 
+/**
+ * onDelta：模型每吐出一小段就回呼一次（delta 是新增的片段，full 是目前累積的全文）。
+ *
+ * 給了才會走串流。實測 gpt-oss-120b 寫一份摘要：不串流要等 3,100ms 才拿得到全文，
+ * 串流則 474ms 就吐出第一個字。使用者盯著轉圈圈的時間差了六倍以上，
+ * 而摘要卡與 plugins/llm.ts 早就接好逐段更新，只差伺服器這一端真的分段送。
+ *
+ * 目前只有 Groq 走串流；Gemini 的串流 API 形式不同，不給 onDelta 時所有 client
+ * 都維持原本的一次回傳，所以是可選的加強，不是必要條件。
+ */
+export type LlmSummaryDeltaHandler = (delta: string, full: string) => void;
+
 export interface LlmClient {
-  summarize(input: LlmSummaryInput): Promise<string>;
+  summarize(input: LlmSummaryInput, onDelta?: LlmSummaryDeltaHandler): Promise<string>;
 }

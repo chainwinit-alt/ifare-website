@@ -1,4 +1,4 @@
-import type { LlmClient, LlmSummaryInput } from "./types";
+import type { LlmClient, LlmSummaryDeltaHandler, LlmSummaryInput } from "./types";
 import {
   buildAnswerPrompt,
   buildGeneralOverviewPrompt,
@@ -327,12 +327,52 @@ export function createGeminiClient(config: {
   };
 }
 
+/**
+ * 讀 Groq 的 SSE 串流，逐段回呼並回傳累積的全文。
+ *
+ * Groq 的格式是 OpenAI 相容的 `data: {json}`，以空行分隔，最後一筆是 `data: [DONE]`。
+ * 網路封包不保證切在事件邊界上，所以要保留尾巴等下一輪補齊；JSON 解析失敗就跳過，
+ * 那代表這一段還沒收完，不是壞掉。
+ */
+async function readGroqStream(response: Response, onDelta: LlmSummaryDeltaHandler) {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  let full = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) {
+      const line = block.split("\n").find((item) => item.startsWith("data: "));
+      if (!line || line === "data: [DONE]") continue;
+      try {
+        const delta = JSON.parse(line.slice(6))?.choices?.[0]?.delta?.content ?? "";
+        if (delta) {
+          full += delta;
+          onDelta(delta, full);
+        }
+      } catch {
+        // 這一段還沒收完整，等下一輪
+      }
+    }
+  }
+
+  return full;
+}
+
 export function createGroqClient(config: {
   apiKey: string;
   model: string;
 }): LlmClient {
   return {
-    async summarize(input: LlmSummaryInput) {
+    async summarize(input: LlmSummaryInput, onDelta?: LlmSummaryDeltaHandler) {
       if (!config.apiKey) {
         throw new Error("Groq API key is not configured.");
       }
@@ -345,7 +385,16 @@ export function createGroqClient(config: {
       // 沒認出來的型號以前給 900 / 160，比 gpt-oss 與 qwen 少了三成到一半。
       // 那會讓「拿新模型跟現行模型比」一開始就不公平——輸出被截斷會被誤讀成
       // 模型寫得比較差。除了 qwen 的一句話模式（實測需要 500）之外一律拉齊。
-      const maxCompletionTokens = isOverview ? 1400 : (isQwen ? 500 : 300);
+      //
+      // 2026-08-21：overview 從 1400 降到 900（與上面那個舊預設值同數字純屬巧合，
+      // 這次是量過額度才訂的）。Groq 的每分鐘額度是照「預留上限」扣，不是照實際
+      // 寫掉幾個 token——上限開多大就先付多少。同一份輸入餵 openai/gpt-oss-20b 實測：
+      //   上限 1400 → 佔用 4,274 tokens、摘要 533 字、未截斷
+      //   上限  900 → 佔用 2,918 tokens、摘要 575 字、未截斷
+      //   上限  500 → 佔用 2,123 tokens、摘要 548 字、未截斷
+      // 不取 500 是因為先前 28 次基準測試中 gpt-oss-20b 最長寫到 877 字，
+      // 500 很可能中途截斷；900 已省下約三成額度，離實測最長值仍有餘裕。
+      const maxCompletionTokens = isOverview ? 900 : (isQwen ? 500 : 300);
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -361,6 +410,8 @@ export function createGroqClient(config: {
               : {}),
           temperature: 0.3,
           max_completion_tokens: maxCompletionTokens,
+          // 有人要逐段更新畫面才開串流；沒有 onDelta 就維持一次回傳，行為與原本相同
+          stream: Boolean(onDelta),
           messages: [
             {
               role: "system",
@@ -377,6 +428,13 @@ export function createGroqClient(config: {
       if (!response.ok) {
         const errorText = await readErrorText(response);
         throw new Error(`Groq request failed with status ${response.status}. ${errorText}`.trim());
+      }
+
+      if (onDelta) {
+        // 串流回來的是模型的原始輸出。finalizeSummary 會補上結尾的引導問句、
+        // 收斂空白並套上長度上限——那些只能等全文收完才算得出來，所以畫面上
+        // 使用者先看到逐字長出來的原文，最後由 done 事件換成整理過的版本。
+        return finalizeSummary(await readGroqStream(response, onDelta), input);
       }
 
       const data: any = await response.json();

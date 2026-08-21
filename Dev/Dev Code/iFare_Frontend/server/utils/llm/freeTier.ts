@@ -1,13 +1,19 @@
 import { createGeminiClient, createGroqClient } from "./providers";
 import type {
   LlmProviderName,
+  LlmSummaryDeltaHandler,
   LlmSummaryInput,
 } from "./types";
 
+// 2026-08-21：移除 gemini-2.5-flash-lite。Google 已對新用戶下架，API 直接回 404：
+//「This model models/gemini-2.5-flash-lite is no longer available to new users.
+//  Please update your code to use models/gemini-3.5-flash-lite」。
+// 它原本掛在候選鏈最後一棒，前面全部失敗時會再白打一次註定 404 的請求才掉到
+// 本地腳本——等於每次全鏈失敗都多付一趟往返延遲，卻不可能成功。
+// 清單同步 nuxt.config.ts 的 llm.geminiModels 預設值。
 export const DEFAULT_GEMINI_MODELS = [
   "gemini-3.5-flash-lite",
   "gemini-3.1-flash-lite",
-  "gemini-2.5-flash-lite",
 ];
 
 // 2026-08-12：qwen/qwen3.6-27b 為 Groq Preview 模型（官方警告可能隨時下架），
@@ -161,7 +167,7 @@ export async function summarizeWithFreeTier(
   config: FreeTierLlmConfig,
   // 使用者按「重新摘要」時要跳過這層快取。不跳的話同樣的條件會拿回一模一樣的
   // 字，按了等於沒事發生——那顆按鈕的意義就沒了。產生後照樣寫回快取。
-  options?: { skipCache?: boolean } & ModelOverride
+  options?: { skipCache?: boolean; onDelta?: LlmSummaryDeltaHandler } & ModelOverride
 ): Promise<FreeTierSummaryResult> {
   const override = resolveModelOverride(options);
   const cached = options?.skipCache ? null : getCachedSummary(input, override || undefined);
@@ -207,7 +213,10 @@ export async function summarizeWithFreeTier(
     if (!override?.model && isCoolingDown(candidateKey)) continue;
 
     try {
-      const rawSummary = await candidate.client.summarize(input);
+      // 逐段回呼交給 client 自己決定要不要用（目前只有 Groq 走串流）。
+      // 額度不足或金鑰錯誤都是在讀 body 之前就以非 2xx 回來，所以退讓到下一個
+      // 候選時，前面那個不會已經吐出半篇文字到畫面上。
+      const rawSummary = await candidate.client.summarize(input, options?.onDelta);
       // overview / overview_general / answer 是多段 Markdown，換行就是版面結構，
       // 只能收斂行內空白；guidance 維持原本的單行輸出。
       const isMarkdownMode = input.mode === "overview"
