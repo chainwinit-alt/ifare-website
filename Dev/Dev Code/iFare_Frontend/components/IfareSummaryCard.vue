@@ -250,6 +250,24 @@
         <p v-if="isFollowUpLoading" class="summary-message-pending">{{ followUpPendingText }}</p>
       </div>
 
+      <!--
+        還沒問過任何東西時，給幾顆可以直接點的問句。
+        摘要結尾雖然會問一句引導問題，但輸入框是空的，使用者得自己想怎麼開口——
+        對「不知道從哪查起」的人來說，那正是他最不擅長的一步。
+        問過一次之後就收起來：那時他已經知道這個框能做什麼了，留著只是佔版面。
+      -->
+      <div v-if="showQuickAsk" class="summary-quick-ask">
+        <span class="summary-quick-ask-label">也可以直接問：</span>
+        <button
+          v-for="question in QUICK_ASK_QUESTIONS"
+          :key="question"
+          type="button"
+          class="summary-quick-ask-chip"
+          :disabled="isFollowUpLoading"
+          @click="askQuickQuestion(question)"
+        >{{ question }}</button>
+      </div>
+
       <form class="summary-followup-form" @submit.prevent="submitFollowUp">
         <label class="summary-followup-label" for="ifare-summary-followup">回覆或提問</label>
         <div class="summary-followup-controls">
@@ -834,6 +852,27 @@ const conditionNote = computed(() =>
   Object.keys(conditionCounts.value).length > 0 ? "筆數是實際查回來的，不是估算" : ""
 );
 
+/**
+ * 一點就送出的建議問句。
+ *
+ * 三題各自對應政策明細裡一定會有的欄位：應備文件（evidence）、補助內容（welfareInfo）、
+ * 承辦單位（officeUnitInfo）。刻意不放「申請要多久」這種站內資料多半沒寫的題目——
+ * 實測四個模型被問到時都只能誠實回「未載明」，那一次往返對使用者沒有收穫。
+ */
+const QUICK_ASK_QUESTIONS = ["要準備什麼文件？", "補助金額大概多少？", "要去哪裡申請？"];
+
+// 只在還沒開始對話時出現。條件跟追問框一致，摘要還在跑或搜尋失敗時都不顯示。
+const showQuickAsk = computed(
+  () => canContinueConversation.value && threadItems.value.length === 0 && !isFollowUpLoading.value
+);
+
+/** 點了建議問句就直接送出，不用再按一次送出鈕 */
+function askQuickQuestion(question: string) {
+  if (isFollowUpLoading.value) return;
+  followUpInput.value = question;
+  void submitFollowUp();
+}
+
 const pickedConditionList = computed(() =>
   Object.entries(pickedConditions.value)
     .filter(([, val]) => Boolean(val))
@@ -1302,16 +1341,6 @@ const summaryDisplayText = computed(() => {
   return fallbackText.value;
 });
 
-function escapeHtml(value: string) {
-  return (value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-/** 追問對話的種子訊息要用純文字：把總覽的 Markdown 標記與引用符號拆掉 */
 function toPlainSummaryText(value: string) {
   return (value || "")
     .replace(/^(?:#{1,6}\s+)+/gm, "")
@@ -1376,92 +1405,14 @@ function applyInlineMarkdown(text: string) {
     return `<a class="summary-inline-reference" href="${href}" title="${escapeHtml(item.title)}">參考 ${item.referenceNo}</a>`;
   });
 
-  const withLinks = withReferences.replace(
-    /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
-    (_match, label, url) =>
-      `<a class="summary-inline-link" href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`
-  );
-
-  const withStrong = withLinks.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  const withEm = withStrong.replace(/(^|[^*])\*(?!\s)(.+?)(?!\s)\*(?!\*)/g, "$1<em>$2</em>");
-  return withEm.replace(/`([^`]+)`/g, "<code>$1</code>");
+  return applyBasicInlineMarkdown(withReferences);
 }
 
 function renderMarkdown(text: string) {
-  const source = normalizeReferenceNotation((text || "").replace(/\r\n?/g, "\n")).trim();
-  if (!source) return "";
-
-  const blocks: string[] = [];
-  const lines = source.split("\n");
-  let paragraph: string[] = [];
-  let listType: "ul" | "ol" | null = null;
-  let listItems: string[] = [];
-
-  const flushParagraph = () => {
-    if (!paragraph.length) return;
-    blocks.push(`<p>${paragraph.join("<br>")}</p>`);
-    paragraph = [];
-  };
-
-  const flushList = () => {
-    if (!listType || !listItems.length) {
-      listType = null;
-      listItems = [];
-      return;
-    }
-
-    blocks.push(`<${listType}>${listItems.join("")}</${listType}>`);
-    listType = null;
-    listItems = [];
-  };
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      flushParagraph();
-      flushList();
-      continue;
-    }
-
-    const unordered = line.match(/^[-*+]\s+(.*)$/);
-    const ordered = line.match(/^\d+[.)]\s+(.*)$/);
-
-    if (unordered || ordered) {
-      flushParagraph();
-      const nextType: "ul" | "ol" = unordered ? "ul" : "ol";
-      if (listType && listType !== nextType) {
-        flushList();
-      }
-      listType = nextType;
-      const match = unordered || ordered;
-      const itemText = applyInlineMarkdown(match[1]);
-      listItems.push(`<li>${itemText}</li>`);
-      continue;
-    }
-
-    const heading = line.match(/^#{1,6}\s+(.*)$/);
-    if (heading) {
-      flushParagraph();
-      flushList();
-      // 模型偶爾會寫成「### ### 站內相符的福利」，多出來的記號要拆掉，
-      // 不然標題會連 ### 一起顯示出來。已經存進快取的舊內容也靠這一步救回來。
-      const headingText = heading[1].replace(/^(?:#{1,6}\s*)+/u, "");
-      blocks.push(`<h4 class="summary-section-title">${applyInlineMarkdown(headingText)}</h4>`);
-      continue;
-    }
-
-    flushList();
-    paragraph.push(applyInlineMarkdown(line));
-  }
-
-  flushParagraph();
-  flushList();
-
-  if (!blocks.length) {
-    return `<p>${applyInlineMarkdown(source)}</p>`;
-  }
-
-  return blocks.join("");
+  // 區塊解析與政策明細頁共用（utils/ifareMarkdown.ts）；行內渲染留在這裡，
+  // 因為只有摘要卡需要把 [參考 N] 接回畫面上那幾張來源卡。
+  const source = normalizeReferenceNotation(text || "");
+  return renderMarkdownBlocks(source, applyInlineMarkdown);
 }
 
 /** 這筆政策要求某種特殊身分，而使用者沒宣告任何身分 */
@@ -2529,6 +2480,43 @@ onBeforeUnmount(() => {
   font-size: 14px;
   line-height: 1.6;
   overflow-wrap: anywhere;
+}
+
+.summary-quick-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.summary-quick-ask-label {
+  color: #8a7a63;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summary-quick-ask-chip {
+  border: 1px solid rgba(92, 67, 31, 0.3);
+  border-radius: 999px;
+  background: #fff;
+  color: #5c431f;
+  font-size: 13px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.summary-quick-ask-chip:hover:not(:disabled),
+.summary-quick-ask-chip:focus-visible:not(:disabled) {
+  background: #5c431f;
+  border-color: #5c431f;
+  color: #fff;
+}
+
+.summary-quick-ask-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .summary-followup-form {

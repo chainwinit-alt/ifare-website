@@ -66,6 +66,8 @@ export default defineNuxtPlugin(() => {
     cases: SummaryCaseItem[];
     conversation?: Array<{ role: "user" | "assistant"; content: string }>;
     provider?: ProviderName;
+    /** 政策明細頁：畫面上只有這一筆，每一輪都當成在問它 */
+    focusPolicy?: boolean;
     onChunk?: (chunk: string, fullText: string) => void;
     onMeta?: (meta: any) => void;
     signal?: AbortSignal;

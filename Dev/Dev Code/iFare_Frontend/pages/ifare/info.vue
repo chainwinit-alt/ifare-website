@@ -92,6 +92,12 @@
           </div>
         </div>
       </section>
+      <!--
+        看完明細還是有想問的（要帶什麼文件、金額多少、去哪辦），以前只能回上一頁重查。
+        這裡直接就著這一筆問，答案只從這一頁的政策資料來。
+      -->
+      <IfarePolicyAskBox :policy="askPolicy" />
+
       <!-- 相關福利載不到時整區收起，不要留一個空標題讓使用者以為這筆政策沒有相關福利 -->
       <section class="section-relation" v-if="iFarePolicyList.length > 0">
         <div class="relation-links">
@@ -217,6 +223,21 @@ const _welfareItem = reactive<infoItem>({
   codeIdentityIDs: [],
   codeIncomeIDs: [],
   codeRecipientIDs: [],
+});
+
+// 問答元件要的政策形狀。has* 三項明細 API 沒有直接給，用限制代碼的陣列長度推——
+// 有列到代碼就代表這筆設了該項限制，跟列表頁的判斷一致。
+const askPolicy = computed(() => {
+  if (!hasPolicy.value || !_welfareItem.id) return null;
+  return {
+    id: _welfareItem.id,
+    title: _welfareItem.title,
+    area: _welfareItem.area,
+    qualification: _welfareItem.qualification,
+    hasRecipient: _welfareItem.codeRecipientIDs.length > 0,
+    hasIncome: _welfareItem.codeIncomeIDs.length > 0,
+    hasIndentity: _welfareItem.codeIdentityIDs.length > 0,
+  };
 });
 
 // Office Unit
