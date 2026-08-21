@@ -47,6 +47,7 @@
                   v-model="searchQuery"
                   :filters="autocompleteFilters"
                   placeholder="請輸入關鍵字"
+                  aria-label="搜尋福利關鍵字"
                   @submit="Search"
                 />
                 <div class="part-filter">
@@ -134,8 +135,10 @@
             </div>
             <div class="part-mobile-query">
               <label class="sr-only" for="ifare-result-mobile-query">關鍵字</label>
+              <!-- 上面那個 <label for> 一直指著不存在的 id，這裡補上去才接得起來 -->
               <IfareSearchAutocomplete
                 v-model="searchQuery"
+                input-id="ifare-result-mobile-query"
                 :filters="autocompleteFilters"
                 placeholder="請輸入關鍵字"
                 :show-count="false"

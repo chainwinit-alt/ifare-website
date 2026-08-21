@@ -174,6 +174,10 @@ export default defineNuxtConfig({
 
   app: {
     head: {
+      // 沒有 lang 的話，NVDA／JAWS 會退回系統預設語音引擎（多半是英文）去念中文——
+      // 使用者聽到的不是口音怪，是逐字亂念或整段跳過。本站的長者與視障使用者比例
+      // 遠高於一般網站，這一行沒寫等於整站對報讀軟體不可用。WCAG 3.1.1（A）。
+      htmlAttrs: { lang: "zh-Hant-TW" },
       charset: "utf-8",
       viewport: "width=device-width, initial-scale=1",
       meta: [{ name: "format-detection", content: "telephone=no" }],

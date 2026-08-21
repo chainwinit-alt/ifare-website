@@ -1,8 +1,16 @@
 <template>
   <div ref="rootRef" class="ifare-search-autocomplete" :class="{ 'is-open': isOpen }">
     <div class="query-input-wrap">
+      <!--
+        id 由呼叫端傳入，讓外面的 <label for> 指得到這個 input。
+        result.vue 早就寫好 <label for="ifare-result-mobile-query">，但這個元件從來沒有
+        把該 id 放上來，等於標籤指向不存在的元素——報讀軟體只念「編輯區，空白」。
+        沒有傳 id 的呼叫端則退回 aria-label；placeholder 不算可靠的名稱，一打字就不見了。
+      -->
       <input
         ref="inputRef"
+        :id="inputId || undefined"
+        :aria-label="inputId ? undefined : (ariaLabel || placeholder)"
         :value="modelValue"
         class="input-query"
         type="text"
@@ -19,7 +27,16 @@
         @keydown.enter.prevent="handleEnter"
         @keydown.esc.prevent="closePanel"
       />
-      <div v-if="showCount" class="query-count" aria-live="polite">{{ modelValue.length }}/{{ maxLength }}</div>
+      <!--
+        原本固定掛 aria-live="polite"，於是每打一個字報讀軟體就念一次「1/50」「2/50」，
+        中文注音輸入時每個組字階段都觸發，吵到蓋掉使用者自己在打的內容。
+        改成只有快到上限時才播報，其餘時間純視覺提示。
+      -->
+      <div
+        v-if="showCount"
+        class="query-count"
+        :aria-live="isNearLimit ? 'polite' : 'off'"
+      >{{ modelValue.length }}/{{ maxLength }}</div>
     </div>
 
     <!--
@@ -94,13 +111,22 @@ const props = withDefaults(defineProps<{
   filters?: SuggestionFilters;
   disabled?: boolean;
   showCount?: boolean;
+  /** 外部 <label for> 要指到的 id */
+  inputId?: string;
+  /** 沒有外部 label 時用的可讀名稱 */
+  ariaLabel?: string;
 }>(), {
   placeholder: "Enter keyword",
   maxLength: 50,
   filters: () => ({}),
   disabled: false,
   showCount: true,
+  inputId: "",
+  ariaLabel: "",
 });
+
+// 剩 10 字以內才開始播報，這時候的提醒才有意義（真的快打不下了）
+const isNearLimit = computed(() => props.maxLength - props.modelValue.length <= 10);
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;

@@ -91,6 +91,7 @@
                   v-model="searchQuery"
                   :filters="autocompleteFilters"
                   placeholder="請輸入關鍵字"
+                  aria-label="搜尋福利關鍵字"
                   @submit="Search"
                 />
               </div>
@@ -137,8 +138,7 @@
             </ul>
           </div>
           <div class="part-pages">
-            <!-- <CompPage :page-list="pageNums_office" @change-page="PageChange_Office"/> -->
-            <CompPageNum :page-list="pageNums_office" @change-page="PageChange_Office"/>
+            <CompPage mode="num" :page-list="pageNums_office" @change-page="PageChange_Office"/>
           </div>
         </div>
       </section>
@@ -190,8 +190,7 @@
             </ul>
           </div>
           <div class="part-pages">
-            <!-- <CompPage :page-list="pageNums_QA" @change-page="PageChange_QA"/> -->
-            <CompPageNum :page-list="pageNums_QA" @change-page="PageChange_QA"/>
+            <CompPage mode="num" :page-list="pageNums_QA" @change-page="PageChange_QA"/>
           </div>
         </div>
       </section>
@@ -220,7 +219,6 @@ const { $WebApiGet } = useNuxtApp();
 const $router = useRouter();
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue"
-import CompPageNum from "../components/CompPageNum.vue";
 import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
 
 interface selectItem {

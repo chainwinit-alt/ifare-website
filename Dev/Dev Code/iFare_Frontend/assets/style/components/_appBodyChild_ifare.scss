@@ -242,6 +242,13 @@
             &:focus {
               border-color: rgba($color-primary-dark, 0.4);
             }
+
+            // 上面那條只把邊框換成 40% 透明的青色，實測焦點對比只有 1.21:1，
+            // 鍵盤使用者看不出游標在哪。滑鼠點擊不受影響（:focus-visible 只對鍵盤生效）。
+            &:focus-visible {
+              outline: 3px solid $color-black;
+              outline-offset: 2px;
+            }
           }
 
           .component-select {
