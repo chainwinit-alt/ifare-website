@@ -655,6 +655,52 @@ function findSpokenOption(options: SummaryQuickOption[], spoken: string) {
 }
 
 /**
+ * 摘要引用的那三筆政策各屬於哪一類（去重，保留卡片上的先後順序）。
+ *
+ * 來源就是送去產生摘要的那一份 cases（見 loadSummary 的 cases: referenceCases）。
+ * 摘要結尾「例如長期照顧、老人福利」舉的例子也是從同一份數出來的，
+ * 見 server/utils/llm/shared.ts 的 buildPolicyGuidanceQuestion()。
+ *
+ * 「全選」是後端代碼表裡「沒有限制」的那一項，跟伺服器那邊一樣要排除：
+ * 拿它當推薦條件等於篩了跟沒篩一樣。
+ */
+const citedPolicyCategories = computed(() => [
+  ...new Set(
+    referenceCases.value
+      .map((item) => String(item.policyCategory || "").trim())
+      .filter((name) => name && !["全選", "全部"].includes(name))
+  ),
+]);
+
+/**
+ * 「類別」這一列：摘要引用那三筆政策的類別排前面，其餘才照筆數補位。
+ *
+ * 這一列原本純粹照「目前結果裡哪個類別筆數最多」排，跟摘要結尾那句問句不同源，
+ * 於是問句舉的例子跟下面列出來的選項對不起來，使用者只能挑一個看得到的。
+ * 實測搜「家裡有人跌倒」＋桃園市＋老人共 28 筆，第 1 名是【桃園市】中低收入老人
+ * 住屋修繕補助——跌倒最需要的就是這一筆；照著建議再勾「長期照顧」之後只剩 3 筆，
+ * 而且住屋修繕不見了：它歸在「老人福利」，不是「長期照顧」。照建議走反而把最該看的
+ * 那筆篩掉，所以這一列必須跟問句舉的例子同一份來源。
+ *
+ * 同一句話搜「家裡有人跌倒」不套條件共 320 筆，照筆數排的前四名是身心障礙福利 272、
+ * 老人福利 26、社會救助 7、兒少福利 4——引用的三筆有兩筆是長期照顧（站內只有 4 筆），
+ * 問句也照著舉了長期照顧，這一列卻連列都沒列出來，使用者只能從看得到的裡面挑。
+ *
+ * 引用最多三筆、CONDITION_PICK_LIMIT 是 4，照筆數排的那一份至少還留得下一個名額。
+ */
+function prioritizeCitedPolicyOptions(options: SummaryQuickOption[]) {
+  const cited = citedPolicyCategories.value;
+  if (!cited.length) return options;
+
+  const rankOf = (option: SummaryQuickOption) => {
+    const index = cited.indexOf(option.name.trim());
+    return index < 0 ? cited.length : index;
+  };
+  // 只調順序不砍選項：某個類別沒被引用不代表它不能選，只是輪不到它排前面
+  return [...options].sort((a, b) => rankOf(a) - rankOf(b));
+}
+
+/**
  * 推薦鎖定範圍的候選條件（還沒依查回來的筆數篩過）。
  *
  * 值一律從目前這批結果裡真的存在的選項來（見結果頁的 summaryQuickOptions），
@@ -680,10 +726,14 @@ const conditionCandidates = computed<SummaryConditionSuggestion[]>(() => {
       continue;
     }
 
-    const options = [...(props.quickOptions[field] || [])]
+    const byCount = [...(props.quickOptions[field] || [])]
       .filter((option) => option.val && option.name)
       .sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
-    if (!options.length) continue;
+    if (!byCount.length) continue;
+
+    // 類別這一列改跟摘要引用的三筆政策同源（見 prioritizeCitedPolicyOptions），
+    // 其餘幾列維持照筆數排——它們的值不是從政策分類來的，沒有這個對應關係。
+    const options = field === "policy" ? prioritizeCitedPolicyOptions(byCount) : byCount;
 
     // 直接給一個勾選框的唯一理由，是使用者自己講出了那個值。
     //
@@ -738,7 +788,14 @@ const conditionSuggestions = computed<SummaryConditionSuggestion[]>(() =>
       if (item.mode === "check" && kept[0]?.val === item.options[0]?.val) {
         return { ...item, options: kept.slice(0, 1) };
       }
-      // 依查回來的真實筆數重排。原本的順序是照「目前結果裡標了幾筆」排的，
+      // 類別這一列不重排：它的順序是摘要結尾那句問句舉例的順序（見
+      // prioritizeCitedPolicyOptions）。實測搜「家裡有人跌倒」，問句寫「例如長期照顧、
+      // 老人福利」，這一列就照著讀成長期照顧、老人福利、身心障礙福利、社會救助——
+      // 改照筆數排會變成 72、42、31、4 筆，長期照顧掉到最後一個，跟上一句對不起來。
+      // 數字看起來沒有由大到小是這一列的代價，但那句問句才是使用者正在讀的東西。
+      if (item.field === "policy") return { ...item, mode: "pick" as const, options: kept };
+
+      // 其餘幾列依查回來的真實筆數重排。原本的順序是照「目前結果裡標了幾筆」排的，
       // 跟畫面上寫的數字不是同一個東西，並排看起來就像亂序。
       const sorted = [...kept].sort(
         (a, b) =>
