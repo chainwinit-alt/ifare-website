@@ -110,19 +110,58 @@ export default defineNuxtConfig({
         "openai/gpt-oss-20b,openai/gpt-oss-120b",
       // AI 摘要獨立一份候選清單，跟聊天機器人（chatbot.post.ts 也吃 groqModels）分開。
       //
-      // 2026-08-20 實測：同一份輸入餵 7 個模型跑 4 種情境，120b 在三件事上都贏 20b——
-      // 具體資訊密度 0.48 vs 0.42（每百字寫出幾個查得證的金額或門檻）、
-      // 平均字數 522 vs 652（20b 有一次把整份清單重複列了兩遍）、
-      // token 消耗 2,893 vs 4,267（免費方案 8000 TPM 下，每分鐘 2.8 次 vs 1.9 次）。
-      // 大的模型反而比較省，因為輸入提示詞一樣，差別在它寫得比較短。
+      // 2026-08-20 曾實測 7 個模型跑 4 種情境，結論是「120b 全面優於 20b，20b 留第二順位」。
+      // 那次只測了搜尋總覽（overview），而總覽測不出下面這些問題——問答才會出現。
       //
-      // 20b 留第二順位：撞到額度時接手，品質只差一點，而且兩者的 TPM 額度是分開計算的。
+      // 2026-08-24 改測「追問問答」，涵蓋全部 1337 筆政策所屬的 12 個類別，
+      // 每個回答都比對過網站原始資料並人工複核。三種會害到民眾的錯誤：
+      //   編造     憑空生出網站沒有的內容（例如來源只寫流程，卻列出一整份應備文件清單）
+      //   斷定資格 把「須經評估或審核才能確定」的事說成已確定
+      //   擋錯人   漏讀條件，把符合資格的民眾說成不符合
+      // 結果：gpt-oss-20b 三種全中（編造三輪三中、斷定 3 次、擋錯人 1 次），
+      //       gpt-oss-120b 僅單一政策測試中斷定過一次，跨 11 個類別未再犯，
+      //       兩個 gemini 模型完全沒有出現過。
+      //
+      // 因此摘要改成 Gemini 優先（見下方 summaryProviderOrder），Groq 只留 120b 當最後備援：
+      // Gemini 兩個都掛掉時，120b 多數題目仍答得正確，比完全沒有摘要好。
+      // 20b 已整個移出——它接手的那一次，正是最可能給出錯誤資訊的一次。
       groqSummaryModels:
         readEnv("NUXT_LLM_GROQ_SUMMARY_MODELS") ||
-        "openai/gpt-oss-120b,openai/gpt-oss-20b",
+        "openai/gpt-oss-120b",
+      // 摘要專用的 Gemini 清單。不共用 geminiModels，因為那份還餵給意圖判讀
+      //（search-intent）與協作搜尋（collaborator-search），那兩條這次沒測過，不動它們。
+      //
+      // 3.1 排第一是因為它在七道功能題與 11 個類別的資格題全數正確，是本次唯一零缺點的；
+      // 3.5 排第二當備援——它同樣沒出過錯，只是有一題答得過於簡略。
+      // 注意 3.1 是較舊的版本，Google 有下架舊模型的前例（見上方 geminiModels 的說明），
+      // 哪天它回 404 就把兩者對調。
+      geminiSummaryModels:
+        readEnv("NUXT_LLM_GEMINI_SUMMARY_MODELS") ||
+        "gemini-3.1-flash-lite,gemini-3.5-flash-lite",
+      // 摘要的供應商順序。空值或非 gemini 開頭 = 維持原本的 Groq 優先。
+      // 代價：Gemini 目前不走串流，民眾等到第一個字的時間從約 0.8 秒變成 1.3～1.5 秒。
+      summaryProviderOrder:
+        readEnv("NUXT_LLM_SUMMARY_PROVIDER_ORDER") || "gemini,groq",
       groqIntentModels:
         readEnv("NUXT_LLM_GROQ_INTENT_MODELS") ||
         "openai/gpt-oss-20b,openai/gpt-oss-120b",
+      // 芒寶（chatbot.post.ts）專用的 Gemini 清單與供應商順序。
+      //
+      // 2026-08-24 實測芒寶的 LLM 生成層（Layer 3，只有這一層會自由作答）：
+      //   gpt-oss-120b 出現三次編造——把民眾導向不存在的「福利專欄的低收入戶懶人包」、
+      //     保證政策內頁「會列出需要的文件與申請步驟」（多數政策其實只寫流程）、
+      //     保證搜得到一個測試用的虛構補助；另把長照問題導向就業服務站。
+      //   gpt-oss-20b 表現正常，只回「站內沒有這項細節，建議洽承辦單位確認」。
+      //   兩個 gemini 型號都沒有出現上述情形。
+      // 因此改為 Gemini 優先，Groq 留作備援並維持 20b 在 120b 前面。
+      //
+      // 已知共通弱點（換模型解決不了，要改提示詞）：問到站內沒有的虛構政策時，
+      // 四個模型都不會說「查無此政策」，而是請民眾去搜尋，等於讓人白找一趟。
+      geminiChatbotModels:
+        readEnv("NUXT_LLM_GEMINI_CHATBOT_MODELS") ||
+        "gemini-3.1-flash-lite,gemini-3.5-flash-lite",
+      chatbotProviderOrder:
+        readEnv("NUXT_LLM_CHATBOT_PROVIDER_ORDER") || "gemini,groq",
       summaryCacheTtlMs: Number(readEnv("NUXT_LLM_SUMMARY_CACHE_TTL_MS")) || 86400000,
       ollamaBaseUrl: readEnv("NUXT_OLLAMA_BASE_URL") || "http://localhost:11434",
       ollamaModel: readEnv("NUXT_OLLAMA_MODEL") || "llama3.1",

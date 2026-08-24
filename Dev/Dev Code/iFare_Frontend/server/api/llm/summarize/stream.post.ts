@@ -201,12 +201,16 @@ export default defineEventHandler(async (event) => {
         input,
         {
           geminiApiKey: llmConfig.geminiApiKey || "",
-          geminiModels: llmConfig.geminiModels || llmConfig.geminiModel || "",
+          // 摘要有自己的 Gemini 清單，不跟意圖判讀／協作搜尋共用（見 nuxt.config.ts）
+          geminiModels:
+            llmConfig.geminiSummaryModels || llmConfig.geminiModels || llmConfig.geminiModel || "",
           groqApiKey: llmConfig.groqApiKey || "",
           // 摘要有自己的候選清單（見 nuxt.config.ts 的 groqSummaryModels）；
           // 沒設定時才退回跟聊天機器人共用的那一份
           groqModels:
             llmConfig.groqSummaryModels || llmConfig.groqModels || llmConfig.groqModel || "",
+          // Gemini 優先。理由見 nuxt.config.ts 對 summaryProviderOrder 的說明
+          providerOrder: llmConfig.summaryProviderOrder || "",
           summaryCacheTtlMs: llmConfig.summaryCacheTtlMs,
         },
         {

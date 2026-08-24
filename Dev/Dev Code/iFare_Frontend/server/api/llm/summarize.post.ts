@@ -79,11 +79,13 @@ export default defineEventHandler(async (event) => {
       },
       {
         geminiApiKey: llmConfig.geminiApiKey || "",
-        geminiModels: llmConfig.geminiModels || llmConfig.geminiModel || "",
+        // 跟串流版同源：摘要有自己的 Gemini 與 Groq 清單，也有自己的供應商順序
+        geminiModels:
+          llmConfig.geminiSummaryModels || llmConfig.geminiModels || llmConfig.geminiModel || "",
         groqApiKey: llmConfig.groqApiKey || "",
-        // 跟串流版同源：摘要優先用 groqSummaryModels
         groqModels:
           llmConfig.groqSummaryModels || llmConfig.groqModels || llmConfig.groqModel || "",
+        providerOrder: llmConfig.summaryProviderOrder || "",
         summaryCacheTtlMs: llmConfig.summaryCacheTtlMs,
       }
     );

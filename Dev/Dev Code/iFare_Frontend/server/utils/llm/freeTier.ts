@@ -1,4 +1,5 @@
 import { createGeminiClient, createGroqClient } from "./providers";
+import { clampOverviewLead } from "./shared";
 import type {
   LlmProviderName,
   LlmSummaryDeltaHandler,
@@ -56,6 +57,14 @@ export interface FreeTierLlmConfig {
   groqApiKey?: string;
   groqModels?: string | string[];
   summaryCacheTtlMs?: number;
+  /**
+   * 供應商的嘗試順序，"gemini" 開頭表示 Gemini 先跑，其餘（含未設定）維持 Groq 先跑。
+   *
+   * 2026-08-24：AI 摘要的問答改成 Gemini 優先。跨 12 個政策類別實測，兩個 gemini 模型
+   * 沒有出現過編造、斷定資格或把符合資格者擋掉的情形，gpt-oss 系列則三種都出現過。
+   * 只有摘要走這個設定；聊天機器人與意圖判讀各自組裝候選，不受影響。
+   */
+  providerOrder?: string;
 }
 
 export interface FreeTierSummaryResult {
@@ -188,14 +197,18 @@ export async function summarizeWithFreeTier(
           client: createGroqClient({ apiKey: config.groqApiKey || "", model }),
         };
 
-  const allCandidates = [
-    ...parseModelList(config.groqModels, DEFAULT_GROQ_MODELS).map((model) =>
-      makeCandidate("groq", model)
-    ),
-    ...parseModelList(config.geminiModels, DEFAULT_GEMINI_MODELS).map((model) =>
-      makeCandidate("gemini", model)
-    ),
-  ];
+  const groqCandidates = parseModelList(config.groqModels, DEFAULT_GROQ_MODELS).map((model) =>
+    makeCandidate("groq", model)
+  );
+  const geminiCandidates = parseModelList(config.geminiModels, DEFAULT_GEMINI_MODELS).map((model) =>
+    makeCandidate("gemini", model)
+  );
+
+  // 順序沒設就維持原本的 Groq 優先，這樣其他呼叫端（沒傳 providerOrder 的）行為完全不變。
+  const geminiFirst = /^gemini/iu.test(String(config.providerOrder || "").trim());
+  const allCandidates = geminiFirst
+    ? [...geminiCandidates, ...groqCandidates]
+    : [...groqCandidates, ...geminiCandidates];
 
   // 指定了型號就只跑那一個（型號不在設定清單裡也照跑，才測得到還沒設定的新模型）；
   // 只指定供應商則在該供應商的清單內照原本的順序退讓。
@@ -222,9 +235,12 @@ export async function summarizeWithFreeTier(
       const isMarkdownMode = input.mode === "overview"
         || input.mode === "overview_general"
         || input.mode === "answer";
-      const summary = isMarkdownMode
+      const cleaned = isMarkdownMode
         ? rawSummary.replace(/[ \t]+/g, " ").trim()
         : rawSummary.replace(/\s+/g, " ").trim();
+      // 只有帶政策的首次摘要需要收開頭段；查無政策（overview_general）與
+      // 回答問題（answer）的版面不同，交給各自的提示詞控制。
+      const summary = input.mode === "overview" ? clampOverviewLead(cleaned) : cleaned;
       if (!summary) throw new Error("LLM returned an empty summary.");
 
       const result: FreeTierSummaryResult = {
