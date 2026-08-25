@@ -145,6 +145,15 @@ export default defineNuxtConfig({
       groqIntentModels:
         readEnv("NUXT_LLM_GROQ_INTENT_MODELS") ||
         "openai/gpt-oss-20b,openai/gpt-oss-120b",
+      // 請求層指定模型（provider／model）是開發比較模型用的，預設只在非正式環境開放。
+      //
+      // 它接受任意型號而不限於候選清單，等於讓外部挑一個更貴的模型來消耗額度；
+      // 摘要那三個端點（summarize、summarize/stream、search-intent）目前又沒有
+      // 速率限制，兩者疊起來風險不小。芒寶有每分鐘 12 次的本地限流，影響較輕。
+      // 正式環境要臨時比對模型時，設 NUXT_LLM_ALLOW_MODEL_OVERRIDE=1 再開。
+      allowModelOverride:
+        readEnv("NUXT_LLM_ALLOW_MODEL_OVERRIDE")
+        || (process.env.NODE_ENV !== "production" ? "1" : ""),
       // 芒寶（chatbot.post.ts）專用的 Gemini 清單與供應商順序。
       //
       // 2026-08-24 實測芒寶的 LLM 生成層（Layer 3，只有這一層會自由作答）：

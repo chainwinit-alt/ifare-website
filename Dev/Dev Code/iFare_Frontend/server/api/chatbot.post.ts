@@ -9,6 +9,8 @@
 // 只有 Layer 3 會出現語氣變異，而它現在是最少被觸發的一層。
 
 import { loadCards } from '../utils/chatbot/cardStore';
+// 與摘要端點共用同一個判斷，避免兩邊對「要不要接受指定模型」有不同解讀
+import { isModelOverrideAllowed } from '../utils/llm/shared';
 import {
   loadSiteKnowledge,
   buildSiteContextBlock,
@@ -707,8 +709,12 @@ export default defineEventHandler(async (event) => {
   // 指定型號時只跑那一個，不做候選退讓——比較模型時最怕「以為在測 A、其實 A 掛了
   // 退到 B」，那會得出完全相反的結論。與 /api/llm/summarize/stream 的做法一致
   //（見 server/utils/llm/freeTier.ts 的 ModelOverride）。只有開發比較模型時才會用到。
-  const overrideModel = String(body?.model || '').trim();
-  const overrideProvider = String(body?.provider || '').trim().toLowerCase();
+  // 正式環境預設不接受請求層指定模型，見 nuxt.config.ts 的 allowModelOverride
+  const overrideAllowed = isModelOverrideAllowed(llmConfig);
+  const overrideModel = overrideAllowed ? String(body?.model || '').trim() : '';
+  const overrideProvider = overrideAllowed
+    ? String(body?.provider || '').trim().toLowerCase()
+    : '';
   const overrideIsGemini = overrideProvider === 'gemini'
     || (!overrideProvider && /^gemini/iu.test(overrideModel));
 

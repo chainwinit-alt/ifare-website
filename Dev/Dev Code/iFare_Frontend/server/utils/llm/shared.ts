@@ -17,6 +17,18 @@ export interface RankedSummaryCaseItem extends LlmSummaryCaseItem {
   exactMatch: boolean;
 }
 
+/**
+ * 請求層的 provider／model 指定是否開放。
+ *
+ * 這個入口是開發比較模型用的（指定後不做候選退讓，才不會「以為在測 A、其實退到 B」），
+ * 但它接受任意型號、不限候選清單，而摘要那幾個端點又沒有速率限制——開放等於讓外部
+ * 挑更貴的模型消耗額度。預設只在非正式環境開放，見 nuxt.config.ts 的 allowModelOverride。
+ */
+export function isModelOverrideAllowed(llmConfig: unknown) {
+  const value = String((llmConfig as any)?.allowModelOverride ?? "").trim().toLowerCase();
+  return !["", "0", "false", "off", "no"].includes(value);
+}
+
 export function normalizeSummaryQuery(value?: string) {
   const query = String(value ?? "").trim();
   if (!query || /^(?:未指定|undefined|null)$/iu.test(query)) return "";

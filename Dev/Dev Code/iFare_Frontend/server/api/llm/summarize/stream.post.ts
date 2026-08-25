@@ -5,6 +5,7 @@ import {
   getSummaryGuidanceFields,
   hasResolvedTopic,
   isSummaryAnswerTurn,
+  isModelOverrideAllowed,
   normalizeSummaryQuery,
   sanitizeSummaryCases,
   sanitizeSummaryConversation,
@@ -102,6 +103,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  const overrideAllowed = isModelOverrideAllowed(llmConfig);
   const conversation = sanitizeSummaryConversation(body.conversation);
   const receivedCases = sanitizeSummaryCases(body.cases, 3);
   const enrichedCases = sanitizeSummaryCases(
@@ -215,8 +217,9 @@ export default defineEventHandler(async (event) => {
         },
         {
           skipCache: body.refresh === true,
-          provider: body.provider,
-          model: body.model,
+          // 指定模型只在開放時採用，正式環境預設忽略（見 nuxt.config.ts）
+          provider: overrideAllowed ? body.provider : undefined,
+          model: overrideAllowed ? body.model : undefined,
           onDelta,
         }
       );
