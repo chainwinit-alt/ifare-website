@@ -4,6 +4,11 @@ import {
   parseModelList,
 } from '../../utils/llm/freeTier';
 import { normalizeRespectfulPolicyTerm } from '../../../utils/ifareIntent';
+// 限流與快取改用共用工具：getClientKey 取 XFF「最後一段」的可信來源（不可偽造），
+// createRateLimiter 會清過期項並設硬上限，createBoundedTtlCache 讓結果快取有上限、
+// 自動過期與 LRU，取代本檔原本會被繞過、又只增不減的行內 Map。
+import { createRateLimiter, getClientKey } from '~/server/utils/rateLimit';
+import { createBoundedTtlCache } from '~/server/utils/boundedCache';
 
 interface CollaboratorCandidate {
   id?: number;
@@ -25,8 +30,16 @@ const SEARCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 15000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
-const resultCache = new Map<string, { expiresAt: number; result: Record<string, unknown> }>();
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+// 結果快取：以整包請求內容當 key，過期與 LRU 淘汰交給工具處理，max 設 500 為單行程上限。
+const resultCache = createBoundedTtlCache<Record<string, unknown>>({
+  max: 500,
+  ttlMs: SEARCH_CACHE_TTL_MS,
+});
+// 限流器：沿用原本的視窗與次數常數（60 秒 / 20 次）。
+const collaboratorSearchRateLimiter = createRateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX_REQUESTS,
+});
 
 const COLLABORATOR_SEARCH_SYSTEM_PROMPT = [
   'You match a Traditional Chinese user request to nonprofit partner records supplied in the prompt.',
@@ -163,23 +176,6 @@ function getFallbackIds(query: string, collaborators: Required<CollaboratorCandi
     .map(item => item.id);
 }
 
-function getClientKey(event: any) {
-  const forwardedFor = getHeader(event, 'x-forwarded-for');
-  if (typeof forwardedFor === 'string' && forwardedFor.trim()) return forwardedFor.split(',')[0].trim();
-  return event.node?.req?.socket?.remoteAddress || 'unknown';
-}
-
-function checkRateLimit(clientKey: string) {
-  const now = Date.now();
-  const current = rateLimitStore.get(clientKey);
-  if (!current || current.resetAt <= now) {
-    rateLimitStore.set(clientKey, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  current.count += 1;
-  return current.count <= RATE_LIMIT_MAX_REQUESTS;
-}
-
 export default defineEventHandler(async (event) => {
   const body = (await readBody<CollaboratorSearchPayload>(event)) || {};
   const query = normalizeQuery(body.query);
@@ -188,17 +184,21 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Query and collaborators are required' });
   }
 
+  // 限流移到快取查詢之前：連 cacheKey 的雜湊成本（大 payload 的 JSON.stringify）
+  // 都受限流保護。副作用是快取命中也會計入限流，這是刻意取捨，可接受。
+  const rl = collaboratorSearchRateLimiter(getClientKey(event));
+  if (!rl.allowed) {
+    setHeader(event, 'Retry-After', String(rl.retryAfter));
+    throw createError({ statusCode: 429, statusMessage: 'Too many AI searches' });
+  }
+
   const cacheKey = JSON.stringify({
     query,
     collaborators: collaborators.map(item => [item.id, item.title, item.serviceItem]),
   });
+  // 命中即代表未過期（過期項在 get 內部已清掉並回 undefined），直接回。
   const cached = resultCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return { ...cached.result, cached: true };
-  if (cached) resultCache.delete(cacheKey);
-
-  if (!checkRateLimit(getClientKey(event))) {
-    throw createError({ statusCode: 429, statusMessage: 'Too many AI searches' });
-  }
+  if (cached) return { ...cached, cached: true };
 
   const config = useRuntimeConfig();
   const llmConfig = (config as any).llm || {};
@@ -241,7 +241,7 @@ export default defineEventHandler(async (event) => {
         cached: false,
         errorMessage: '',
       };
-      resultCache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, result });
+      resultCache.set(cacheKey, result);
       return result;
     } catch (error: any) {
       const message = error?.message || String(error);
@@ -250,12 +250,18 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // 去敏：上游原始錯誤可能夾帶供應商內部訊息，只保留在伺服器端記錄
+  //（每個候選的錯誤在迴圈內已逐一 console.warn，這裡再彙整一筆，方便對照為何走到兜底）。
+  if (errors.length) {
+    console.warn('[LLM][collaborator-search] 全部供應商失敗，改用關鍵字兜底：', errors.join(' | '));
+  }
   return {
     matchedIds: getFallbackIds(query, collaborators),
     intent: '',
     source: 'fallback',
     model: 'script',
     cached: false,
-    errorMessage: errors.join(' | ') || 'No LLM provider is configured.',
+    // 回應只給通用訊息，不把上游錯誤字串洩漏給前端
+    errorMessage: 'AI 服務暫時無法使用',
   };
 });

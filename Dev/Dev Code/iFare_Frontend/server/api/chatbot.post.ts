@@ -30,6 +30,9 @@ import type {
   ChatbotReplySource,
   SiteLinkKey,
 } from '../utils/chatbot/types';
+// 限流改用共用工具：getClientKey 取 XFF「最後一段」（反向代理附加的可信來源，不可偽造），
+// createRateLimiter 會定期清過期項並設硬上限，取代本檔原本會被繞過、又只增不減的行內實作。
+import { createRateLimiter, getClientKey } from '~/server/utils/rateLimit';
 
 type ChatHistoryItem = {
   role: 'user' | 'assistant';
@@ -48,11 +51,6 @@ type ChatbotErrorCode =
   | 'llm_network'
   | 'llm_unknown'
   | 'local_rate_limit';
-
-type RateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
 
 type AiReply = {
   reply: string;
@@ -80,7 +78,11 @@ const MAX_CONTEXT_CARDS = 3;
 /** 檢索沒撈到足夠卡片時，補進生成層的基礎卡片（涵蓋面最廣的兩張） */
 const BASELINE_CONTEXT_CARD_IDS = ['ifare-search', 'site-overview'];
 
-const rateLimitStore = new Map<string, RateLimitEntry>();
+// 限流器改用共用工具（見檔頭 import 說明），沿用原本的視窗與次數常數。
+const chatbotRateLimiter = createRateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX_REQUESTS,
+});
 
 const SITE_LINKS: Record<SiteLinkKey, ChatbotInternalLink> = {
   home: { label: '回到首頁', path: '/' },
@@ -255,44 +257,6 @@ function normalizeGroqModels(value: unknown, fallback: string) {
     .map(item => normalizeGroqModel(item))
     .filter(Boolean);
   return [...new Set(models.length ? models : [fallback])];
-}
-
-function getClientKey(event: any) {
-  const forwardedFor = getHeader(event, 'x-forwarded-for');
-  if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
-    return forwardedFor.split(',')[0].trim();
-  }
-
-  const realIp = getHeader(event, 'x-real-ip');
-  if (typeof realIp === 'string' && realIp.trim()) {
-    return realIp.trim();
-  }
-
-  return event.node?.req?.socket?.remoteAddress || 'unknown';
-}
-
-function checkRateLimit(clientKey: string) {
-  const now = Date.now();
-  const current = rateLimitStore.get(clientKey);
-
-  if (!current || current.resetAt <= now) {
-    rateLimitStore.set(clientKey, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    });
-    return { allowed: true, retryAfter: 0 };
-  }
-
-  current.count += 1;
-
-  if (current.count <= RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: true, retryAfter: 0 };
-  }
-
-  return {
-    allowed: false,
-    retryAfter: Math.max(1, Math.ceil((current.resetAt - now) / 1000)),
-  };
 }
 
 function parseLlmError(status: number, body: string): ChatbotErrorCode {
@@ -644,9 +608,9 @@ export default defineEventHandler(async (event) => {
   ];
   const matches = rankCards(message, allCards);
 
-  const rateLimit = checkRateLimit(getClientKey(event));
-  if (!rateLimit.allowed) {
-    setHeader(event, 'Retry-After', String(rateLimit.retryAfter));
+  const rl = chatbotRateLimiter(getClientKey(event));
+  if (!rl.allowed) {
+    setHeader(event, 'Retry-After', String(rl.retryAfter));
     // 限流時答案卡仍然可用——它本來就不耗用任何額度
     const direct = findDirectMatch(matches, message);
     if (direct) {
