@@ -278,6 +278,7 @@ import CompPage from "~/components/CompPage.vue"
 import IfareSummaryCard from "~/components/IfareSummaryCard.vue";
 import IfareSearchAutocomplete from "~/components/IfareSearchAutocomplete.vue";
 import {
+  beneficiaryMismatchPenalty,
   buildRelevanceQuery,
   expandSituationVocabulary,
   extractExplicitSearchConditions,
@@ -1816,6 +1817,8 @@ function mergeRankedPolicySearchResults(
     keywordMatch: PolicyKeywordMatchMetrics;
     aiMatch: PolicyKeywordMatchMetrics;
     conditionFit: number;
+    // 受助對象不符的排序降權（0 或負值），只影響排序、不篩除
+    beneficiaryPenalty: number;
     isLocal: boolean;
     needsUndeclaredIdentity: boolean;
     isOverSpecific: boolean;
@@ -1829,8 +1832,14 @@ function mergeRankedPolicySearchResults(
   const localAreaName = String(conditionContext.area || "").trim();
   // 判斷「窄主題」時要看使用者自己打的字加上 AI 擴充後的查詢
   const intentText = [originalQuery, resolvedQuery].filter(Boolean).join(" ");
-  const fitAdjustedScore = (entry: { keywordMatch: PolicyKeywordMatchMetrics; conditionFit: number }) =>
-    entry.keywordMatch.score + entry.conditionFit * CONDITION_FIT_WEIGHT;
+  // 關鍵字分數＋條件符合度，再併入「受助對象不符」的降權（beneficiaryPenalty，見下方物件）。
+  // 只是多加一個負向調整項，keywordMatch 與 conditionFit 的既有算法都沒有動到。
+  const fitAdjustedScore = (entry: {
+    keywordMatch: PolicyKeywordMatchMetrics;
+    conditionFit: number;
+    beneficiaryPenalty: number;
+  }) =>
+    entry.keywordMatch.score + entry.conditionFit * CONDITION_FIT_WEIGHT + entry.beneficiaryPenalty;
 
   responses.forEach((response, responseIndex) => {
     const plan = plans[responseIndex];
@@ -1846,6 +1855,11 @@ function mergeRankedPolicySearchResults(
         keywordMatch: getPolicyKeywordMatchMetrics(item, originalQuery),
         aiMatch: getPolicyKeywordMatchMetrics(item, resolvedQuery),
         conditionFit: scorePolicyConditionFit(toPolicyConditionFacts(item), conditionContext),
+        // 受助對象不符的排序降權：政策主要給「子女」類、但這次查詢沒提到子女就扣分，
+        // 讓給本人的政策排到前面；查詢一提到小孩／就學即回 0，不會誤壓真正的子女政策。
+        // 查詢來源沿用上面算相關性的同一份 intentText（使用者原字＋AI 擴充），不另接查詢；
+        // 只降低分數、不做任何篩除。
+        beneficiaryPenalty: beneficiaryMismatchPenalty(intentText, item),
         isLocal:
           Boolean(localAreaName) &&
           String(item?.codeDomicile_LabelName ?? "") === localAreaName,
@@ -1950,7 +1964,12 @@ function mergeRankedPolicySearchResults(
         // 這裡刻意不加條件符合度：查詢本身沒有可比對的具體詞時，每一筆的關鍵字分數
         // 都是 0，加了符合度就等於「限制越少的排越前面」，完全蓋掉後端算好的相關性。
         // 實測搜「家裡有人跌倒」（站內沒有「跌倒」這個詞）第一名會變成低收入戶喪葬補助。
-        const rawDiff = b.keywordMatch.score - a.keywordMatch.score;
+        //
+        // 但這裡仍要併入「受助對象不符」的降權：它只針對「本人查詢卻是子女類政策」給固定負值，
+        // 沒有條件符合度那種「限制越少排越前」的副作用。少了這一項，像「我兩個月沒工作」
+        // 這種沒有具體詞的查詢，失業勞工子女就學補助會照樣排在失業給付等本人政策前面。
+        const rawDiff =
+          (b.keywordMatch.score + b.beneficiaryPenalty) - (a.keywordMatch.score + a.beneficiaryPenalty);
         if (Math.abs(rawDiff) > Number.EPSILON) return rawDiff;
       }
 

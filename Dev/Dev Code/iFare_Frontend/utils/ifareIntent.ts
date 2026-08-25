@@ -276,6 +276,51 @@ export function buildRelevanceQuery(value: unknown) {
 }
 
 // ---------------------------------------------------------------------------
+// 受助對象（beneficiary）分類與重排
+//
+// 使用者問「我兩個月沒工作怎麼辦」（本人失業），摘要卻推「失業勞工子女就學補助」——
+// 那是補助申請人的「子女」、不是「本人」，答非所問。這裡把「這筆政策是給誰的」與
+// 「使用者關心的是誰」抽成可重用的判斷，讓摘要卡與結果清單用同一套邏輯重排。
+//
+// 紅線：只用來「排序加權/降權」，絕不硬篩掉。判斷錯只會順序差一點、其他排序訊號會
+// 兜回；硬篩錯會把符合資格的政策藏起來。地區/年齡/經濟/身分的硬篩選仍只認字面。
+//
+// 範圍（Phase 1）：只做最明確的「子女就學類 vs 非子女查詢」這一組；照顧者/父母等
+// 雙向視角風險較高（求助者常本身就是照顧者），留待後續。
+// ---------------------------------------------------------------------------
+
+// 政策「主要是給子女」的訊號：標題/資格出現子女就學相關字。刻意收窄到「子女/就學/
+// 助學/學費」這種明確「給孩子」的字，不收「兒童/兒少」——兒少生活扶助那類直接受助者
+// 就是孩子、在問孩子時本來就該出現，收進來反而會誤降。
+const POLICY_CHILD_BENEFICIARY_PATTERN = /子女|就學|助學|學費|學雜費/u;
+
+// 使用者這句話「關心的是子女」：提到小孩/就學等。比對用修過錯字、去空白的正規化文字。
+const QUERY_CHILD_CONCERN_PATTERN =
+  /子女|小孩|兒子|女兒|孩子|寶寶|嬰|新生兒|就學|上學|學費|學雜費|註冊|念書|讀書|育兒|托育|幼兒|學童|兒少|兒童|青少年|學生|教育/u;
+
+/** 這筆政策的主要受助對象是不是「子女」（從標題與資格判斷） */
+export function isChildBeneficiaryPolicy(item: { title?: string; qualification?: string } | null | undefined) {
+  const text = normalizeConditionText(`${item?.title ?? ""}${item?.qualification ?? ""}`);
+  return POLICY_CHILD_BENEFICIARY_PATTERN.test(text);
+}
+
+/** 使用者這句查詢關心的對象是不是子女 */
+export function queryConcernsChild(value: unknown) {
+  const text = normalizeConditionText(fixCommonTypos(value));
+  return QUERY_CHILD_CONCERN_PATTERN.test(text);
+}
+
+/**
+ * 受助對象不符時的排序懲罰（負值，只影響排序）。
+ * 政策是給「子女」的、但使用者查詢沒提到子女 → 降權，讓給本人的政策排到前面。
+ * 一提到小孩/就學就回 0（不降），避免把該給的子女政策壓掉。
+ */
+export function beneficiaryMismatchPenalty(queryText: unknown, item: { title?: string; qualification?: string } | null | undefined) {
+  if (isChildBeneficiaryPolicy(item) && !queryConcernsChild(queryText)) return -80;
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // 政策類別（後端 /Code/GetCodePolicyList，畫面上是「受助者情況」下拉）
 //
 // 訪客不會照著這 12 個官方名稱講——會說「長照」而不是「長期照顧」、

@@ -359,6 +359,7 @@
 
 <script setup lang="ts">
 import {
+  beneficiaryMismatchPenalty,
   buildFallbackIntentSummary,
   buildRelevanceQuery,
   extractExplicitSearchConditions,
@@ -1158,6 +1159,9 @@ function rankCases(
         // 關鍵字分數動輒 40 以上，±3 的差距排不動任何東西——實測選了台北市卻推薦
         // 原住民限定政策，台北市自己的服務排在第 8 名之後。
         score += scorePolicyConditionFit(item, context);
+        // 受助對象不符就降權：政策主要給「子女就學」類、但查詢沒提到子女時扣分。
+        // 改用 ifareIntent 的共用 helper，跟下方結果清單同一套判斷（單一真相來源）。
+        score += beneficiaryMismatchPenalty(query, item);
 
         if (isOverSpecificCaseForIntent(item, query)) {
           score -= 80;
@@ -1165,6 +1169,8 @@ function rankCases(
       } else {
         // 純篩選搜尋沒有關鍵字可比，條件符合度就是唯一的排序依據
         score = scorePolicyConditionFit(item, context) * 4;
+        // 沒有關鍵字時一樣可能撈到子女就學類政策，同樣依受助對象降權，行為才一致
+        score += beneficiaryMismatchPenalty(query, item);
       }
 
       return {
@@ -1298,14 +1304,6 @@ const overSpecificSummaryGuards: Array<{ allowedBy: RegExp; blockedInSummary: Re
   {
     allowedBy: /托育|幼兒|兒童|青少年|兒少|育兒|生育|早療/u,
     blockedInSummary: /托育|幼兒|兒童|青少年|兒少|育兒|生育|早療/u,
-  },
-  {
-    // 受助對象守衛：使用者沒提到子女或就學，就不該把「子女就學／助學」類政策當成推薦
-    // 重點——那是補助申請人的「孩子」、不是申請人「本人」。實測「我兩個月沒工作我該
-    // 怎麼辦」被推「失業勞工子女就學補助」，答非所問（對象錯了）。上一條守衛只涵蓋
-    // 兒童/托育，沒收「子女/就學/助學」，所以這一類從縫裡漏出來。提到小孩或就學時照常放行。
-    allowedBy: /子女|小孩|兒子|女兒|孩子|寶寶|嬰|就學|上學|學費|註冊|念書|讀書|育兒|托育|學生|幼兒|兒少|兒童|青少年|學童|教育/u,
-    blockedInSummary: /子女(?:就學|助學|教育|生活)|就學補助|助學(?:金|補助)|學費補助|學雜費/u,
   },
 ];
 
@@ -1482,6 +1480,10 @@ const referenceCases = computed<ReferencedCaseItem[]>(() => {
     // 會讓明明有結果的搜尋送出空的 cases，被伺服器判成站內查無政策而走一般知識總覽。
     .filter((item) => !rankQuery.value || !hasTypedKeyword.value || item.similarityScore > 0)
     .filter((item) => !isOverSpecificCaseForIntent(item, buildIntentSource()))
+    // 受助對象守衛改由 ifareIntent 的共用 helper 過濾：政策主要給「子女就學」類、
+    // 但查詢沒提到子女時，就不讓它出現在摘要推薦的前三筆。原本靠 overSpecificSummaryGuards
+    // 第三條的 blockedInSummary 過濾，改用 helper 後行為等價，且與結果清單同一套判斷。
+    .filter((item) => beneficiaryMismatchPenalty(buildIntentSource(), item) === 0)
     .filter((item) => {
       const key = `${normalizeText(item.title)}:${normalizeText(item.area)}`;
       if (usedPolicyKeys.has(key)) return false;
