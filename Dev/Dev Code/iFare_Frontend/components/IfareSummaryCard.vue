@@ -1018,8 +1018,9 @@ const threadItems = ref<SummaryThreadItem[]>([]);
 // v43：福利內容欄位改成先解 percent-encoding 再送進模型，摘要內容會不一樣
 // v44：引導條件由單一 guidanceField 改成一次三項的 guidanceFields，舊快取存的形狀不同
 // v45：多存摘要的模型出處，舊快取沒有這兩個欄位，讀回來會少一行字
-// v46：「哪一類福利」的問句改成照實際查到的類別舉例，舊快取裡是寫死的那組例子
-const SUMMARY_CACHE_VERSION = "v46-dynamic-policy-question";
+// v47：拿掉「### 如何申請」整段、列點由 3 點改為 2 點、開頭段收斂，
+// 舊快取裡是改版前的長版面（約 400～500 字，含申請步驟）
+const SUMMARY_CACHE_VERSION = "v47-shorter-overview";
 const SUMMARY_CACHE_KEY_PREFIX = IFARE_SUMMARY_CACHE_PREFIX;
 const SUMMARY_CACHE_TTL_MS = 30 * 60 * 1000;
 
