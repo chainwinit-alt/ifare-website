@@ -1809,7 +1809,6 @@ async function loadSummary(forceRefresh = false) {
           summaryProvider.value = String(meta.provider);
           summaryModel.value = String(meta.model || "");
         }
-        console.log("[IFareSummaryCard][llm-meta]", meta);
       },
     });
     completedByStream = true;

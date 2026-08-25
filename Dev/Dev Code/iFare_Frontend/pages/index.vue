@@ -148,8 +148,27 @@
 </template>
 
 <script setup lang="ts">
+// 首頁 SEO / 社群分享卡（Open Graph）描述
+// 以下 description 與 og 文案為預設值，符合本站定位，日後可再由團隊調整
+// title 維持原本品牌名稱不變
 useHead({
-  title: '長穩社福慈善基金會'
+  title: '長穩社福慈善基金會',
+  meta: [
+    {
+      name: 'description',
+      content:
+        '長穩社福慈善基金會 i-Fare 福利搜尋，讓您輸入自身年齡、身分與家庭狀況，快速找到適用的政府與民間福利補助資源，一站掌握專屬於您的社會福利。',
+    },
+    // Open Graph — 供 LINE / Facebook 等分享時顯示的標題與描述
+    { property: 'og:title', content: '長穩社福慈善基金會｜i-Fare 福利搜尋' },
+    {
+      property: 'og:description',
+      content:
+        '長穩社福慈善基金會 i-Fare 福利搜尋，讓您輸入自身年齡、身分與家庭狀況，快速找到適用的政府與民間福利補助資源，一站掌握專屬於您的社會福利。',
+    },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:site_name', content: '長穩社福慈善基金會' },
+  ],
 })
 
 // 首頁置頂福利專欄顯示數量
