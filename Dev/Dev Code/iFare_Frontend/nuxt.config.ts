@@ -142,6 +142,12 @@ export default defineNuxtConfig({
       // 代價：Gemini 目前不走串流，民眾等到第一個字的時間從約 0.8 秒變成 1.3～1.5 秒。
       summaryProviderOrder:
         readEnv("NUXT_LLM_SUMMARY_PROVIDER_ORDER") || "gemini,groq",
+      // 站內查無相符政策時，是否附一段「清楚標示非站內資料」的一般知識總覽
+      //（overview_general 模式，紅線收得更緊：不得寫具體金額／名額／日期、不用 [參考 N]）。
+      // 2026-08-25 拍板：維持開。開＝查無資料時頁面不會空掉、仍有引導價值；
+      // 要完全杜絕站外內容的疑慮，設 NUXT_LLM_SUMMARY_GENERAL_FALLBACK=0 即可關閉。
+      summaryGeneralFallback:
+        readEnv("NUXT_LLM_SUMMARY_GENERAL_FALLBACK") || "true",
       groqIntentModels:
         readEnv("NUXT_LLM_GROQ_INTENT_MODELS") ||
         "openai/gpt-oss-20b,openai/gpt-oss-120b",
