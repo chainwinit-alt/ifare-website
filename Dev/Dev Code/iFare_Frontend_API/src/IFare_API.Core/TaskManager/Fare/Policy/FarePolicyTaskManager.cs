@@ -174,11 +174,23 @@ namespace IFare_API.TaskManager.Fare.Policy
                         {
                             Item = item,
                             Tokens = tokens,
+                            SearchText = FoldSearchText(TraditionalChineseFuzzyMatcher.Normalize(searchText)),
                             TermFrequencies = TraditionalChineseFuzzyMatcher.BuildTermFrequencyMap(tokens),
                             DocumentLength = tokens.Count
                         };
                     })
                     .ToList();
+
+                // 站內完全沒有的主題（如「寵物醫療」）會被「醫療」「補助」這類高頻字撐過
+                // 相關性門檻，撈回數百筆弱相關結果，也讓前端「查無資料」的引導流程永遠走不到。
+                // 先確認查詢的具體主題在政策庫裡真的存在：完全不存在就回空清單；
+                // 存在（或屬於純泛用詞查詢）則完全維持原本的計分與排序。
+                if (!HasGroundedSearchTopic(param.Query, searchCorpus.Select(entry => entry.SearchText).ToList()))
+                {
+                    stopwatch.Stop();
+                    WriteSearchMetricsLog(param, stopwatch.ElapsedMilliseconds, 0);
+                    return new FarePolicyResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), list.Take(0).ToList());
+                }
 
                 var averageDocumentLength = searchCorpus.Count > 0
                     ? searchCorpus.Average(item => item.DocumentLength)
@@ -271,6 +283,80 @@ namespace IFare_API.TaskManager.Fare.Policy
                 : 0d;
 
             return (fuzzyScore * 0.68d) + (normalizedBm25Score * 0.32d);
+        }
+
+        private static readonly string[] GenericSearchTerms =
+        {
+            "補助", "津貼", "福利", "服務", "政策", "申請", "資格", "計畫", "方案", "資訊", "相關"
+        };
+
+        private static readonly char[] QuerySegmentSeparators =
+        {
+            ' ', '　', ',', '，', '、', '。', '．', ';', '；', ':', '：', '/', '／', '|', '｜'
+        };
+
+        private static string FoldSearchText(string text)
+        {
+            return string.IsNullOrEmpty(text) ? string.Empty : text.Replace('臺', '台');
+        }
+
+        /// <summary>
+        /// 查詢的具體主題是否存在於政策庫。
+        /// 把查詢依使用者輸入的空白／標點切段，每段再依泛用詞（補助、津貼⋯）切成具體片段；
+        /// 任一片段（兩字以上）的「每一個相鄰二字組」都出現在政策庫全文裡，即視為落地。
+        /// 「寵物醫療」的「寵物」「物醫」站內都不存在→擋下；「新北市老人」的新北／北市／市老／老人
+        /// 全存在→放行。全部片段都不落地才回 false；沒有具體片段（純泛用詞）維持原行為回 true。
+        /// 刻意不用斷詞器判斷：JiebaNet 詞典偏簡體，繁體詞常被切成單字，結果不可靠。
+        /// </summary>
+        private static bool HasGroundedSearchTopic(string query, IReadOnlyList<string> normalizedDocuments)
+        {
+            var corpusBigrams = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var document in normalizedDocuments)
+            {
+                for (var i = 0; i + 1 < document.Length; i++)
+                {
+                    corpusBigrams.Add(document.Substring(i, 2));
+                }
+            }
+
+            var hasSpecificFragment = false;
+
+            foreach (var segment in (query ?? string.Empty).Split(QuerySegmentSeparators, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var fragments = new List<string> { FoldSearchText(TraditionalChineseFuzzyMatcher.Normalize(segment)) };
+                foreach (var generic in GenericSearchTerms)
+                {
+                    fragments = fragments
+                        .SelectMany(fragment => fragment.Split(new[] { generic }, StringSplitOptions.None))
+                        .ToList();
+                }
+
+                foreach (var fragment in fragments)
+                {
+                    if (fragment.Length < 2)
+                    {
+                        continue;
+                    }
+
+                    hasSpecificFragment = true;
+                    var chainGrounded = true;
+                    for (var i = 0; i + 1 < fragment.Length; i++)
+                    {
+                        if (!corpusBigrams.Contains(fragment.Substring(i, 2)))
+                        {
+                            chainGrounded = false;
+                            break;
+                        }
+                    }
+
+                    if (chainGrounded)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return !hasSpecificFragment;
         }
 
         private static string BuildSearchDocument(FarePolicyData item)
