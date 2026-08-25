@@ -33,7 +33,7 @@
 
       <section class="section section-info">
         <div class="article-info">
-          <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
+          <button class="btn-icon btn-ic-share" aria-label="分享到 LINE" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
           <div ref="welfareContentRef" class="raw-html"></div>
         </div>
         <!-- 2026-05-25 UIUX #21 — LINE 訂閱主動推廣 -->

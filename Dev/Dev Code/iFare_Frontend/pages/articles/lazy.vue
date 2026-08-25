@@ -30,7 +30,7 @@
 
       <section class="section section-info">
         <div class="article-info">
-          <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
+          <button class="btn-icon btn-ic-share" aria-label="分享到 LINE" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
           <div class="raw-html lazy-images">
             <img
               v-for="(imageSrc, index) in lazyImages"
@@ -188,7 +188,10 @@ async function loadLazyDetail(articleId: number) {
       .filter(Boolean);
     lazyItem.id = Number(data.id || 0);
     lazyItem.title = safeText(data.title);
-    lazyItem.content = safeText(data.title);
+    // 修正 #31:原本誤把內文指派成 data.title(複製貼上錯誤,上一行才剛指派過 title)。
+    // 內文正確來源為 data.detail;比照本檔「相關懶人包」清單的 safeText(item.detail) 處理,
+    // lazy 無 decode 函式、content 也未在 template 渲染,故沿用既有風格不需解碼。
+    lazyItem.content = safeText(data.detail);
     lazyItem.releaseTime = safeText(data.releaseTime);
     lazyImages.value = images;
     lazyItem.codePolicy = safeText(data.codePolicy_LabelName);
