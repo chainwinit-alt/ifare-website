@@ -18,6 +18,8 @@ import type {
   LlmSummaryConversationMessage,
   LlmSummarySearchContext,
 } from "../../utils/llm/types";
+import { createRateLimiter, getClientKey } from "~/server/utils/rateLimit";
+import { createBoundedTtlCache } from "~/server/utils/boundedCache";
 
 interface SearchIntentPayload {
   query?: string;
@@ -138,10 +140,23 @@ function resolveFallbackArea(
 }
 
 const SEARCH_INTENT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const searchIntentCache = new Map<
-  string,
-  { expiresAt: number; response: Record<string, string> }
->();
+// 【快取上限｜問題 B】原本是裸 Map：無筆數上限、無過期清掃，key 又是整包 body，
+// 不同 query 連打會讓它只增不減、撐爆記憶體。改用有上限的 TTL 快取——max 設 500、
+// 過期時間沿用 SEARCH_INTENT_CACHE_TTL_MS，過期清掃與 LRU 淘汰都交給工具處理。
+// 快取內容維持原本存的回應物件型別（Record<string, string>）。
+const searchIntentCache = createBoundedTtlCache<Record<string, string>>({
+  max: 500,
+  ttlMs: SEARCH_INTENT_CACHE_TTL_MS,
+});
+
+// 每個 IP 每分鐘的請求上限：這支端點每次請求都可能觸發外部 LLM 呼叫，
+// 沒有限流的話腳本連打就能燒光額度，所以設定每 IP 每分鐘上限。
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const searchIntentRateLimiter = createRateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX,
+});
 
 function parseSearchIntent(text: string): SearchIntentResponse {
   const normalized = String(text || "")
@@ -311,6 +326,18 @@ async function requestGeminiIntent(apiKey: string, model: string, prompt: string
 }
 
 export default defineEventHandler(async (event) => {
+  // 【限流｜問題 A】放在處理器最前面（讀 body／快取之前）：超限直接回 429、
+  // 並帶 Retry-After，完全不觸發下游的 LLM 呼叫，用來擋腳本連打燒額度。
+  const rl = searchIntentRateLimiter(getClientKey(event));
+  if (!rl.allowed) {
+    setResponseHeader(event, "Retry-After", String(rl.retryAfter));
+    throw createError({
+      statusCode: 429,
+      statusMessage: "Too many requests",
+      data: { retryAfter: rl.retryAfter },
+    });
+  }
+
   const body = (await readBody<SearchIntentPayload>(event)) || {};
   // 先修常見錯字（老任津貼→老人津貼），LLM 與本地抽取都吃修正後的字串
   const query = fixCommonTypos(normalizeSummaryQuery(body.query)).trim();
@@ -337,9 +364,9 @@ export default defineEventHandler(async (event) => {
   );
 
   const cacheKey = JSON.stringify({ query, conversation, context: body.context || {} });
+  // 過期與 LRU 淘汰都由 createBoundedTtlCache 內部處理，命中即直接回傳存好的回應
   const cached = searchIntentCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.response;
-  if (cached) searchIntentCache.delete(cacheKey);
+  if (cached) return cached;
 
   const config = useRuntimeConfig();
   const llmConfig = (config as any).llm || {};
@@ -410,10 +437,8 @@ export default defineEventHandler(async (event) => {
         model: candidate.model,
         errorMessage: "",
       };
-      searchIntentCache.set(cacheKey, {
-        expiresAt: Date.now() + SEARCH_INTENT_CACHE_TTL_MS,
-        response: result,
-      });
+      // 過期時間由快取工具依 ttlMs 自動計算，這裡只存回應本身
+      searchIntentCache.set(cacheKey, result);
       return result;
     } catch (error: any) {
       const message = error?.message || String(error);
@@ -434,6 +459,8 @@ export default defineEventHandler(async (event) => {
     identities: localConditions.identities,
     source: "fallback",
     model: "script",
-    errorMessage: errors.join(" | ") || "No free-tier LLM provider is configured.",
+    // 【去敏｜問題 C】errors 內含供應商名、型號、配額訊息，逐筆已在上方 catch 的
+    // console.warn 記到伺服器端；回給前端的 errorMessage 只給通用字串，不外洩內部細節
+    errorMessage: "AI 服務暫時無法使用",
   };
 });

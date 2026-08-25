@@ -18,6 +18,7 @@ import type {
   LlmSummaryMode,
   LlmSummarySearchContext,
 } from "../../../utils/llm/types";
+import { createRateLimiter, getClientKey } from "~/server/utils/rateLimit";
 
 interface SummaryPayload {
   query?: string;
@@ -85,7 +86,29 @@ function createSseResponse(handler: (push: PushEvent) => Promise<void>) {
   );
 }
 
+// 每個 IP 每分鐘的請求上限：這支端點每次請求都會觸發外部 LLM 呼叫（且會開 SSE 串流），
+// 沒有限流的話腳本連打就能燒光額度，所以設定每 IP 每分鐘上限。
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const streamRateLimiter = createRateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX,
+});
+
 export default defineEventHandler(async (event) => {
+  // 【限流｜問題 A】這支平常回傳 SSE 串流，限流檢查放在 return createSseResponse 之前：
+  // 超限直接回 429（並帶 Retry-After），完全不開串流。前端 plugins/llm.ts 會檢查
+  // res.ok 並丟錯，429 能被正確處理。這是每 IP 每分鐘上限，用來擋腳本連打燒額度。
+  const rl = streamRateLimiter(getClientKey(event));
+  if (!rl.allowed) {
+    setResponseHeader(event, "Retry-After", String(rl.retryAfter));
+    throw createError({
+      statusCode: 429,
+      statusMessage: "Too many requests",
+      data: { retryAfter: rl.retryAfter },
+    });
+  }
+
   const body = (await readBody<SummaryPayload>(event)) || {};
   const config = useRuntimeConfig();
   const llmConfig = (config as any).llm || {};
