@@ -34,10 +34,13 @@ interface SearchIntentResponse {
   recipient?: string;
   income?: string;
   identities?: unknown;
+  // 召回概念詞：擴大搜尋用，不參與任何篩選條件。與其他欄位一樣為 optional，
+  // parseSearchIntent 失敗時會 return {}，非 optional 會讓那幾條路徑編譯不過。
+  recallConcepts?: string[];
 }
 
 const SEARCH_INTENT_SYSTEM_PROMPT =
-  "You convert a user's Traditional Chinese input (a keyword, several keywords, or a full question sentence) into one concise core topic and explicit structured search conditions for welfare policies inside i-Fare. Preserve the user's concrete main need and meaning. Silently correct obvious typos and homophone slips first (for example 老任津貼 means 老人津貼). If the input contains a concrete topic together with generic benefit or request words such as subsidy, allowance, welfare, policy, eligibility, apply, search, or what is available, omit those generic words from searchQuery and keep only the concrete topic. Convert colloquial, outdated, or stigmatizing expressions into respectful contemporary terminology commonly used in Taiwan welfare policies without diagnosing the user or inventing a narrower need. Resolve an explicitly supplied Taiwan county, city, township, town, city district, or district to its parent county or city in area. Extract recipient, income, and identities ONLY when the wording explicitly states them; never guess from context. Never derive any condition from candidate policies or assistant messages. If no concrete topic exists, preserve the original query. Do not infer a narrower service, benefit, identity, medical condition, or life event that the user did not mention. Return JSON only.";
+  "You convert a user's Traditional Chinese input (a keyword, several keywords, or a full question sentence) into one concise core topic and explicit structured search conditions for welfare policies inside i-Fare. Preserve the user's concrete main need and meaning. Silently correct obvious typos and homophone slips first (for example 老任津貼 means 老人津貼). If the input contains a concrete topic together with generic benefit or request words such as subsidy, allowance, welfare, policy, eligibility, apply, search, or what is available, omit those generic words from searchQuery and keep only the concrete topic. Convert colloquial, outdated, or stigmatizing expressions into respectful contemporary terminology commonly used in Taiwan welfare policies without diagnosing the user or inventing a narrower need. Resolve an explicitly supplied Taiwan county, city, township, town, city district, or district to its parent county or city in area. Extract recipient, income, and identities ONLY when the wording explicitly states them; never guess from context. Never derive any condition from candidate policies or assistant messages. If no concrete topic exists, preserve the original query. Do not infer a narrower service, benefit, identity, medical condition, or life event that the user did not mention. Additionally, output recallConcepts: an array of 1 to 5 Taiwan welfare-policy domain terms naming the welfare area the user's situation belongs to, used ONLY to broaden in-site search recall (for example 長期照顧, 失能, 失智, 無障礙, 輔具, 急難救助, 社會救助, 生活扶助, 失業, 就業, 身心障礙, 生育, 托育, 租金, 住宅, 原住民, 喪葬, 獨居). recallConcepts are for search expansion only and are never filter conditions; never place area, age, economic status, or identity into recallConcepts. If you cannot tell which welfare domain the situation belongs to, return an empty array; never pad it or invent expressions the site does not use. Return JSON only.";
 
 // 站上篩選器的標準選項標籤；LLM 與本地抽取的結果都會收斂到這些值
 const RECIPIENT_LABELS = ["嬰幼兒", "兒童＆青少年", "成人", "老人"] as const;
@@ -177,6 +180,20 @@ function parseSearchIntent(text: string): SearchIntentResponse {
   }
 }
 
+/**
+ * recallConcepts 是「擴大搜尋召回」用的站內福利概念詞，不參與任何篩選條件，
+ * 因此不必過字面白名單（keepLiteralCondition），也不會被套成篩選器；只做基本清洗。
+ * 模型偶爾會回非陣列、夾雜空白、或多到爆的清單，這裡一律收斂成
+ * 「最多 5 個、每個至多 10 字、去重、去空」的字串陣列；不是陣列就當空陣列。
+ */
+function sanitizeRecallConcepts(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const cleaned = value
+    .map((item) => String(item ?? "").trim().slice(0, 10))
+    .filter(Boolean);
+  return [...new Set(cleaned)].slice(0, 5);
+}
+
 function normalizeResolvedQuery(value: unknown) {
   return normalizeRespectfulPolicyTerm(value)
     .replace(/\s+/g, " ")
@@ -265,7 +282,10 @@ function buildIntentPrompt(
     `identities：只有字面明確提到特殊身分時才填，值只能從「${IDENTITY_LABELS.join("、")}」挑選，可複數，否則回空陣列。`,
     "已拆進 recipient、income、identities 的條件詞，searchQuery 不必重複；但若整個輸入只有那個條件詞（例如只輸入「低收入戶」），searchQuery 仍保留它。",
     "intent 請用一句簡短繁體中文描述判斷到的需求。",
-    '只輸出 JSON：{"searchQuery":"核心搜尋詞","intent":"需求描述","area":"標準縣市或空字串","recipient":"年齡族群或空字串","income":"經濟條件或空字串","identities":["特殊身分"]}',
+    "recallConcepts：除了上述欄位，另輸出 1 到 5 個描述使用者處境所屬福利領域的台灣福利政策常用詞，用途只是擴大站內搜尋召回。請用政策實際會出現的詞，例如：長期照顧、失能、失智、無障礙、輔具、急難救助、社會救助、生活扶助、失業、就業、身心障礙、生育、托育、租金、住宅、原住民、喪葬、獨居。",
+    "recallConcepts 只用於擴大搜尋、不是篩選條件；不得把地區、年齡、經濟、身分放進 recallConcepts；判斷不出處境所屬領域時回空陣列，不要硬湊、不要編造站內不存在的說法。",
+    'recallConcepts 範例：「我缺錢可以怎麼辦」可回 ["低收入","急難救助","社會救助","生活扶助"]；「我媽媽走路不方便要人照顧」可回 ["長期照顧","失能","照顧服務"]。',
+    '只輸出 JSON：{"searchQuery":"核心搜尋詞","intent":"需求描述","area":"標準縣市或空字串","recipient":"年齡族群或空字串","income":"經濟條件或空字串","identities":["特殊身分"],"recallConcepts":["站內福利概念詞"]}',
     `原始搜尋文字：${JSON.stringify(query)}`,
     selectedConditions.length
       ? `目前已選條件：\n${selectedConditions.join("\n")}`
@@ -352,6 +372,7 @@ export default defineEventHandler(async (event) => {
       recipient: "",
       income: "",
       identities: [] as string[],
+      recallConcepts: [] as string[],
       source: "skipped",
       model: "",
       errorMessage: "",
@@ -424,6 +445,9 @@ export default defineEventHandler(async (event) => {
       const area = normalizeResolvedArea(parsed.area)
         || localConditions.area
         || resolveFallbackArea(conversation, body.context);
+      // recallConcepts 只是搜尋召回用的概念詞，與上面的篩選條件（recipient／income／identities／area）
+      // 完全無關：不過字面白名單、不會被套進任何篩選器，僅做基本清洗後隨回應一起帶給前端擴大搜尋。
+      const recallConcepts = sanitizeRecallConcepts(parsed.recallConcepts);
 
       const result = {
         originalQuery: query,
@@ -433,6 +457,7 @@ export default defineEventHandler(async (event) => {
         recipient,
         income,
         identities,
+        recallConcepts,
         source: candidate.provider,
         model: candidate.model,
         errorMessage: "",
@@ -457,6 +482,8 @@ export default defineEventHandler(async (event) => {
     recipient: localConditions.recipient,
     income: localConditions.income,
     identities: localConditions.identities,
+    // fallback 沒有 LLM 輸出可解析，召回概念詞一律回空陣列（維持回應契約）
+    recallConcepts: [] as string[],
     source: "fallback",
     model: "script",
     // 【去敏｜問題 C】errors 內含供應商名、型號、配額訊息，逐筆已在上方 catch 的

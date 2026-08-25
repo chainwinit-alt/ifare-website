@@ -1523,6 +1523,8 @@ type SearchIntentResult = {
   recipient?: string;
   income?: string;
   identities?: string[];
+  /** 站內福利用語的概念詞，用來擴大搜尋召回；可能為空陣列 */
+  recallConcepts?: string[];
   source?: "groq" | "gemini" | "fallback" | "skipped";
   model?: string;
   errorMessage?: string;
@@ -2012,6 +2014,8 @@ type ResolvedPolicySearchIntent = {
   recipient: string;
   income: string;
   identities: string[];
+  /** 擴大召回用的站內用語概念詞，沿用後端 recallConcepts；取用時預設空陣列 */
+  recallConcepts?: string[];
 };
 
 function normalizeAreaLabel(value: unknown) {
@@ -2043,6 +2047,7 @@ const EMPTY_RESOLVED_INTENT_CONDITIONS = {
   recipient: "",
   income: "",
   identities: [] as string[],
+  recallConcepts: [] as string[],
 };
 
 async function resolvePolicySearchIntent(
@@ -2070,6 +2075,9 @@ async function resolvePolicySearchIntent(
       income: String(result?.income || "").trim(),
       identities: Array.isArray(result?.identities)
         ? result.identities.map((item) => String(item || "").trim()).filter(Boolean)
+        : [],
+      recallConcepts: Array.isArray(result?.recallConcepts)
+        ? result.recallConcepts.map((item) => String(item || "").trim()).filter(Boolean)
         : [],
     };
   } catch (error) {
@@ -2361,6 +2369,21 @@ async function SetDataInit() {
         weight: 0.35,
       }))
     : [];
+  // 站內福利用語的概念詞（後端 search-intent 回的 recallConcepts）：把使用者的說法
+  // 對映到政策實際會用的詞，合成一句另外查一次擴大召回。權重壓到跟 AI 擴充同級，只
+  // 負責在字面幾乎查不到時把對的政策補進來；站內查無的概念詞由後端 grounding 擋掉，
+  // 會自然回 0 筆、不汙染結果。空陣列時就不多查。
+  const recallConcepts = Array.isArray(resolvedIntent.recallConcepts)
+    ? resolvedIntent.recallConcepts
+    : [];
+  const recallConceptQuery = recallConcepts.join(" ").trim();
+  const recallConceptPlans: PolicySearchRequestPlan[] = recallConceptQuery
+    ? buildFarePolicyApiQueries(recallConceptQuery).map((query) => ({
+        query,
+        source: "ai" as const,
+        weight: 0.3,
+      }))
+    : [];
   // 複數關鍵字：每個分段各自查一次，字面命中權重高於 AI 擴充
   const segmentPlans: PolicySearchRequestPlan[] = splitQuerySegments(originalQuery)
     .flatMap((segment) => buildFarePolicyApiQueries(segment))
@@ -2371,7 +2394,7 @@ async function SetDataInit() {
     }));
 
   try {
-    const extraPlans = [...segmentPlans, ...aiPlans, ...situationPlans];
+    const extraPlans = [...segmentPlans, ...aiPlans, ...situationPlans, ...recallConceptPlans];
     const [originalOutcomes, extraOutcomes] = await Promise.all([
       originalResponsePromise,
       Promise.all(extraPlans.map((plan) => requestPolicyList(plan.query))),
