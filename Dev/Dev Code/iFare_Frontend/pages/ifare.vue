@@ -49,6 +49,10 @@
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
             />
+            <p class="filter-error" v-if="policyError" role="alert">
+              <span>{{ policyError }}</span>
+              <button type="button" class="btn-retry-inline transition-general" @click="loadPolicyList">重試</button>
+            </p>
           </div>
           <div class="item item-recipient transition-general" :class="{'visible': isVisibleRecipient}">
             <label class="filter-name" id="label-recipient">受助者年齡區間</label>
@@ -68,6 +72,10 @@
                 >{{ _recipient.name }}</span
               >
             </div>
+            <p class="filter-error" v-if="recipientError" role="alert">
+              <span>{{ recipientError }}</span>
+              <button type="button" class="btn-retry-inline transition-general" @click="loadRecipientList">重試</button>
+            </p>
           </div>
           <div class="item item-identity">
             <label class="filter-name" id="label-area" for="select-area">受助者戶籍地</label>
@@ -82,6 +90,10 @@
               @update:select-value="getSelectValue"
               @is-opened="isSelectOpen"
             />
+            <p class="filter-error" v-if="areaError" role="alert">
+              <span>{{ areaError }}</span>
+              <button type="button" class="btn-retry-inline transition-general" @click="loadAreaList">重試</button>
+            </p>
           </div>
           <div class="item item-query">
             <label class="filter-name">關鍵字</label>
@@ -119,7 +131,12 @@
           </div>
         </div>
         <div class="part-body">
-          <div class="part-list">
+          <!-- API 掛掉時給明確錯誤與重試，取代原本靜默的空清單（#21） -->
+          <div class="part-empty part-error" v-if="officeError" role="alert">
+            <p>{{ officeError }}</p>
+            <button class="btn-retry transition-general" type="button" @click="loadOfficeList">重新載入</button>
+          </div>
+          <div class="part-list" v-if="!officeError">
             <ul class="list-unstyled agency-list">
               <li
                 class="agency-item"
@@ -137,7 +154,7 @@
               </li>
             </ul>
           </div>
-          <div class="part-pages">
+          <div class="part-pages" v-if="!officeError">
             <CompPage mode="num" :page-list="pageNums_office" @change-page="PageChange_Office"/>
           </div>
         </div>
@@ -151,7 +168,12 @@
           </div>
         </div>
         <div class="part-body">
-          <div class="part-faq">
+          <!-- API 掛掉時給明確錯誤與重試，取代原本靜默的空區塊（#21） -->
+          <div class="part-empty part-error" v-if="qaError" role="alert">
+            <p>{{ qaError }}</p>
+            <button class="btn-retry transition-general" type="button" @click="loadQAList">重新載入</button>
+          </div>
+          <div class="part-faq" v-if="!qaError">
             <ul class="list-unstyled faq-list">
               <li
                 class="faq-item transition-general"
@@ -189,7 +211,7 @@
               </li>
             </ul>
           </div>
-          <div class="part-pages">
+          <div class="part-pages" v-if="!qaError">
             <CompPage mode="num" :page-list="pageNums_QA" @change-page="PageChange_QA"/>
           </div>
         </div>
@@ -215,7 +237,12 @@ definePageMeta({
   toLinkName: "首頁",
   toLink: "/",
 });
-const { $WebApiGet } = useNuxtApp();
+// 這頁五個清單 API 全部改走 Detailed 版本：$WebApiGet 會把連線錯誤吞成 null（見
+// plugins/WebAPI.ts），呼叫端無從分辨「API 掛了」還是「真的沒資料」，畫面只能一起
+// 留白。Detailed 版本會一併回傳 error，才能在失敗時顯示提示與重試（#21）。
+const { $WebApiGetDetailed } = useNuxtApp();
+const { getApiResultArray } = useApiResult();
+const { getApiErrorMessage } = useApiErrorMessage();
 const $router = useRouter();
 import CompSelect from "../components/CompSelect.vue";
 import CompPage from "../components/CompPage.vue"
@@ -229,6 +256,16 @@ interface selectItem {
 
 const ALL_POLICY_VALUE = "全部";
 const ALL_AREA_VALUE = "全國";
+
+// id 1 是後端各代碼／清單共用的「不限／中央」佔位項，固定放在資料第一筆。
+// 對象別、機構清單、常見問題都靠它把佔位項濾掉；此約定由後端維護，
+// 後端若日後改變佔位項的 id，下面幾處篩選要一起調整。
+const UNRESTRICTED_CODE_ID = 1;
+
+// 載入失敗時的預設說法（getApiErrorMessage 分不出確切類別時的墊底字串）
+const CODE_ERROR_MESSAGE = "選項載入失敗，請重試。";
+const OFFICE_ERROR_MESSAGE = "相關福利機構載入失敗，請稍後再試。";
+const QA_ERROR_MESSAGE = "常見福利問題載入失敗，請稍後再試。";
 
 function isSelectOpen(type: string, val: boolean) {
   // console.log(`[${type}] val => ${val} || type ${typeof val}`)
@@ -281,10 +318,16 @@ function getSelectValue(type: string, val: string) {
 }
 
 // Code Policy
-const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
-codePolicy.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+const policyError = ref("");
+async function loadPolicyList() {
+  policyError.value = "";
+  const { data, error } = await $WebApiGetDetailed("/Code/GetCodePolicyList");
+  // API 真的掛了才顯示錯誤與重試；連得上但沒資料維持原本行為（靜靜留著預設項）
+  if (error) {
+    policyError.value = getApiErrorMessage(error, CODE_ERROR_MESSAGE);
+    return;
+  }
+  const _data = getApiResultArray<any>(data);
 
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
@@ -293,14 +336,22 @@ codePolicy.then((res: any) => {
     };
   });
 
+  // 只保留第 0 筆預設「全部」，其餘重建，重試時才不會把選項疊加兩份
+  policySelectList.splice(1);
   policySelectList.push(..._list);
-});
+}
+loadPolicyList();
 
 // Code area
-const codeArea = $WebApiGet("/Code/GetCodeDomicileList");
-codeArea.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+const areaError = ref("");
+async function loadAreaList() {
+  areaError.value = "";
+  const { data, error } = await $WebApiGetDetailed("/Code/GetCodeDomicileList");
+  if (error) {
+    areaError.value = getApiErrorMessage(error, CODE_ERROR_MESSAGE);
+    return;
+  }
+  const _data = getApiResultArray<any>(data);
 
   let _list: Array<selectItem> = _data.map((item: any, i: number) => {
     return {
@@ -309,25 +360,40 @@ codeArea.then((res: any) => {
     };
   });
 
+  // 只保留第 0 筆預設「全國」，其餘重建，避免重試時重複疊加
+  areaSelectList.splice(1);
   areaSelectList.push(..._list);
-});
+}
+loadAreaList();
 
 // Code recipient
-const codeRecipient = $WebApiGet("/Code/GetCodeRecipientList");
-codeRecipient.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+const recipientError = ref("");
+async function loadRecipientList() {
+  recipientError.value = "";
+  const { data, error } = await $WebApiGetDetailed("/Code/GetCodeRecipientList");
+  if (error) {
+    recipientError.value = getApiErrorMessage(error, CODE_ERROR_MESSAGE);
+    return;
+  }
+  const _data = getApiResultArray<any>(data);
 
-  let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
-    return {
-      name: item.codeName,
-      val: String(item.id),
-      isActive: false,
-    };
-  });
+  // 原本用 _data.slice(1) 略過第 0 筆佔位項，改以 id 判斷：意圖更明確，也不再假設
+  // 佔位項一定排在第一筆。濾掉「不限」佔位項（UNRESTRICTED_CODE_ID）後才是真正的對象別。
+  let _list: Array<selectItem> = _data
+    .filter((item: any) => item.id != UNRESTRICTED_CODE_ID)
+    .map((item: any, i: number) => {
+      return {
+        name: item.codeName,
+        val: String(item.id),
+        isActive: false,
+      };
+    });
 
+  // 重試時清空重建，避免標籤重複
+  recipientSelectList.splice(0);
   recipientSelectList.push(..._list);
-});
+}
+loadRecipientList();
 
 function SwitchRecipient(codeVal: any) {
   const selectedItem = recipientSelectList.find((item) => item.val == codeVal);
@@ -381,13 +447,23 @@ const storageOfficeList = reactive<Array<OfficeUnitItem>>([]);
 const pageNums_office = reactive<Array<pageNum>>([]);
 const PAGEITEMMAX_OFFICE = 6;
 
-const listOffice = $WebApiGet("/FareOfficeUnit/GetIFareOfficeUnitList");
-listOffice.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+const officeError = ref("");
+async function loadOfficeList() {
+  officeError.value = "";
+  // 重試前先清掉三份狀態再重建，避免資料疊加（storage 全量、officeList 當頁、pageNums 頁碼）
+  storageOfficeList.splice(0);
+  officeList.splice(0);
+  pageNums_office.splice(0);
+
+  const { data, error } = await $WebApiGetDetailed("/FareOfficeUnit/GetIFareOfficeUnitList");
+  if (error) {
+    officeError.value = getApiErrorMessage(error, OFFICE_ERROR_MESSAGE);
+    return;
+  }
+  const _data = getApiResultArray<any>(data);
 
   let _newsList: Array<OfficeUnitItem> = _data
-    .filter((p: any) => p.id != 1)
+    .filter((p: any) => p.id != UNRESTRICTED_CODE_ID) // id 1＝中央／不限佔位項，機構清單不列
     .map((item: any, i: number) => {
       return {
         id: item.id,
@@ -413,7 +489,8 @@ listOffice.then((res: any) => {
       isHide: false
     });
   }
-});
+}
+loadOfficeList();
 
 function PageChange_Office(pageNum: number) {
   officeList.splice(0);
@@ -463,13 +540,23 @@ const storageQAList = reactive<Array<QAItem>>([]);
 const pageNums_QA = reactive<Array<pageNum_QA>>([]);
 const PAGEITEMMAX_QA = 9;
 
-const listNews = $WebApiGet("/FareQA/GetIFareQAList");
-listNews.then((res: any) => {
-  if (!res?.result?.result) return;
-  const _data = res.result.result;
+const qaError = ref("");
+async function loadQAList() {
+  qaError.value = "";
+  // 同 office：重試前先清空三份狀態，避免疊加
+  storageQAList.splice(0);
+  qaList.splice(0);
+  pageNums_QA.splice(0);
+
+  const { data, error } = await $WebApiGetDetailed("/FareQA/GetIFareQAList");
+  if (error) {
+    qaError.value = getApiErrorMessage(error, QA_ERROR_MESSAGE);
+    return;
+  }
+  const _data = getApiResultArray<any>(data);
 
   let _newsList: Array<QAItem> = _data
-    .filter((p: any) => p.id != 1)
+    .filter((p: any) => p.id != UNRESTRICTED_CODE_ID) // id 1＝佔位項，常見問題不列
     .map((item: any, i: number) => {
       return {
         id: item.id,
@@ -495,7 +582,8 @@ listNews.then((res: any) => {
       isHide: false
     });
   }
-});
+}
+loadQAList();
 
 function PageChange_QA(pageNum: number) {
   qaList.splice(0);
@@ -572,3 +660,31 @@ const currentPage_QA = ref(1);
 //   console.log(storageQAList.length)
 // }
 </script>
+
+<style scoped>
+/* 下拉／標籤選項載入失敗時的行內提示：比區塊級 .part-error 精簡，直接貼在該欄位下方，
+   顏色沿用全站錯誤／空狀態的低彩度灰，不搶版面又看得到（#21） */
+.filter-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 13px;
+}
+
+.btn-retry-inline {
+  padding: 2px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-retry-inline:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.02);
+}
+</style>

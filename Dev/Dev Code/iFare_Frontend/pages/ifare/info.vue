@@ -78,10 +78,11 @@
                 >
                   <i class="ic-phone" aria-hidden="true"></i>
                 </a>
+                <!-- 洽辦單位是「中央」佔位項（UNRESTRICTED_CODE_ID）時沒有可看的詳情頁，藏起跳轉鈕 -->
                 <button
                   class="btn-icon btn-go"
                   type="button"
-                  v-if="_welfareItem.officeUnitID != 1"
+                  v-if="_welfareItem.officeUnitID != UNRESTRICTED_CODE_ID"
                   @click="JumpTo(_welfareItem.officeUnitID)"
                   aria-label="查看洽辦單位詳情"
                 >
@@ -152,6 +153,11 @@ const QUALIFICATION_PREVIEW_LENGTH = 50;
 
 // 載入失敗的預設說法 — 分不出原因時就用這句，總比讓使用者對著空白頁猜好
 const DETAIL_ERROR_MESSAGE = "政策資料載入失敗，請稍後再試。";
+
+// id 1 是後端「不限／中央」的佔位項（洽辦單位為中央、限制代碼為不限），不是可點的實體資料。
+// 此約定由後端維護：本檔用它決定洽辦單位能不能跳詳情、以及某筆限制算不算「有特定條件」。
+// 後端若日後改變佔位項的 id，下面幾處判斷要一起調整。
+const UNRESTRICTED_CODE_ID = 1;
 
 const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
 const { getApiResultValue } = useApiResult();
@@ -275,7 +281,8 @@ function toDetailErrorMessage(error: any) {
 }
 
 function JumpTo(id: any) {
-  if (id == 1) return false;
+  // 中央／不限佔位項沒有對應的洽辦單位頁，直接擋掉跳轉
+  if (id == UNRESTRICTED_CODE_ID) return false;
   $router.push({ path: "/ifare/contact", query: { id: id } });
 }
 
@@ -572,7 +579,8 @@ function getCodeList(value: any) {
 }
 
 function hasSpecificCode(value: any) {
-  return getCodeList(value).findIndex((p: any) => Number(p?.id) === 1) < 0;
+  // 清單裡若含「不限」佔位項（UNRESTRICTED_CODE_ID）就代表這項沒設限制；找不到它才算有特定條件
+  return getCodeList(value).findIndex((p: any) => Number(p?.id) === UNRESTRICTED_CODE_ID) < 0;
 }
 
 interface iFarePolicyItem {
