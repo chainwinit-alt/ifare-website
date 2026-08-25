@@ -4,32 +4,22 @@ import { applyCors, requireDynamicApiToken } from '~/server/utils/cors';
 
 const ASSET_DIR = path.resolve(process.cwd(), 'server/data/dynamic-assets');
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set([
-  'image/avif',
-  'image/gif',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
+// multipart body 除了檔案本身還有 boundary/欄位標頭，Content-Length 會略大於檔案；預留 8KB 餘裕。
+const MAX_UPLOAD_SIZE = MAX_FILE_SIZE + 8 * 1024;
+// MIME → 副檔名白名單對應表。存檔的副檔名一律由此表決定，完全不採用使用者檔名的副檔名，
+// 避免被塞入 .html/.aspx 等可被伺服器執行的副檔名。下方仍用 .has() 做白名單檢查。
+const ALLOWED_MIME_TYPES = new Map([
+  ['image/avif', '.avif'],
+  ['image/gif', '.gif'],
+  ['image/jpeg', '.jpg'],
+  ['image/png', '.png'],
+  ['image/webp', '.webp'],
 ]);
 
-function getExtension(filename: string, mimeType: string) {
-  const ext = path.extname(filename).toLowerCase();
-  if (ext) return ext;
-
-  switch (mimeType) {
-    case 'image/avif':
-      return '.avif';
-    case 'image/gif':
-      return '.gif';
-    case 'image/jpeg':
-      return '.jpg';
-    case 'image/png':
-      return '.png';
-    case 'image/webp':
-      return '.webp';
-    default:
-      return '';
-  }
+function getExtension(mimeType: string) {
+  // 副檔名一律由 MIME 決定，完全不沿用使用者檔名的副檔名（避免 .html/.aspx 等注入）。
+  // mimeType 已在寫入前用白名單擋過，必定命中對應表；仍以 '' 保底以防萬一。
+  return ALLOWED_MIME_TYPES.get(mimeType) ?? '';
 }
 
 function makeSafeFilename(filename: string, mimeType: string) {
@@ -40,7 +30,7 @@ function makeSafeFilename(filename: string, mimeType: string) {
     .slice(0, 60) || 'image';
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  return `${basename}-${suffix}${getExtension(filename, mimeType)}`;
+  return `${basename}-${suffix}${getExtension(mimeType)}`;
 }
 
 function getRequestOrigin(event: any) {
@@ -54,6 +44,13 @@ function getRequestOrigin(event: any) {
 export default defineEventHandler(async (event) => {
   applyCors(event);
   requireDynamicApiToken(event);
+
+  // 先用 Content-Length 擋掉過大的上傳，避免 readMultipartFormData 先把整個 body
+  // 讀進記憶體才發現超標而吃滿記憶體（多留 8KB 給 multipart 邊界/欄位標頭）。
+  const contentLength = Number(getHeader(event, 'content-length') || 0);
+  if (contentLength > MAX_UPLOAD_SIZE) {
+    throw createError({ statusCode: 413, statusMessage: 'Image must be smaller than 8MB' });
+  }
 
   const parts = await readMultipartFormData(event);
   const file = parts?.find((part) => part.name === 'file' && part.data?.length);
