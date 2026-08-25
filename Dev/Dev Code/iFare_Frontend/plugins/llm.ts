@@ -124,6 +124,10 @@ export default defineNuxtPlugin(() => {
           } else if (event === "meta") {
             onMeta?.(data);
           } else if (event === "done") {
+            // done 也帶 provider/model：供應商全掛時是 fallback/script。伺服器端降級
+            // 只推 done、不會再推一個 meta，若不在這裡把它轉給 onMeta，前端就無從得知
+            // 這份摘要是本地腳本拼的、而非模型寫的（摘要卡靠這個顯示「非 AI 生成」）。
+            onMeta?.(data);
             if (typeof data?.summary === "string" && data.summary) {
               fullText = data.summary;
               onChunk?.("", fullText);

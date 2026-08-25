@@ -2,7 +2,7 @@
   <section class="ifare-summary-card" :data-provider="selectedProvider">
     <div class="summary-head">
       <div class="summary-head-copy">
-        <span class="summary-kicker" :title="summaryModelLabel || undefined">AI 快速摘要</span>
+        <span class="summary-kicker" :title="summaryModelLabel || undefined">{{ isScriptFallback ? "快速摘要" : "AI 快速摘要" }}</span>
         <h3 class="summary-title">為您整理的重點</h3>
         <!--
           這一份摘要是誰寫的。伺服器會依序試 Groq、Gemini 的多個模型（見 freeTier.ts），
@@ -12,7 +12,13 @@
           和「重新摘要」佔掉，民眾要捲過將近半個螢幕才讀得到第一句摘要，而型號對他們
           沒有意義。改成掛在「AI 快速摘要」的 tooltip 上，比較模型時加 ?debug=1 就會印回來。
         -->
-        <p v-if="summaryModelLabel && showSummaryModel" class="summary-model">{{ summaryModelLabel }}</p>
+        <!--
+          伺服器降級成本地腳本時（provider=fallback / model=script）一律講明「非 AI 生成」，
+          不受 ?debug=1 影響——否則民眾會把腳本拼出來的句子當成 AI 的回答（資料誠信）。
+          真正走到模型時，型號維持只在 ?debug=1 顯示（比較模型用，民眾不需要）。
+        -->
+        <p v-if="isScriptFallback" class="summary-model summary-model-fallback">{{ SCRIPT_FALLBACK_NOTICE }}</p>
+        <p v-else-if="summaryModelLabel && showSummaryModel" class="summary-model">{{ summaryModelLabel }}</p>
       </div>
 
       <div class="summary-tools">
@@ -604,6 +610,13 @@ const summaryModelLabel = computed(() => {
   if (!model) return `模型：${provider}`;
   return `模型：${provider} · ${model}`;
 });
+
+// 伺服器把摘要降級成本地腳本時的判斷（provider=fallback 或 model=script）。
+// 那是腳本依站內資料拼出來的、不是模型寫的，畫面上一律要講明，不能讓它冒充 AI 回答。
+const isScriptFallback = computed(
+  () => summaryProvider.value === "fallback" || summaryModel.value === "script"
+);
+const SCRIPT_FALLBACK_NOTICE = "本摘要由系統依站內資料整理，非 AI 生成，僅供參考。";
 
 const hasKeyword = computed(() => Boolean(normalizeSummaryKeyword(props.query)));
 const isSummaryBusy = computed(() => props.resultsLoading || isLoading.value);
@@ -2129,6 +2142,13 @@ onBeforeUnmount(() => {
   font-size: 12px;
   line-height: 1.5;
   word-break: break-all;
+}
+
+/* 降級說明必須看得見（有別於 debug 用的灰色型號標示）：這關係到民眾會不會把腳本當成 AI 回答 */
+.summary-model-fallback {
+  color: #b96a06;
+  font-weight: 600;
+  word-break: normal;
 }
 
 .summary-kicker {
