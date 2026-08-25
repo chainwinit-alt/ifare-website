@@ -417,6 +417,11 @@ type SummarySearchContext = {
   income?: string;
   identity?: string;
   query?: string;
+  /**
+   * 上游 LLM 判斷的受助對象：self｜child｜elder｜family｜unknown。
+   * 目前只用來判斷「這次查詢是不是在問子女」，取用對 undefined 安全。
+   */
+  beneficiary?: string;
 };
 
 type SummaryConversationMessage = {
@@ -1086,6 +1091,15 @@ function splitQueryTokens(query: string) {
 }
 
 /**
+ * 安全閥：上游 LLM 判斷這次查詢的受助對象就是「子女」（searchContext.beneficiary === "child"）。
+ *
+ * 這時子女類政策（例如子女就學補助）本來就該照常出現，rankCases 與 referenceCases
+ * 都不再套用 beneficiaryMismatchPenalty 的降權與過濾。其餘值（self／elder／family／
+ * unknown，或上游沒帶這個欄位）維持原行為：子女政策照常降權、照常被過濾。
+ */
+const isChildBeneficiaryQuery = computed(() => props.searchContext?.beneficiary === "child");
+
+/**
  * localArea：使用者選定的縣市名（沒選特定縣市時傳空字串）。
  *
  * 只用在「相關性完全同分」時的排序依據。實測「長照＋高雄市＋老人」11 筆裡有 10 筆
@@ -1161,7 +1175,8 @@ function rankCases(
         score += scorePolicyConditionFit(item, context);
         // 受助對象不符就降權：政策主要給「子女就學」類、但查詢沒提到子女時扣分。
         // 改用 ifareIntent 的共用 helper，跟下方結果清單同一套判斷（單一真相來源）。
-        score += beneficiaryMismatchPenalty(query, item);
+        // 安全閥：上游已判斷受助對象就是子女時不降權，子女政策照常出現（見 isChildBeneficiaryQuery）。
+        if (!isChildBeneficiaryQuery.value) score += beneficiaryMismatchPenalty(query, item);
 
         if (isOverSpecificCaseForIntent(item, query)) {
           score -= 80;
@@ -1170,7 +1185,8 @@ function rankCases(
         // 純篩選搜尋沒有關鍵字可比，條件符合度就是唯一的排序依據
         score = scorePolicyConditionFit(item, context) * 4;
         // 沒有關鍵字時一樣可能撈到子女就學類政策，同樣依受助對象降權，行為才一致
-        score += beneficiaryMismatchPenalty(query, item);
+        // 安全閥：受助對象明確是子女時不降權（與上方分支同一道判斷）
+        if (!isChildBeneficiaryQuery.value) score += beneficiaryMismatchPenalty(query, item);
       }
 
       return {
@@ -1483,7 +1499,8 @@ const referenceCases = computed<ReferencedCaseItem[]>(() => {
     // 受助對象守衛改由 ifareIntent 的共用 helper 過濾：政策主要給「子女就學」類、
     // 但查詢沒提到子女時，就不讓它出現在摘要推薦的前三筆。原本靠 overSpecificSummaryGuards
     // 第三條的 blockedInSummary 過濾，改用 helper 後行為等價，且與結果清單同一套判斷。
-    .filter((item) => beneficiaryMismatchPenalty(buildIntentSource(), item) === 0)
+    // 安全閥：上游已判斷受助對象就是子女時放行，子女政策照常出現（見 isChildBeneficiaryQuery）。
+    .filter((item) => isChildBeneficiaryQuery.value || beneficiaryMismatchPenalty(buildIntentSource(), item) === 0)
     .filter((item) => {
       const key = `${normalizeText(item.title)}:${normalizeText(item.area)}`;
       if (usedPolicyKeys.has(key)) return false;

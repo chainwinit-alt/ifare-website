@@ -353,6 +353,9 @@ const summaryTriggerKey = ref(0);
 const summaryResetKey = ref(0);
 const latestSummaryText = ref("");
 const resolvedPolicySearchQuery = ref("");
+// 這一輪 LLM 解析出的受助對象排序提示（"self"|"child"|"elder"|"family"|"unknown"）。
+// 只用來塞進 summarySearchContext 給摘要卡讀；排序的安全閥另外從 resolvedIntent 直接取用。
+const resolvedPolicyBeneficiary = ref("unknown");
 /**
  * 推薦區探測筆數時要用的關鍵字，以及它的基準筆數。
  *
@@ -577,6 +580,8 @@ const summarySearchContext = computed(() => ({
   income: activeIncomeLabel.value || "未指定",
   identity: activeIdentityLabel.value || "未指定",
   query: activeSummaryState.query.trim() || "未指定",
+  // LLM 解析出的受助對象排序提示，給摘要卡用（讀取由另一支負責）；預設 "unknown"
+  beneficiary: resolvedPolicyBeneficiary.value || "unknown",
 }));
 
 const summaryCacheKey = computed(() =>
@@ -1526,6 +1531,8 @@ type SearchIntentResult = {
   identities?: string[];
   /** 站內福利用語的概念詞，用來擴大搜尋召回；可能為空陣列 */
   recallConcepts?: string[];
+  /** 受助對象排序提示："self"|"child"|"elder"|"family"|"unknown"；取用時預設 "unknown" */
+  beneficiary?: string;
   source?: "groq" | "gemini" | "fallback" | "skipped";
   model?: string;
   errorMessage?: string;
@@ -1809,7 +1816,10 @@ function mergeRankedPolicySearchResults(
   plans: PolicySearchRequestPlan[],
   responses: any[],
   originalQuery: string,
-  resolvedQuery: string
+  resolvedQuery: string,
+  // LLM 判斷的受助對象排序提示（"self"|"child"|"elder"|"family"|"unknown"）。
+  // 只當一道安全閥用：值為 "child" 時跳過子女政策降權，其餘一律維持既有 helper 行為。
+  resolvedBeneficiary: string = "unknown",
 ) {
   const rankedItems = new Map<string, {
     item: any;
@@ -1849,6 +1859,10 @@ function mergeRankedPolicySearchResults(
       const itemId = String(item?.id ?? item?.ID ?? "");
       if (!itemId) return;
 
+      // 受助對象降權的安全閥：LLM 判定這次確實在問「子女」（beneficiary === "child"）時
+      // 就不對子女政策降權，避免把使用者真正要找的東西壓下去；其餘值維持 helper 原本行為。
+      const penalty = resolvedBeneficiary === "child" ? 0 : beneficiaryMismatchPenalty(intentText, item);
+
       const current = rankedItems.get(itemId) || {
         item,
         score: 0,
@@ -1858,8 +1872,8 @@ function mergeRankedPolicySearchResults(
         // 受助對象不符的排序降權：政策主要給「子女」類、但這次查詢沒提到子女就扣分，
         // 讓給本人的政策排到前面；查詢一提到小孩／就學即回 0，不會誤壓真正的子女政策。
         // 查詢來源沿用上面算相關性的同一份 intentText（使用者原字＋AI 擴充），不另接查詢；
-        // 只降低分數、不做任何篩除。
-        beneficiaryPenalty: beneficiaryMismatchPenalty(intentText, item),
+        // 只降低分數、不做任何篩除。beneficiary === "child" 時上面已把 penalty 設為 0。
+        beneficiaryPenalty: penalty,
         isLocal:
           Boolean(localAreaName) &&
           String(item?.codeDomicile_LabelName ?? "") === localAreaName,
@@ -2035,6 +2049,8 @@ type ResolvedPolicySearchIntent = {
   identities: string[];
   /** 擴大召回用的站內用語概念詞，沿用後端 recallConcepts；取用時預設空陣列 */
   recallConcepts?: string[];
+  /** 受助對象排序提示，沿用後端 beneficiary；取用時預設 "unknown" */
+  beneficiary?: string;
 };
 
 function normalizeAreaLabel(value: unknown) {
@@ -2067,6 +2083,8 @@ const EMPTY_RESOLVED_INTENT_CONDITIONS = {
   income: "",
   identities: [] as string[],
   recallConcepts: [] as string[],
+  // 受助對象排序提示：查不到／未解析時一律 "unknown"，代表照既有規則降權
+  beneficiary: "unknown",
 };
 
 async function resolvePolicySearchIntent(
@@ -2098,6 +2116,8 @@ async function resolvePolicySearchIntent(
       recallConcepts: Array.isArray(result?.recallConcepts)
         ? result.recallConcepts.map((item) => String(item || "").trim()).filter(Boolean)
         : [],
+      // 受助對象排序提示，取用對 undefined 安全，缺值時預設 "unknown"
+      beneficiary: String(result?.beneficiary || "").trim() || "unknown",
     };
   } catch (error) {
     console.warn("[iFare][search-intent]", error);
@@ -2316,11 +2336,18 @@ async function searchSummaryConversationPolicies(
     return { query: resolvedQuery || originalQuery, cases: [...storageiFarePolicyList] };
   }
 
+  // beneficiary 只有走意圖解析那一路才會有；純補條件的追問（只打「高雄」）沒有，
+  // 預設 "unknown"，代表維持既有的子女政策降權。
+  const resolvedBeneficiary =
+    "beneficiary" in resolvedIntent && resolvedIntent.beneficiary
+      ? resolvedIntent.beneficiary
+      : "unknown";
   const rawItems = mergeRankedPolicySearchResults(
     plans,
     responses,
     literalMemoryQuery || originalQuery,
     resolvedQuery || originalQuery,
+    resolvedBeneficiary,
   );
   const nextItems = mapPolicySearchItems(getUniquePolicySearchResults(rawItems));
   replacePolicySearchItems(nextItems);
@@ -2363,6 +2390,7 @@ async function SetDataInit() {
     ? Promise.all(originalQueries.map((query) => requestPolicyList(query)))
     : prefetchedOriginalResponse;
   resolvedPolicySearchQuery.value = resolvedQuery;
+  resolvedPolicyBeneficiary.value = resolvedIntent.beneficiary || "unknown";
   const hasAiExpansion = Boolean(resolvedQuery && resolvedQuery !== originalQuery);
   const originalWeight = hasAiExpansion ? 0.7 : 1;
   const requestPlans: PolicySearchRequestPlan[] = originalQueries.map((query) => ({
@@ -2457,7 +2485,8 @@ async function SetDataInit() {
           plans,
           responses,
           originalQuery,
-          expandSituationVocabulary(resolvedQuery, originalQuery)
+          expandSituationVocabulary(resolvedQuery, originalQuery),
+          resolvedIntent.beneficiary || "unknown"
         )
       : sortPolicyResultsByCondition(responseItems);
     const _data = getUniquePolicySearchResults(rawItems);
