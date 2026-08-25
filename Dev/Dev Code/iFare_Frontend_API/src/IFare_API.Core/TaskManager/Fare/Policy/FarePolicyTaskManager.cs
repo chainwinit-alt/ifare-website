@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -33,6 +34,7 @@ namespace IFare_API.TaskManager.Fare.Policy
         public FarePolicyDetail GetIFarePolicyDetail(long farePolicyID)
         {
             var detail = _repositoryIFarePolicy.GetAll()
+                                    .AsNoTracking()   // 純讀取查詢，不需追蹤
                                     .Where(p => p.ReleaseTime != null && p.ReleaseTime <= DateTime.Now && (p.DiscontinuedTime == null || p.DiscontinuedTime > DateTime.Now))
                                     .Include(p => p.CodePolicy)
                                     .Where(p => p.CodePolicy.State != DataState.Disabled)
@@ -103,6 +105,7 @@ namespace IFare_API.TaskManager.Fare.Policy
             if (!paramChecker.IsCheckPass()) return new FarePolicyResult(_commonTools.GetErrorInfo_APIWithMsg(ErrAPI.Code_ParamFail, paramChecker.GetErrMsg()), null);
 
             var query = _repositoryIFarePolicy.GetAll()
+                                    .AsNoTracking()   // 純讀取查詢，不需追蹤
                                     .Where(p => p.ReleaseTime != null && p.ReleaseTime <= DateTime.Now && (p.DiscontinuedTime == null || p.DiscontinuedTime > DateTime.Now))
                                     .Include(p => p.CodePolicy)
                                     .Where(p => p.CodePolicy.State != DataState.Disabled)
@@ -156,6 +159,7 @@ namespace IFare_API.TaskManager.Fare.Policy
                             CreateTime = p.CreateTime,
                             ReleaseTime = p.ReleaseTime.Value,
                             DiscontinuedTime = p.DiscontinuedTime.Value,
+                            UpdateTime = p.UpdateTime,   // 給搜尋語料快取做失效判斷的版本戳（實體 p 有此欄位）
                         })
                         .OrderByDescending(p => p.ReleaseTime)
                         .ThenByDescending(p => p.CreateTime)
@@ -165,18 +169,22 @@ namespace IFare_API.TaskManager.Fare.Policy
             {
                 var normalizedQuery = TraditionalChineseFuzzyMatcher.Normalize(param.Query);
                 var queryTokens = TraditionalChineseFuzzyMatcher.TokenizeForBm25(param.Query);
+                // searchCorpus 的每一項（分詞、詞頻表、文件長度、摺疊後全文）只跟政策內容有關、
+                // 與查詢字串完全無關，因此改由行程內記憶化快取取得（見 GetOrBuildSearchCorpusEntry）。
+                // 這裡刻意維持與原本完全相同的匿名型別欄位（Item/Tokens/SearchText/TermFrequencies/
+                // DocumentLength），且各欄位值與原本逐筆重算的結果一模一樣，確保後續 grounding
+                // 與 BM25 計分的輸入位元級不變。
                 var searchCorpus = list
                     .Select(item =>
                     {
-                        var searchText = BuildSearchDocument(item);
-                        var tokens = TraditionalChineseFuzzyMatcher.TokenizeForBm25(searchText);
+                        var corpusEntry = GetOrBuildSearchCorpusEntry(item);
                         return new
                         {
                             Item = item,
-                            Tokens = tokens,
-                            SearchText = FoldSearchText(TraditionalChineseFuzzyMatcher.Normalize(searchText)),
-                            TermFrequencies = TraditionalChineseFuzzyMatcher.BuildTermFrequencyMap(tokens),
-                            DocumentLength = tokens.Count
+                            Tokens = corpusEntry.Tokens,
+                            SearchText = corpusEntry.FoldedSearchText,
+                            TermFrequencies = corpusEntry.TermFrequencies,
+                            DocumentLength = corpusEntry.DocumentLength
                         };
                     })
                     .ToList();
@@ -185,6 +193,9 @@ namespace IFare_API.TaskManager.Fare.Policy
                 // 相關性門檻，撈回數百筆弱相關結果，也讓前端「查無資料」的引導流程永遠走不到。
                 // 先確認查詢的具體主題在政策庫裡真的存在：完全不存在就回空清單；
                 // 存在（或屬於純泛用詞查詢）則完全維持原本的計分與排序。
+                // 落地判定沿用上面已記憶化的 SearchText（＝FoldedSearchText，與原值逐筆相同），
+                // 且刻意排在下方「重的 BM25 計分迴圈」之前：查無主題者能提早回空清單、不必白跑計分。
+                // 傳入的文件內容與 HasGroundedSearchTopic 本身都未更動，判定的 true/false 結果不變。
                 if (!HasGroundedSearchTopic(param.Query, searchCorpus.Select(entry => entry.SearchText).ToList()))
                 {
                     stopwatch.Stop();
@@ -359,6 +370,59 @@ namespace IFare_API.TaskManager.Fare.Policy
             return !hasSpecificFragment;
         }
 
+        // ── 政策搜尋語料的行程內記憶化快取 ─────────────────────────────────────
+        // 為什麼可以快取：searchCorpus 每一項（分詞 Tokens、詞頻表 TermFrequencies、文件長度
+        // DocumentLength、摺疊後全文 FoldedSearchText）都只由「政策內容」決定，與使用者輸入的
+        // 查詢字串完全無關；同一筆政策不論被哪個查詢命中，這些純 CPU 的前處理結果都一樣，
+        // 因此可跨請求重用，把每次請求從零重算 BuildSearchDocument→Tokenize→TF 的成本省下來。
+        // 失效怎麼判：以政策 Id 為 key、以該政策的 UpdateTime 當版本戳。命中且「版本戳相同」
+        // 且「快取年齡 < TTL」才重用；否則用與原本完全相同的算式重算後寫回。
+        // TTL（10 分鐘）只是保險：防「政策沒 bump UpdateTime、但底層關鍵字／身份別等標籤被改」
+        // 這種版本戳抓不到的邊角。快取以 Id 為 key，天然上限＝政策數，不需額外淘汰機制。
+        private static readonly ConcurrentDictionary<long, SearchCorpusCacheEntry> SearchCorpusCache =
+            new ConcurrentDictionary<long, SearchCorpusCacheEntry>();
+
+        private static readonly TimeSpan SearchCorpusCacheTtl = TimeSpan.FromMinutes(10);
+
+        private static SearchCorpusCacheEntry GetOrBuildSearchCorpusEntry(FarePolicyData item)
+        {
+            // 命中且版本戳相同且未過 TTL → 直接重用。
+            // 注意：DateTime.UtcNow 只用來計算「快取年齡」，與任何業務時間比較（如 ReleaseTime）無關。
+            if (SearchCorpusCache.TryGetValue(item.ID, out var cached) &&
+                cached.Version == item.UpdateTime &&
+                (DateTime.UtcNow - cached.CachedAtUtc) < SearchCorpusCacheTtl)
+            {
+                return cached;
+            }
+
+            // 未命中或已失效：用與原本 searchCorpus 完全一致的算式重算後寫回快取。
+            var searchText = BuildSearchDocument(item);
+            var tokens = TraditionalChineseFuzzyMatcher.TokenizeForBm25(searchText);
+            var entry = new SearchCorpusCacheEntry
+            {
+                Version = item.UpdateTime,
+                Tokens = tokens,
+                TermFrequencies = TraditionalChineseFuzzyMatcher.BuildTermFrequencyMap(tokens),
+                DocumentLength = tokens.Count,
+                FoldedSearchText = FoldSearchText(TraditionalChineseFuzzyMatcher.Normalize(searchText)),
+                CachedAtUtc = DateTime.UtcNow
+            };
+            SearchCorpusCache[item.ID] = entry;
+            return entry;
+        }
+
+        // 快取項：對應原本 searchCorpus 匿名型別中「只與政策內容有關」的欄位。
+        // 寫入後不再修改，所有欄位皆為唯讀取用，可安全跨執行緒共享。
+        private sealed class SearchCorpusCacheEntry
+        {
+            public DateTime? Version { get; set; }             // = 該政策的 UpdateTime（版本戳）
+            public List<string> Tokens { get; set; }
+            public Dictionary<string, int> TermFrequencies { get; set; }
+            public int DocumentLength { get; set; }
+            public string FoldedSearchText { get; set; }
+            public DateTime CachedAtUtc { get; set; }          // 快取寫入時間（UtcNow），僅用來算年齡
+        }
+
         private static string BuildSearchDocument(FarePolicyData item)
         {
             return string.Join(" ", new[]
@@ -374,12 +438,22 @@ namespace IFare_API.TaskManager.Fare.Policy
             }.Where(text => !string.IsNullOrWhiteSpace(text)));
         }
 
+        // metrics 記錄的靜態設定與快取（見下方 WriteSearchMetricsLog / ResolveSearchMetricsDirectory）。
+        // 每次搜尋連 SQL 查記憶體 DMV、以及往上層層找 .csproj 都落在請求熱路徑上，成本高。
+        // SQL 快照預設關閉（要診斷才設 IFARE_SEARCH_METRICS_SQL=1）；目錄只解析一次後快取重用。
+        private static readonly bool SearchMetricsSqlEnabled =
+            (Environment.GetEnvironmentVariable("IFARE_SEARCH_METRICS_SQL") ?? "").Trim().ToLowerInvariant()
+                is "1" or "true" or "on";
+        private static string _searchMetricsDirectory;
+        private static readonly object _searchMetricsDirectoryLock = new object();
+
         private void WriteSearchMetricsLog(FarePolicyFilterParam param, long elapsedMilliseconds, int resultCount)
         {
             try
             {
                 var currentProcess = Process.GetCurrentProcess();
-                var sqlProcessMemory = TryGetSqlProcessMemorySnapshot();
+                // SQL 記憶體快照預設關閉：每請求一條連線成本高，需要時才用環境變數開啟
+                var sqlProcessMemory = SearchMetricsSqlEnabled ? TryGetSqlProcessMemorySnapshot() : null;
 
                 var logLine =
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [FarePolicySearchMetrics] " +
@@ -393,8 +467,10 @@ namespace IFare_API.TaskManager.Fare.Policy
                     $"sql_memory_sample_ok={(sqlProcessMemory != null ? "true" : "false")}";
 
                 var searchMetricsDirectory = ResolveSearchMetricsDirectory();
-                Directory.CreateDirectory(searchMetricsDirectory);
-                var searchMetricsFilePath = Path.Combine(searchMetricsDirectory, "SearchMetrics.txt");
+                // 按日期分檔，避免單一檔案無限成長吃光磁碟（前台公開 API，每次搜尋一行）
+                var searchMetricsFilePath = Path.Combine(
+                    searchMetricsDirectory,
+                    $"SearchMetrics-{DateTime.Now:yyyyMMdd}.txt");
                 using var stream = new FileStream(
                     searchMetricsFilePath,
                     FileMode.Append,
@@ -411,20 +487,33 @@ namespace IFare_API.TaskManager.Fare.Policy
 
         private static string ResolveSearchMetricsDirectory()
         {
-            var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            // 目錄只解析一次：原本每次搜尋都從 BaseDirectory 往上逐層找 .csproj（多次磁碟 I/O），
+            // 全落在請求熱路徑上。解析後連同建立目錄一起快取，之後每次搜尋直接重用。
+            if (_searchMetricsDirectory != null) return _searchMetricsDirectory;
 
-            while (directory != null)
+            lock (_searchMetricsDirectoryLock)
             {
-                var projectFilePath = Path.Combine(directory.FullName, "IFare_API.Web.Host.csproj");
-                if (File.Exists(projectFilePath))
+                if (_searchMetricsDirectory != null) return _searchMetricsDirectory;
+
+                string resolved = null;
+                var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+                while (directory != null)
                 {
-                    return Path.Combine(directory.FullName, "App_Data", "SearchMetrics");
+                    var projectFilePath = Path.Combine(directory.FullName, "IFare_API.Web.Host.csproj");
+                    if (File.Exists(projectFilePath))
+                    {
+                        resolved = Path.Combine(directory.FullName, "App_Data", "SearchMetrics");
+                        break;
+                    }
+
+                    directory = directory.Parent;
                 }
 
-                directory = directory.Parent;
+                resolved ??= Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "SearchMetrics");
+                Directory.CreateDirectory(resolved);
+                _searchMetricsDirectory = resolved;
+                return _searchMetricsDirectory;
             }
-
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "SearchMetrics");
         }
 
         private SqlProcessMemorySnapshot TryGetSqlProcessMemorySnapshot()
@@ -490,10 +579,12 @@ FROM sys.dm_os_process_memory;";
             {
                 _existIDs.AddRange(currentList.Select(p => p.ID).ToList());
             }
+            // 先 materialize 一次：舊碼的 _query 是對 IEnumerable 的 Where().Select()（含每筆的巢狀
+            // 投影），之後 Count() 與 OrderBy/Skip/Take 會重複列舉、等於把整段投影重跑好幾次。
             var _query = queryList.Where(p => !_existIDs.Contains(p.Id))
-                                .Select(p => 
+                                .Select(p =>
                                 {
-                                    var _item = new FarePolicyData 
+                                    var _item = new FarePolicyData
                                     {
                                         ID = p.Id,
                                         Title = p.Title,
@@ -531,14 +622,17 @@ FROM sys.dm_os_process_memory;";
                                         CreateTime = p.CreateTime
                                     };
                                     return _item;
-                                });
+                                })
+                                .ToList();
 
-            if (isRandom) 
+            if (isRandom)
             {
                 Random rand = new Random();
-                var ttlCount = _query.Count();
-                var maxNum = ttlCount > 3 ? ttlCount - 3 : ttlCount;
-                int toSkip = rand.Next(0, ttlCount);
+                var count = _query.Count;
+                // 修正舊碼 bug：toSkip 上限必須是 Math.Max(0, count - takeNum)，否則 Skip 過頭會讓
+                // 後面的 Take(takeNum) 回傳不足 takeNum 筆。（+1 是因為 Random.Next 的上界為排除）
+                // 死碼 maxNum（算了沒用）一併移除。
+                int toSkip = rand.Next(0, Math.Max(0, count - takeNum) + 1);
                 _list = _query.OrderBy(r => Guid.NewGuid())
                             .Skip(toSkip)
                             .Take(takeNum)
@@ -557,14 +651,8 @@ FROM sys.dm_os_process_memory;";
 
         public FarePolicyResult GetIFarePolicyRelation(long farePolicyID)
         {
-            // var relationCodeDomicileID = _repositoryIFarePolicy.GetAll()
-            //                                         .Include(p => p.CodeDomicile)
-            //                                         .Where(p => p.CodeDomicile.State != DataState.Disabled)
-            //                                         .Where(p => p.Id == farePolicyID)
-            //                                         .Select(p => p.CodeDomicileId.Value)
-            //                                         .FirstOrDefault();
-
             var cFarePolicyItem = _repositoryIFarePolicy.GetAll()
+                                                            .AsNoTracking()   // 純讀取查詢，不需追蹤
                                                             .Include(p => p.CodePolicy)
                                                             .Include(p => p.CodeDomicile)
                                                             .Include(p => p.IfarePolicyCodeKeywords)
@@ -577,11 +665,23 @@ FROM sys.dm_os_process_memory;";
                                                             .ThenInclude(p => p.CodeRecipient)
                                                             .Where(p => p.Id == farePolicyID)
                                                             .FirstOrDefault();
+
+            // 傳入不存在／已停用的 id 時 cFarePolicyItem 會是 null；舊碼在下一行直接取導覽屬性
+            // 會 NullReferenceException → 500。改為回「成功＋空清單」，沿用既有成功回傳形狀。
+            if (cFarePolicyItem == null)
+            {
+                return new FarePolicyResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), new List<FarePolicyData>());
+            }
+
             var cRecipientList = cFarePolicyItem.IfarePolicyCodeRecipients.Select(p => p.CodeRecipientId).ToList();
             var cIncomeList = cFarePolicyItem.IfarePolicyCodeIncomes.Select(p => p.CodeIncomeId).ToList();
             var cIdentityList = cFarePolicyItem.IfarePolicyCodeIdentities.Select(p => p.CodeIdentityId).ToList();
 
+            // 來源查詢只 materialize 一次：舊碼是 .AsEnumerable() 的延遲查詢，之後每個 .Count() 與
+            // 每次 helper 的多重列舉都會把同一段 SQL 反覆重跑。改成 .AsNoTracking() 後 .ToList() 落地
+            // 一次，後續的 Where/Count/Skip/Take 全在記憶體上做。篩選條件與投影完全不變。
             var _query = _repositoryIFarePolicy.GetAll()
+                                    .AsNoTracking()   // 純讀取查詢，不需追蹤
                                     .Where(p => p.ReleaseTime != null && p.ReleaseTime <= DateTime.Now && (p.DiscontinuedTime == null || p.DiscontinuedTime > DateTime.Now))
                                     .Include(p => p.CodePolicy)
                                     .Where(p => p.CodePolicy.State != DataState.Disabled)
@@ -596,57 +696,65 @@ FROM sys.dm_os_process_memory;";
                                     .Include(p => p.IfarePolicyCodeRecipients.Where(p2 => p2.CodeRecipient.State != DataState.Disabled))
                                     .ThenInclude(p => p.CodeRecipient)
                                     .Where(p => p.State != DataState.Disabled && p.State != DataState.Delete && p.Id != farePolicyID)
-                                    .AsEnumerable();
+                                    .ToList();
 
-            // All same.
+            // 以下三段相符邏輯都在已 materialize 的 _query（記憶體 List）上做，各自 ToList 一次，
+            // 避免後面的 Count() 與傳進 helper 時重複列舉同一段 in-memory 述詞。相符語意完全不變。
+            // All same.（同戶籍地，且該政策的 recipient/income/identity 全都是目標政策的子集）
             var _query_All = _query.Where(p => p.CodeDomicileId == cFarePolicyItem.CodeDomicileId &&
                                             !p.IfarePolicyCodeRecipients.Any(p2 => !cRecipientList.Contains(p2.CodeRecipientId)) &&
                                             !p.IfarePolicyCodeIncomes.Any(p2 => !cIncomeList.Contains(p2.CodeIncomeId)) &&
-                                            !p.IfarePolicyCodeIdentities.Any(p2 => !cIdentityList.Contains(p2.CodeIdentityId)));
-            // All Contains same.
+                                            !p.IfarePolicyCodeIdentities.Any(p2 => !cIdentityList.Contains(p2.CodeIdentityId)))
+                                    .ToList();
+            // All Contains same.（同戶籍地，且 recipient/income/identity 三類各至少有一項與目標政策交集）
             var _quer_All_Contains = _query.Where(p => p.CodeDomicileId == cFarePolicyItem.CodeDomicileId &&
                                                 p.IfarePolicyCodeRecipients.Any(p2 => cRecipientList.Contains(p2.CodeRecipientId)) &&
                                                 p.IfarePolicyCodeIncomes.Any(p2 => cIncomeList.Contains(p2.CodeIncomeId)) &&
-                                                p.IfarePolicyCodeIdentities.Any(p2 => cIdentityList.Contains(p2.CodeIdentityId)));
+                                                p.IfarePolicyCodeIdentities.Any(p2 => cIdentityList.Contains(p2.CodeIdentityId)))
+                                    .ToList();
 
-            // All or.
+            // All or.（同戶籍地，或三類任一有交集）
             var _quer_All_Or = _query.Where(p => p.CodeDomicileId == cFarePolicyItem.CodeDomicileId ||
                                                 p.IfarePolicyCodeRecipients.Any(p2 => cRecipientList.Contains(p2.CodeRecipientId)) ||
                                                 p.IfarePolicyCodeIncomes.Any(p2 => cIncomeList.Contains(p2.CodeIncomeId)) ||
-                                                p.IfarePolicyCodeIdentities.Any(p2 => cIdentityList.Contains(p2.CodeIdentityId)));
+                                                p.IfarePolicyCodeIdentities.Any(p2 => cIdentityList.Contains(p2.CodeIdentityId)))
+                                    .ToList();
 
             var _relationList = new List<FarePolicyData>();
             const int TTLCOUNT = 3;
             var takeNum = TTLCOUNT;
 
+            // 依序用四層意圖補滿，最多回 TTLCOUNT（3）筆相關政策；每層以 currentList 去重、
+            // 並用剩餘名額 takeNum 續補。_query_All/_quer_All_Contains/_quer_All_Or/_query 現在都是
+            // 記憶體 List，故改用 .Count 屬性（與原 .Count() 值完全相同）。
             // All same.
-            if (_query_All.Count() > 0 && takeNum > 0)
+            if (_query_All.Count > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_query_All, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = takeNum - _relationList.Count;
             }
 
             // All Contains same.
-            if (_quer_All_Contains.Count() > 0 && takeNum > 0)
+            if (_quer_All_Contains.Count > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_quer_All_Contains, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = takeNum - _relationList.Count;
             }
 
             // All Or.
-            if (_quer_All_Or.Count() > 0 && takeNum > 0)
+            if (_quer_All_Or.Count > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_quer_All_Or, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = takeNum - _relationList.Count;
             }
 
             // All random.
-            if (_query.Count() > 0 && takeNum > 0) 
+            if (_query.Count > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_query, takeNum, currentList: _relationList, isRandom: true));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = takeNum - _relationList.Count;
             }
-            
+
             return new FarePolicyResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), _relationList);
         }
     }

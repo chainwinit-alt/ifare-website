@@ -32,5 +32,6 @@ namespace IFare_API.TaskManager.Fare.Policy.ValueModel
         public DateTime? CreateTime { get; set; }
         public DateTime? ReleaseTime { get; set; }
         public DateTime? DiscontinuedTime { get; set; }
+        public DateTime? UpdateTime { get; set; }   // 搜尋語料記憶化快取的版本戳（失效判斷用）
     }
 }
