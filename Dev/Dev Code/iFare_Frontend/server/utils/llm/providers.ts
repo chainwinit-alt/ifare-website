@@ -282,12 +282,15 @@ export function createGeminiClient(config: {
         throw new Error("Gemini API key is not configured.");
       }
 
+      // 金鑰改走 x-goog-api-key header，不放進 URL query——避免 proxy／IIS 存取記錄
+      // 或帶 URL 的錯誤堆疊把金鑰明文寫進日誌（與 chatbot.post.ts 的作法一致）。
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:generateContent?key=${encodeURIComponent(config.apiKey)}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:generateContent`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "x-goog-api-key": config.apiKey,
           },
           body: JSON.stringify({
             systemInstruction: {

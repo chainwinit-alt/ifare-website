@@ -1,5 +1,11 @@
 import type { LlmSummaryCaseItem } from "./types";
 
+// 每次摘要固定併發打三筆政策明細；沒有逾時的 $fetch 在後端變慢或半掛時會無限期卡住，
+// 配合 LLM 端點會形成對內部 API 的放大式 DoS，這裡設逾時當保險絲。
+// 取 8 秒的參照：chatbot 的 cardStore.ts / siteKnowledge.ts 用 4 秒、chatbot.post.ts
+// 的 LLM 呼叫用 15 秒；明細查詢比單卡查詢重、但仍應遠快於 LLM，取中間值 8 秒。
+const DETAIL_FETCH_TIMEOUT_MS = 8000;
+
 interface FarePolicyDetailApiResponse {
   result?: {
     result?: {
@@ -68,6 +74,23 @@ function buildSourceSummary(detail: NonNullable<FarePolicyDetailApiResponse["res
   return parts.join("\n");
 }
 
+/**
+ * 逾時中止用的 AbortSignal。優先用 AbortSignal.timeout（Node 17.3+／現代執行環境內建，
+ * 內部計時器會自動清掉）；舊環境沒有時退回 AbortController + setTimeout 的等效寫法，
+ * 並 unref 掉計時器，避免請求提早完成後還把行程吊著。
+ */
+function createTimeoutSignal(ms: number) {
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(ms);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  if (typeof (timer as { unref?: () => void })?.unref === "function") {
+    (timer as { unref: () => void }).unref();
+  }
+  return controller.signal;
+}
+
 export async function enrichSummaryCases(
   cases: LlmSummaryCaseItem[],
   frontendApiServerBase: string,
@@ -87,6 +110,9 @@ export async function enrichSummaryCases(
             query: {
               farePolicyID: item.id,
             },
+            // 逾時就中止這一筆請求；失敗會落到下面的 catch 退回原 item，
+            // 維持「單筆逾時／失敗不影響其他筆」的行為。
+            signal: createTimeoutSignal(DETAIL_FETCH_TIMEOUT_MS),
           }
         );
 
