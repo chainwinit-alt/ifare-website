@@ -6,6 +6,7 @@
       role="combobox"
       :aria-expanded="isShow"
       aria-haspopup="dialog"
+      :aria-controls="dialogId || undefined"
       :aria-label="props.selectTitle || props.placeholder"
       @click="ToggleSelectDialog"
       @keydown.enter.prevent="ToggleSelectDialog"
@@ -22,9 +23,15 @@
             </button>
       </div>
       <div class="select-content-bg" v-show="isShow">
-        <div class="select-content" @click.stop.prevent="PreventClick($event)">
+        <div
+          class="select-content"
+          role="dialog"
+          :id="dialogId || undefined"
+          :aria-labelledby="dialogId ? `${dialogId}-title` : undefined"
+          @click.stop.prevent="PreventClick($event)"
+        >
           <div class="part-top">
-            <h5 class="select-title">{{ props.selectTitle }}</h5>
+            <h5 class="select-title" :id="dialogId ? `${dialogId}-title` : undefined">{{ props.selectTitle }}</h5>
           </div>
           <div class="part-filter-list">
             <div class="filter-group">
@@ -69,6 +76,9 @@
   <script setup lang="ts">
   import { computed, watch } from "vue";
 
+  // 2026-08-25 A11y #35：模組層級計數器，為進階篩選對話框產生穩定且唯一的 id
+  let comboboxUidSeed = 0;
+
   interface switchItem {
     type: string,
     name: string,
@@ -80,6 +90,8 @@
   const isShow = ref(false);
   const isOpts = ref(false)
   const selectItems = reactive<Array<switchItem>>([])
+  // 2026-08-25 A11y #35：進階篩選對話框的唯一 id，於 client 端 mount 後才產生（避免 SSR/CSR hydration 不一致）
+  const dialogId = ref("")
 
   function ToggleSelectDialog() {
     isShow.value = !isShow.value;
@@ -186,6 +198,11 @@
   set() {
       emits("update:select-items", selectItems);
     },
+  });
+
+  onMounted(() => {
+    // 2026-08-25 A11y #35：於 client 端產生唯一 id（避免 SSR/CSR hydration 不一致）
+    dialogId.value = `comp-select-else-${comboboxUidSeed++}`;
   });
   </script>
 
