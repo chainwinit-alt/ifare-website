@@ -1,6 +1,6 @@
 using System;
 using Abp.Domain.Repositories;
-using Abp.UI;
+using Castle.Core.Logging;
 using IFare_API.Common;
 using IFare_API.Common.ValueModel;
 using IFare_API.Constants;
@@ -11,11 +11,13 @@ namespace IFare_API.TaskManager.Visitor
     {
         private readonly IRepository<VisitorRecord> _repositoryVisitor;
         private readonly ICommonToolsManager _commonTools;
+        public ILogger Logger { get; set; }
         public VisitorTaskManager(IRepository<VisitorRecord> repositoryVisitor,
                                 ICommonToolsManager commonTools)
         {
             _repositoryVisitor = repositoryVisitor;
             _commonTools = commonTools;
+            Logger = NullLogger.Instance;
         }
 
         public ErrorInfoBase SetVisitorRecord(string ip, string route)
@@ -34,7 +36,10 @@ namespace IFare_API.TaskManager.Visitor
             }
             catch (Exception e)
             {
-                throw new UserFriendlyException(e.Message);
+                // 原始例外可能含資料表、欄位、連線等內部細節，僅記錄於伺服器端，不外洩給呼叫端
+                Logger.Error("[VisitorTaskManager] SetVisitorRecord 寫入訪客記錄失敗", e);
+                // 對外只回傳通用失敗結果，與本方法其他失敗路徑一致
+                return _commonTools.GetErrorInfo_API(ErrAPI.Code_Fail);
             }
         }
     }
