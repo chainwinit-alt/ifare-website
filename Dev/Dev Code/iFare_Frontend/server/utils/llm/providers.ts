@@ -272,20 +272,69 @@ export function createOpenAIClient(config: {
   };
 }
 
+/**
+ * 讀 Gemini 的 SSE 串流，逐段回呼並回傳累積的全文。
+ *
+ * 與 Groq 的差別只在 JSON 的形狀：Gemini 每一筆 data 是一個完整的
+ * GenerateContentResponse，新增的字在 candidates[0].content.parts[*].text，
+ * 而且 parts 可能不只一段，要全部串起來。切包、尾巴保留、解析失敗就跳過的
+ * 處理方式與 readGroqStream 相同，理由見那邊的說明。
+ */
+async function readGeminiStream(response: Response, onDelta: LlmSummaryDeltaHandler) {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  let full = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    // Google 的 SSE 用 \r\n 換行，統一成 \n 才切得到事件邊界
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/gu, "\n");
+
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) {
+      const line = block.split("\n").find((item) => item.startsWith("data: "));
+      if (!line) continue;
+      try {
+        const parts = JSON.parse(line.slice(6))?.candidates?.[0]?.content?.parts ?? [];
+        const delta = parts.map((part: any) => part?.text ?? "").join("");
+        if (delta) {
+          full += delta;
+          onDelta(delta, full);
+        }
+      } catch {
+        // 這一段還沒收完整，等下一輪
+      }
+    }
+  }
+
+  return full;
+}
+
 export function createGeminiClient(config: {
   apiKey: string;
   model: string;
 }): LlmClient {
   return {
-    async summarize(input: LlmSummaryInput) {
+    async summarize(input: LlmSummaryInput, onDelta?: LlmSummaryDeltaHandler) {
       if (!config.apiKey) {
         throw new Error("Gemini API key is not configured.");
       }
 
+      // 有人要逐段更新畫面才開串流；沒有 onDelta 就走原本的一次回傳。
+      //
+      // 這一站的供應商順序是 gemini 優先（用的是基金會自己的金鑰），所以在 Gemini
+      // 補上串流之前，摘要卡實際上從來沒有逐字長出來過——民眾按下送出後只看得到
+      // 一句「整理中」，十幾秒後整段answer才一次蹦出來，看起來像當掉。
+      const endpoint = onDelta ? "streamGenerateContent?alt=sse" : "generateContent";
       // 金鑰改走 x-goog-api-key header，不放進 URL query——避免 proxy／IIS 存取記錄
       // 或帶 URL 的錯誤堆疊把金鑰明文寫進日誌（與 chatbot.post.ts 的作法一致）。
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:${endpoint}`,
         {
           method: "POST",
           headers: {
@@ -317,6 +366,12 @@ export function createGeminiClient(config: {
       if (!response.ok) {
         const errorText = await readErrorText(response);
         throw new Error(`Gemini request failed with status ${response.status}. ${errorText}`.trim());
+      }
+
+      if (onDelta) {
+        // 串流回來的是模型的原始輸出；結尾的引導問句、空白收斂與長度上限都要等全文
+        // 收完才算得出來，所以畫面上先逐字長出原文，最後由 done 事件換成整理過的版本。
+        return finalizeSummary(await readGeminiStream(response, onDelta), input);
       }
 
       const data: any = await response.json();

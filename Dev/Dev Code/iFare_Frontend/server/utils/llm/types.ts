@@ -72,8 +72,8 @@ export interface LlmSummaryInput {
  * 串流則 474ms 就吐出第一個字。使用者盯著轉圈圈的時間差了六倍以上，
  * 而摘要卡與 plugins/llm.ts 早就接好逐段更新，只差伺服器這一端真的分段送。
  *
- * 目前只有 Groq 走串流；Gemini 的串流 API 形式不同，不給 onDelta 時所有 client
- * 都維持原本的一次回傳，所以是可選的加強，不是必要條件。
+ * Groq 與 Gemini 都走串流（各自的 SSE 形式不同，見 providers.ts）。其餘 client
+ * 與所有不給 onDelta 的呼叫都維持原本的一次回傳，所以是可選的加強，不是必要條件。
  */
 export type LlmSummaryDeltaHandler = (delta: string, full: string) => void;
 
