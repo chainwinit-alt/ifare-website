@@ -99,10 +99,17 @@
             <label class="filter-name">關鍵字</label>
             <div class="query-action-row">
               <div class="query-field">
+                <!--
+                  placeholder 從「請輸入關鍵字」改成一句示範：最需要這個網站的人，
+                  正是不知道該打什麼關鍵字的人。搜尋本來就吃得下口語與處境描述，
+                  只是沒人告訴使用者可以這樣打，所以直接把用法示範在提示裡。
+                  aria-label 維持「搜尋福利關鍵字」——提示文字一打字就消失，
+                  不能拿來當報讀軟體念的名稱。
+                -->
                 <IfareSearchAutocomplete
                   v-model="searchQuery"
                   :filters="autocompleteFilters"
-                  placeholder="請輸入關鍵字"
+                  placeholder="用您的狀況描述，例如：我媽媽需要人照顧"
                   aria-label="搜尋福利關鍵字"
                   @submit="Search"
                 />
@@ -117,6 +124,21 @@
                 <span>搜尋</span>
                 <i class="icon ic-search" aria-hidden="true"></i>
               </button>
+            </div>
+            <!--
+              範例問法：光把 placeholder 換成示範句還不夠，那行字一按下輸入框就不見了。
+              這排是可以直接點的真按鈕，點下去＝幫使用者把句子填進關鍵字欄再送出，
+              走的是跟自己打字後按「搜尋」完全相同的 Search()。
+            -->
+            <div class="query-examples" role="group" aria-labelledby="label-query-examples">
+              <span class="query-examples-label" id="label-query-examples">不知道怎麼描述？試試看：</span>
+              <button
+                class="btn-query-example transition-general"
+                type="button"
+                v-for="_example in searchExamples"
+                :key="_example"
+                @click="SearchExample(_example)"
+              >{{ _example }}</button>
             </div>
           </div>
         </div>
@@ -289,6 +311,20 @@ const areaSelectList = reactive<Array<selectItem>>([
 ]);
 const codeSelectArea = ref(ALL_AREA_VALUE);
 const searchQuery = ref("");
+
+// 搜尋框下方的範例問法。刻意用第一人稱的口語描述，而不是「失業補助」這種名詞，
+// 因為要示範的正是「可以講人話」這件事。
+// 這六句都先在正式資料上查過、確定搜得到結果（82～728 筆不等），要換句子前請
+// 一樣先確認搜得到東西——點下去卻是空結果，比不給範例更打擊人。
+const searchExamples = [
+  "我最近失業沒有收入",
+  "我媽媽需要人照顧",
+  "我想申請低收入戶",
+  "家裡有身心障礙者",
+  "我懷孕了有什麼補助",
+  "老人家想裝假牙",
+];
+
 const recipientSelectList = reactive<Array<selectItem>>([]);
 const codeSelectRecipient = ref("");
 const isVisibleRecipient = ref(true)
@@ -428,6 +464,14 @@ function Search() {
   });
   codeSelectArea.value = ALL_AREA_VALUE
   searchQuery.value = ""
+}
+
+// 點範例問法：只做「填字 + 送出」兩件事，其餘一律交回 Search()。
+// 不另外寫跳轉邏輯，未來搜尋條件或路由怎麼改，這裡都會自動跟著一起改。
+// Search() 是同步讀 searchQuery.value 的，先指派再呼叫即可，不必等 nextTick。
+function SearchExample(example: string) {
+  searchQuery.value = example;
+  Search();
 }
 
 // Office Unit
@@ -686,5 +730,67 @@ const currentPage_QA = ref(1);
 .btn-retry-inline:hover {
   border-color: rgba(0, 0, 0, 0.3);
   background: rgba(0, 0, 0, 0.02);
+}
+
+/* 範例問法：沿用卡片內既有的小標籤語彙（低彩度底色、無粗框、hover 才上色），
+   但用主色系 pill 圓角，跟上方「受助者年齡區間」那排刻意做出區別——那排是會留著
+   選取狀態的篩選標籤，這排點一下就直接送出搜尋，不該長得像可以複選的條件。
+   外距交給 .item 既有的 flex gap（桌機 12px／手機 8px），這裡不再自己加 margin。 */
+.query-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.query-examples-label {
+  color: rgba(23, 24, 24, 0.6);
+  font-family: Noto Sans TC;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.btn-query-example {
+  max-width: 100%;
+  padding: 6px 14px;
+  border: 1px solid rgba(0, 173, 178, 0.32);
+  border-radius: 999px;
+  background: rgba(0, 173, 178, 0.06);
+  color: #007d81;
+  font-family: Noto Sans TC;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  /* 極窄畫面時句子自己折行，寧可變成兩行也不要把卡片撐破 */
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.btn-query-example:hover {
+  border-color: #00adb2;
+  background: rgba(0, 173, 178, 0.14);
+}
+
+/* 鍵盤使用者要看得出焦點停在哪顆：外框沿用全站的橘色焦點樣式（error.vue 同款），
+   另外一併加深底色，讓高對比模式下即使外框被蓋掉也還看得出來 */
+.btn-query-example:focus-visible {
+  outline: 2px solid rgba(234, 85, 4, 0.7);
+  outline-offset: 2px;
+  border-color: #00adb2;
+  background: rgba(0, 173, 178, 0.14);
+}
+
+/* 手機：說明文字獨佔一行，標籤才有整行寬度可以排；字級跟著 .filter-name 一起降 */
+@media (max-width: 768px) {
+  .query-examples-label {
+    flex: 1 0 100%;
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  .btn-query-example {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
 }
 </style>
