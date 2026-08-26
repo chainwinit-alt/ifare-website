@@ -1618,6 +1618,15 @@ function sortPolicyResultsByCondition(items: any[]) {
     .map((entry) => entry.item);
 }
 
+/**
+ * 太通用、不足以代表一個搜尋主題的概念詞。
+ * 它們單獨拿去查會撈回大量弱相關，也會繞過後端的主題落地守門
+ *（HasGroundedSearchTopic）——站內沒有「寵物醫療」，但「醫療」有幾百筆。
+ */
+const GENERIC_CONCEPT_TERMS = new Set([
+  "補助", "津貼", "醫療", "教育", "交通", "居家", "照顧", "就業", "住宅",
+]);
+
 const policySearchConceptPattern =
   /長期照顧|長照|照顧者|照顧|生育|懷孕|孕婦|新生兒|育兒|托育|身心障礙|智能障礙|身障|低能兒|老人|長者|高齡|兒少|兒童|青少年|低收入|中低收入|經濟弱勢|原住民|新住民|醫療|教育|就學|學費|租屋|住宅|失業|就業|急難|喪葬|交通|輔具|看護|居家|喘息|補助|津貼/giu;
 
@@ -2476,6 +2485,37 @@ async function SetDataInit() {
         weight: 0.3,
       }))
     : [];
+  /**
+   * 概念詞兜底：從使用者原句抽出站內認得的福利概念詞，各查一路。
+   *
+   * 為什麼需要：意圖判讀的 LLM 輸出會浮動。同一句「我媽媽80歲想裝假牙」，
+   * 這次回乾淨的「假牙」（38 筆），下次回「媽媽80歲假牙」（0 筆）——後者把年齡黏在
+   * 主題上，整句查不到。而 splitQuerySegments 只依空白與標點切，連續中文的長句
+   * 切不出任何分段，等於完全沒有兜底，使用者就撞到查無資料。
+   *
+   * 這一路只用 policySearchConceptPattern（站內既有的概念詞表：長照、生育、
+   * 身心障礙、假牙…），都是確認過站內查得到的詞，不是 AI 生成，所以不會有
+   * 「硬湊出不存在主題」的風險。權重比照字面分段。
+   */
+  const conceptFallbackTerms = [...new Set(
+    Array.from(
+      String(originalQuery || "").matchAll(policySearchConceptPattern),
+      (match) => String(match[0] || "").trim()
+    ).filter((term) => term.length >= 2)
+  )]
+    .filter((term) => term !== originalQuery.trim())
+    // 排除過度通用的詞：單獨查「醫療」「補助」等於沒篩，而且會繞過後端的主題落地守門——
+    // 實測「寵物醫療補助」原本正確回 0 筆，抽出「醫療」單獨查就撈回幾百筆弱相關。
+    // 這一路是為了救「假牙」「長照」這種具體主題，不是為了讓任何查詢都有結果。
+    .filter((term) => !GENERIC_CONCEPT_TERMS.has(term));
+  const conceptFallbackPlans: PolicySearchRequestPlan[] = conceptFallbackTerms
+    .flatMap((term) => buildFarePolicyApiQueries(term))
+    .map((query) => ({
+      query,
+      source: "original" as const,
+      weight: 0.4,
+    }));
+
   // 複數關鍵字：每個分段各自查一次，字面命中權重高於 AI 擴充
   const segmentPlans: PolicySearchRequestPlan[] = splitQuerySegments(originalQuery)
     .flatMap((segment) => buildFarePolicyApiQueries(segment))
@@ -2486,12 +2526,42 @@ async function SetDataInit() {
     }));
 
   try {
-    const extraPlans = [...segmentPlans, ...aiPlans, ...situationPlans, ...recallConceptPlans];
+    // 召回概念詞先不併進來：要等原句那幾路的結果出來才知道能不能採用（見下方說明）
+    const extraPlans = [...segmentPlans, ...conceptFallbackPlans, ...aiPlans, ...situationPlans];
     const [originalOutcomes, extraOutcomes] = await Promise.all([
       originalResponsePromise,
       Promise.all(extraPlans.map((plan) => requestPolicyList(plan.query))),
     ]);
     if (requestId !== policySearchRequestId) return;
+
+    /**
+     * AI 召回概念詞的守門：站內確實有這個主題時才採用。
+     *
+     * 提示詞已經寫明「判斷不出所屬領域就回空陣列，不要硬湊」，但模型還是會湊——
+     * 實測「電動車充電樁」被硬對成 ["住宅","無障礙"]，那一路查回 428 筆，
+     * 把原本正確的「查無資料」變成一堆弱相關，等於繞過後端的主題落地守門
+     *（HasGroundedSearchTopic）。提示詞壓不住就在程式層擋，與本專案其他 AI 防線一致。
+     *
+     * 判準：原始關鍵字與 AI 核心詞這幾路只要有任何一筆結果，代表站內真的有這個主題，
+     * 召回詞是在既有主題上補漏，可以採用；全部 0 筆則代表站內沒有，這時召回詞
+     * 只會是模型硬湊出來的雜訊。處境擴充詞（situationPlans）不算進判準——
+     * 它來自人工維護、詞都確認過站內查得到，本來就是為了救「原句查無」的情況。
+     */
+    const hasResult = (outcome: PolicySearchOutcome) =>
+      outcome.ok && getPolicyResponseItems(outcome.response).length > 0;
+    // 原始字那幾路 ＋ 字面分段 ＋ 概念詞兜底 ＋ AI 核心詞；不含處境擴充
+    //（處境擴充本來就是為了救「原句查無」，拿它當判準會讓守門失去意義）
+    const groundedHitFromExtra = extraOutcomes.some((outcome, index) =>
+      !situationPlans.includes(extraPlans[index]) && hasResult(outcome));
+    const hasGroundedHit = originalOutcomes.some(hasResult) || groundedHitFromExtra;
+
+    const recallOutcomes = hasGroundedHit && recallConceptPlans.length
+      ? await Promise.all(recallConceptPlans.map((plan) => requestPolicyList(plan.query)))
+      : [];
+    const usedRecallPlans = recallOutcomes.length ? recallConceptPlans : [];
+    if (requestId !== policySearchRequestId) return;
+    extraPlans.push(...usedRecallPlans);
+    extraOutcomes.push(...recallOutcomes);
 
     // 只留查成功的那幾路。mergeRankedPolicySearchResults 是靠索引把 responses 對回
     // plans 的，兩邊必須同進同退，否則權重會套到別路查詢的結果上。

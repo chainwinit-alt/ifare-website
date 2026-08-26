@@ -6,6 +6,9 @@ const commonTypoReplacements: Array<[RegExp, string]> = [
   [/身障(?!礙)/gu, "身心障礙"],
   [/低收戶/gu, "低收入戶"],
   [/中低收戶/gu, "中低收入戶"],
+  // 「假牙」的常見同音誤植。2026-08-26 評估集實測「假芽補助」查 0 筆——
+  // 「假芽」不會有別的意思（發芽、芽苗都不含「假」），無條件修正不會誤傷。
+  [/假芽/gu, "假牙"],
 ];
 
 export function fixCommonTypos(value: unknown) {
