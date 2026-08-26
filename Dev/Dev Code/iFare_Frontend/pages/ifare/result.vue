@@ -981,18 +981,38 @@ async function probeSummaryScopeShift(userText: string) {
   if (!target) return null;
 
   try {
-    const responses = await Promise.all(
-      buildFarePolicyApiQueries(undefined, "", { field: target.field, val: target.val }).map((query) =>
-        $WebApiGet("/FarePolicy/GetIFarePolicyList", query)
-      )
-    );
+    /**
+     * 關鍵字逐步放寬，避免「查不到」被誤讀成「那個範圍沒有」。
+     *
+     * 探測原本沿用目前的搜尋關鍵字（第一個 undefined），但那個詞可能是站內根本沒有的
+     * 講法——實測搜「我爸爸中風需要人照顧」時，AI 核心詞是「中風照顧服務」，
+     * 拿它加上「地區=台北市」去查是 0 筆（站內沒有「中風」二字），於是探測回 null、
+     * 不送 scopeHint，AI 只能照候選那三筆回答「站內未載明台北市」——但台北市其實有
+     * 233 筆、光是長照機構相關就有 7 筆。這是「把真有的說成沒有」，是本站最該避免的錯。
+     *
+     * 所以依序試：原關鍵字 → 處境擴充後的詞 → 完全不帶關鍵字（只看該範圍本身有幾筆）。
+     * 任何一階段查到東西就採用，回報的筆數才是那個範圍的真實情況。
+     */
+    const probeKeywords: Array<string | undefined> = [undefined];
+    const expandedProbe = expandSituationVocabulary(policyProbeKeyword.value || searchQuery.value);
+    if (expandedProbe && expandedProbe !== policyProbeKeyword.value) probeKeywords.push(expandedProbe);
+    probeKeywords.push("");
+
     const ids = new Set<string>();
-    responses.forEach((response) => {
-      getPolicyResponseItems(response).forEach((item: any) => {
-        const id = String(item?.id ?? item?.ID ?? "");
-        if (id) ids.add(id);
+    for (const keyword of probeKeywords) {
+      const responses = await Promise.all(
+        buildFarePolicyApiQueries(keyword, "", { field: target.field, val: target.val }).map((query) =>
+          $WebApiGet("/FarePolicy/GetIFarePolicyList", query)
+        )
+      );
+      responses.forEach((response) => {
+        getPolicyResponseItems(response).forEach((item: any) => {
+          const id = String(item?.id ?? item?.ID ?? "");
+          if (id) ids.add(id);
+        });
       });
-    });
+      if (ids.size > 0) break;
+    }
     if (ids.size === 0) return null;
     return { ...target, count: ids.size };
   } catch (error) {
