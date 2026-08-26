@@ -430,6 +430,35 @@ function getSpecificArea(value = codeSelectArea.value) {
  * override：把某一項換成別的值，用來算「改成台北市會有幾筆」。
  * 一律走同一個組裝流程，避免建議的筆數跟實際搜尋結果對不上。
  */
+/**
+ * 勾一項經濟條件之後，選取的會變成哪幾項。
+ *
+ * 經濟條件與特殊身分是複選：勾第二項是「再加一項」，不是「換成這一項」。
+ * 摘要卡上寫的筆數是先查回來的，查的時候得跟按下去之後完全一樣才不會騙人——
+ * 已選低收入戶、卡片又推薦中低收入戶時，若查的是「只有中低收入戶」，
+ * 寫出來的數字會比實際套用後（兩者都算）少一截。
+ * 所以切換與探測共用這一支，兩邊各寫一次規則遲早會走偏。
+ */
+function nextIncomeSelection(current: string[], value: string) {
+  return current.includes(value)
+    ? current.filter((item) => item !== value)
+    : [...current, value];
+}
+
+/** 同上。「無」與其他身分互斥：選了「無」就只剩它，選別的就把它拿掉。 */
+function nextIdentitySelection(current: string[], value: string) {
+  const noIdentityValue = identitySelectList.find((item) => item.name.trim() === "無")?.val;
+
+  if (value === noIdentityValue) {
+    return current.includes(value) ? [] : [value];
+  }
+
+  const withoutNoIdentity = current.filter((item) => item !== noIdentityValue);
+  return withoutNoIdentity.includes(value)
+    ? withoutNoIdentity.filter((item) => item !== value)
+    : [...withoutNoIdentity, value];
+}
+
 function buildFarePolicyApiQueries(
   keywordOverride?: string,
   omitField = "",
@@ -440,8 +469,11 @@ function buildFarePolicyApiQueries(
   const baseQuery: Record<string, any> = {};
   const selectedPolicy = overrideOf("policy") || codeSelect_policy.value || ALL_POLICY_VALUE;
   const selectedRecipient = overrideOf("recipient") || codeSelectRecipient.value;
+  // 複選欄位要照「勾下去會變成什麼」來算，不是「只留這一項」——理由見 nextIncomeSelection。
+  // 帶 override 的呼叫都是在替某顆按鈕算筆數，而那些按鈕按下去走的正是 SwitchIdentity／
+  // SwitchIncome（見 applySummaryConditions、applySummaryQuickOption）。
   const selectedIdentities = overrideOf("identity")
-    ? [overrideOf("identity")]
+    ? nextIdentitySelection(codeSelectIdentity.value, overrideOf("identity"))
     : codeSelectIdentity.value;
 
   if (omitField !== "policy" && !isAllPolicyValue(selectedPolicy)) baseQuery.CodePolicy = selectedPolicy;
@@ -455,7 +487,9 @@ function buildFarePolicyApiQueries(
 
   const selectedIncomes = omitField === "income"
     ? []
-    : (overrideOf("income") ? [overrideOf("income")] : codeSelectIncomes.value);
+    : (overrideOf("income")
+      ? nextIncomeSelection(codeSelectIncomes.value, overrideOf("income"))
+      : codeSelectIncomes.value);
   const incomeQueries: Array<string | undefined> = selectedIncomes.length > 0
     ? [...selectedIncomes]
     : [undefined];
@@ -1286,10 +1320,7 @@ function SwitchIncome(codeVal: any) {
   if (codeVal == "reset") {
     codeSelectIncomes.value = [];
   } else {
-    const value = String(codeVal);
-    codeSelectIncomes.value = codeSelectIncomes.value.includes(value)
-      ? codeSelectIncomes.value.filter((item) => item !== value)
-      : [...codeSelectIncomes.value, value];
+    codeSelectIncomes.value = nextIncomeSelection(codeSelectIncomes.value, String(codeVal));
   }
 
   incomeSelectList.forEach((item) => {
@@ -1345,17 +1376,7 @@ function SwitchIdentity(codeVal: any) {
   if (codeVal == "reset") {
     codeSelectIdentity.value = [];
   } else {
-    const value = String(codeVal);
-    const noIdentityValue = identitySelectList.find((item) => item.name.trim() === "無")?.val;
-
-    if (value === noIdentityValue) {
-      codeSelectIdentity.value = codeSelectIdentity.value.includes(value) ? [] : [value];
-    } else {
-      const withoutNoIdentity = codeSelectIdentity.value.filter((item) => item !== noIdentityValue);
-      codeSelectIdentity.value = withoutNoIdentity.includes(value)
-        ? withoutNoIdentity.filter((item) => item !== value)
-        : [...withoutNoIdentity, value];
-    }
+    codeSelectIdentity.value = nextIdentitySelection(codeSelectIdentity.value, String(codeVal));
   }
 
   identitySelectList.forEach((item) => {
