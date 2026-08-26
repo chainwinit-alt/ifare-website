@@ -1363,8 +1363,8 @@ function SwitchIdentity(codeVal: any) {
   });
 }
 
-function Search() {
-  if (!canSearch.value) return false;
+/** 目前的篩選狀態轉成網址參數。網址上讀得到的就是這一組，分享出去也是這一組。 */
+function buildFilterRouteQuery() {
   const routeQuery: Record<string, string> = {
     policy: codeSelect_policy.value || ALL_POLICY_VALUE,
     area: codeSelectArea.value || ALL_AREA_VALUE,
@@ -1373,7 +1373,70 @@ function Search() {
   if (codeSelectIncomes.value.length > 0) routeQuery.income = codeSelectIncomes.value.join(",");
   if (codeSelectIdentity.value.length > 0) routeQuery.identities = codeSelectIdentity.value.join(",");
   if (searchQuery.value.trim()) routeQuery.query = searchQuery.value.trim();
-  void $router.replace({ query: routeQuery });
+  return routeQuery;
+}
+
+/**
+ * 網址參數 → 篩選條件。舊網址的寫法（area=全國、__all_policy）與簡體關鍵字都在這裡收斂，
+ * 所以拿「網址寫的」跟「畫面選的」互相比對時，兩邊用的是同一套標準。
+ */
+function parseRouteFilters(query: Record<string, any>) {
+  return {
+    policy: getPolicyRouteValue(query.policy),
+    area: getRouteValues(query.area, [ALL_AREA_VALUE])[0] || ALL_AREA_VALUE,
+    recipient: typeof query.recipient == "string" ? query.recipient : "",
+    incomes: getRouteValues(query.income),
+    identities: getRouteValues(query.identities),
+    query: normalizeSummaryKeyword(typeof query.query == "string" ? query.query : ""),
+  };
+}
+
+/** 一組條件的身分證。用來分辨網址是「自己剛剛寫上去的」還是「使用者按了上一頁」。 */
+function getRouteFilterSignature(query: Record<string, any>) {
+  return JSON.stringify(parseRouteFilters(query));
+}
+
+/**
+ * 把網址上那組條件套回畫面。
+ * isActive 一定要跟著補：年齡、經濟、特殊身分的選取狀態存在清單自己身上，
+ * 只改 codeSelect* 的話按鈕會亮在上一組條件上，看起來像篩選跟結果對不起來。
+ */
+function applyRouteFilters(query: Record<string, any>) {
+  const filters = parseRouteFilters(query);
+  codeSelect_policy.value = filters.policy;
+  codeSelectArea.value = filters.area;
+  codeSelectRecipient.value = filters.recipient;
+  codeSelectIncomes.value = filters.incomes;
+  codeSelectIdentity.value = filters.identities;
+  searchQuery.value = filters.query;
+
+  recipientSelectList.forEach((item) => {
+    item.isActive = item.val === filters.recipient;
+  });
+  incomeSelectList.forEach((item) => {
+    item.isActive = filters.incomes.includes(item.val);
+  });
+  identitySelectList.forEach((item) => {
+    item.isActive = filters.identities.includes(item.val);
+  });
+}
+
+function Search() {
+  if (!canSearch.value) return false;
+  const routeQuery = buildFilterRouteQuery();
+  /**
+   * 換一組條件就是一次新的搜尋，歷史紀錄要留下一筆。
+   *
+   * 全部用取代的話，搜「長照」看完再搜「托育」，按上一頁會直接離開結果頁跳回首頁——
+   * 想再看一次長照那組結果，只能自己重打一次關鍵字、重選一次條件。
+   *
+   * 條件一模一樣的重查（連按兩次搜尋鈕）仍然取代：那不是新的一步，
+   * 留成一筆只會讓上一頁按起來像卡住，畫面停在同一組結果上。
+   */
+  const isSameSearch = getRouteFilterSignature(routeQuery) === getRouteFilterSignature($route.query);
+  void (isSameSearch
+    ? $router.replace({ query: routeQuery })
+    : $router.push({ query: routeQuery }));
   void SetDataInit();
 }
 
@@ -1392,13 +1455,29 @@ const $route = useRoute();
 const $router = useRouter();
 
 // Init filter default value.
-codeSelect_policy.value = getPolicyRouteValue($route.query.policy)
-codeSelectArea.value = getRouteValues($route.query.area, [ALL_AREA_VALUE])[0] || ALL_AREA_VALUE
-codeSelectRecipient.value = typeof $route.query.recipient == "string" ? $route.query.recipient : ""
-codeSelectIncomes.value = getRouteValues($route.query.income)
-codeSelectIdentity.value = getRouteValues($route.query.identities)
-searchQuery.value = normalizeSummaryKeyword(
-  typeof $route.query.query == "string" ? $route.query.query : ""
+applyRouteFilters($route.query)
+
+// 這個頁面自己的路徑。導覽去政策明細時 $route 會先換成明細那一頁，
+// 下面的 watcher 要靠它認出「已經不是我這一頁了」，才不會在拆掉的路上又發一次搜尋。
+const resultRoutePath = $route.path
+
+/**
+ * 瀏覽器上一頁／下一頁。
+ *
+ * 只有 query 變動時 Nuxt 不會重新掛載這一頁，所以沒有這一段的話，按上一頁只會看到
+ * 網址從「托育」退回「長照」、底下卻還是托育那批結果，比停在原地更難理解。
+ *
+ * 網址跟畫面已經一致就什麼都不做：搜尋當下寫網址、意圖解析把地區補進網址，
+ * 那幾次都會經過這裡，照著再查一次等於每搜一次就白白多打一整輪 API。
+ */
+watch(
+  () => $route.query,
+  (query) => {
+    if ($route.path !== resultRoutePath) return
+    if (getRouteFilterSignature(query) === getRouteFilterSignature(buildFilterRouteQuery())) return
+    applyRouteFilters(query)
+    void SetDataInit()
+  }
 )
 
 interface iFarePolicyItem {
@@ -2063,6 +2142,9 @@ onMounted(() => {
   if (consumeReloadNavigation()) {
     ResetParam();
     clearIFareSummaryCaches();
+    // 網址是跟著剛清空的表單一起修掉的，不是使用者又往前走了一步。
+    // 留成新的一筆，按上一頁會退回那個還帶著舊條件的網址，但畫面上的欄位早就空了，
+    // 網址與畫面從此對不起來。
     void $router.replace({ query: {} });
     // 瀏覽器會還原重整前的捲軸位置，畫面會停在政策清單中間——欄位明明已經清空，
     // 看到的卻跟剛剛一樣。擋掉這一輪自動捲到結果的行為，改成捲回最上面
@@ -2105,6 +2187,9 @@ async function applyResolvedSearchArea(areaName: string) {
   codeSelectArea.value = areaItem.val;
   activeSummaryState.area = areaItem.val;
   const routeQuery = { ...$route.query, area: areaItem.val };
+  // 意圖解析認出來的地區是這一次搜尋的一部分，網址只是補寫成跟畫面一致。
+  // 留成新的一筆，一次搜尋就在歷史裡佔兩格：按上一頁還是同一批結果，
+  // 只有網址少了地區，看起來像按了沒反應，得連按兩次才退得回上一次搜尋。
   await $router.replace({ query: routeQuery });
   return true;
 }
@@ -2242,6 +2327,8 @@ async function applyResolvedSearchFilters(
     else delete routeQuery.income;
     if (codeSelectIdentity.value.length > 0) routeQuery.identities = codeSelectIdentity.value.join(",");
     else delete routeQuery.identities;
+    // 這幾項是這一次搜尋自己補進來的，網址跟著補寫而已，使用者並沒有多走一步。
+    // 留成新的一筆，上一頁就得按兩次才退得回上一次搜尋。
     await $router.replace({ query: routeQuery });
   }
 
