@@ -268,7 +268,23 @@
             </div>
           </div>
         </template>
-        <p v-if="isFollowUpLoading" class="summary-message-pending">{{ followUpPendingText }}</p>
+        <!--
+          串流中的答案。等待時只有一句「整理中」而答案一次整段蹦出來，會讓人以為當掉了
+          （回答動輒十幾秒）；邊收邊顯示則是一開頭就看得到它在動，也能提早讀。
+
+          aria-hidden：這一整區是 aria-live="polite"，串流每進一個字都算一次變動，
+          讀螢幕的人會被同一句話重複唸到底。串流中的字對他們沒有用（他們讀不了半句話），
+          等下面 threadItems 收到完整的回答時再唸一次完整的就好。
+        -->
+        <div v-if="isFollowUpLoading && streamingAnswer" class="summary-answer" aria-hidden="true">
+          <span class="summary-answer-label">AI 回覆</span>
+          <div
+            class="summary-markdown"
+            v-html="renderThreadAnswer(streamingAnswer)"
+            @click="handleSummaryLinkClick"
+          ></div>
+        </div>
+        <p v-else-if="isFollowUpLoading" class="summary-message-pending">{{ followUpPendingText }}</p>
       </div>
 
       <!--
@@ -296,20 +312,31 @@
       <form class="summary-followup-form" @submit.prevent="submitFollowUp">
         <label class="summary-followup-label" for="ifare-summary-followup">回覆或提問</label>
         <div class="summary-followup-controls">
+          <!--
+            readonly 而不是 disabled：整理中要擋住重複送出，但 disabled 會讓輸入框
+            退出鍵盤焦點順序，游標當場掉到 body。只用鍵盤或讀螢幕的人送出一句話之後
+            就失去了位置，得從頭 Tab 一次才能問下一句——連問五題根本問不下去。
+            readonly 一樣打不了字，焦點卻留在原處。
+          -->
           <input
             id="ifare-summary-followup"
+            ref="followUpInputRef"
             v-model="followUpInput"
             type="text"
             maxlength="120"
             autocomplete="off"
             placeholder="回覆上面的問題，或直接問我（例如：要準備什麼文件？）"
-            :disabled="isFollowUpLoading"
+            :readonly="isFollowUpLoading"
           />
           <button type="submit" :disabled="!canSubmitFollowUp">
             {{ isFollowUpLoading ? "整理中" : "送出" }}
           </button>
         </div>
-        <p v-if="followUpError" class="summary-followup-error">
+        <!--
+          role="alert"：送出失敗只有這一行紅字，而它長在頁面下方。看不到畫面的人
+          原本完全不會知道剛才那句話沒送出去，只會一直等一個永遠不會來的回答。
+        -->
+        <p v-if="followUpError" class="summary-followup-error" role="alert">
           {{ followUpError }}
           <!-- 失敗時您那句話還留在對話串上，重試不用自己再打一次 -->
           <button
@@ -646,7 +673,11 @@ function expandPolicyIndexReference(text: string) {
 
 const conversationMessages = ref<SummaryConversationMessage[]>([]);
 const followUpInput = ref("");
+const followUpInputRef = ref<HTMLInputElement | null>(null);
 const followUpDraft = ref("");
+// 伺服器 meta 事件回報的這一輪模式。決定串流中的字要顯示在哪裡，所以必須是響應式的：
+// 「問問題」的答案接在對話串下面，「補條件」的結果是拿去取代上方那份摘要。
+const followUpDraftMode = ref("");
 const followUpError = ref("");
 // 送出失敗時保留那句話，讓使用者按一下就能重送，不用自己再打一次
 const failedFollowUpText = ref("");
@@ -704,11 +735,13 @@ const summaryLoadingText = computed(() => {
     return "正在依照您的補充重新整理摘要...";
   }
 
+  // 這兩句要講「現在在做什麼」，不是「AI 在判斷」。民眾看到「判斷中」會以為系統正在
+  // 決定他有沒有資格——這正是本站不做也不能做的事（資格一律由承辦機關認定）。
   if (props.resultsLoading) {
-    return "AI摘要判斷中...";
+    return "正在找出相符的政策…";
   }
 
-  return "AI 正在整理判斷結果...";
+  return "AI 正在整理重點…";
 });
 const canContinueConversation = computed(
   () => hasKeyword.value && !isSummaryBusy.value && Boolean(summaryDisplayText.value.trim())
@@ -721,6 +754,17 @@ const canSubmitFollowUp = computed(
 const isAnswerTurn = ref(false);
 const followUpPendingText = computed(() =>
   isAnswerTurn.value ? "正在翻找政策內容，為您回答…" : "正在依照您的補充重新整理摘要…"
+);
+// 串流中的答案，一個字一個字顯示在對話串下面。
+//
+// 只有「問問題」的回合這樣做，而且要等伺服器的 meta 說了 mode 才開始——補條件的回合
+// 產出的是「更新後的摘要」，會取代上方那一份，若也在下面邊打邊顯示，做完就得整段
+// 搬到卡片頂端，畫面會跳一下。在 mode 回來之前的短暫空檔仍然顯示「整理中」那句話。
+//
+// 首次摘要本來就是這樣邊收邊渲染的（summaryText 直接吃 fullText），
+// 半截的 Markdown 交給同一套 renderMarkdown 是既有且已驗證的行為。
+const streamingAnswer = computed(() =>
+  followUpDraftMode.value === "answer" ? followUpDraft.value : ""
 );
 // 伺服器算出的「這輪還值得請使用者補哪幾項條件」，依縮小範圍最有效的順序排。
 // 判斷邏輯不在前端重算，否則兩邊會各自算出不同答案，就會出現
@@ -985,6 +1029,9 @@ function askQuickQuestion(question: string) {
   if (isFollowUpLoading.value) return;
   followUpInput.value = question;
   void submitFollowUp();
+  // 這幾顆建議問句問過一次就整排收起來（showQuickAsk），焦點會跟著剛才那顆按鈕一起
+  // 消失。把焦點接到輸入框，只用鍵盤的人才接得下去問第二句。
+  void nextTick(() => followUpInputRef.value?.focus());
 }
 
 const pickedConditionList = computed(() =>
@@ -1674,7 +1721,7 @@ function sanitizeCachedThread(value: unknown): SummaryThreadItem[] {
       && typeof item.content === "string"
       && item.content
     )
-    .slice(-8)
+    .slice(-CONVERSATION_HISTORY_LIMIT)
     .map((item: any) => ({
       role: item.role,
       content: item.content,
@@ -1701,7 +1748,7 @@ function sanitizeCachedConversation(value: unknown): SummaryConversationMessage[
       && typeof item.content === "string"
       && item.content
     )
-    .slice(-8)
+    .slice(-CONVERSATION_HISTORY_LIMIT)
     .map((item: any) => ({ role: item.role, content: item.content }));
 }
 
@@ -1933,6 +1980,7 @@ function resetFollowUpConversation() {
   threadItems.value = [];
   followUpInput.value = "";
   followUpDraft.value = "";
+  followUpDraftMode.value = "";
   followUpError.value = "";
   failedFollowUpText.value = "";
   conversationSearchQuery.value = "";
@@ -1981,6 +2029,7 @@ async function submitFollowUp() {
   isAnswerTurn.value = isFollowUpQuestion(userReply);
   followUpInput.value = "";
   followUpDraft.value = "";
+  followUpDraftMode.value = "";
   followUpError.value = "";
   failedFollowUpText.value = "";
   isFollowUpLoading.value = true;
@@ -2034,7 +2083,10 @@ async function submitFollowUp() {
       },
       onMeta: (meta) => {
         if (currentRequestId !== followUpRequestId) return;
-        if (meta?.mode) replyMode = String(meta.mode);
+        if (meta?.mode) {
+          replyMode = String(meta.mode);
+          followUpDraftMode.value = replyMode;
+        }
         // answer 回合不動上方摘要，那份摘要結尾的引導問題還在，
         // 對應的推薦條件就不能跟著被清掉。
         if (meta?.mode !== "answer" && meta?.guidanceFields !== undefined) {
@@ -2061,7 +2113,10 @@ async function submitFollowUp() {
           content: reply,
           ...(scopeShift ? { action: scopeShift } : {}),
         });
-        threadItems.value = threadItems.value.slice(-8);
+        // 畫面上留的輪數要跟送給模型的輪數一樣。留 8 則等於只看得到 4 組問答，
+        // 問到第五個問題時前面就從畫面上消失了，但模型其實還記得——
+        // 使用者會以為系統忘了，於是把講過的話再講一次。
+        threadItems.value = threadItems.value.slice(-CONVERSATION_HISTORY_LIMIT);
       } else {
         // 補條件的回覆本身就是「更新後的摘要」：直接取代上面那份。
         // 政策集跟著換了，舊的問答不再對應現在的結果，只留這次說的那句話。
@@ -2081,6 +2136,7 @@ async function submitFollowUp() {
   } finally {
     if (currentRequestId !== followUpRequestId) return;
     followUpDraft.value = "";
+    followUpDraftMode.value = "";
     isFollowUpLoading.value = false;
     followUpController.value = null;
     // 摘要與對話串一起寫回快取，重新整理才接得下去
@@ -3144,6 +3200,13 @@ onBeforeUnmount(() => {
   outline: none;
 }
 
+/* 整理中不能打字。原本靠 disabled 的灰底，改用 readonly 之後要自己補回來，
+   否則游標還在框裡、按鍵卻沒反應，看起來像壞了 */
+.summary-followup-controls input:read-only {
+  background: rgba(246, 242, 235, 0.92);
+  color: #7d7266;
+  cursor: default;
+}
 .summary-followup-controls input:focus {
   border-color: #e9580c;
   box-shadow: 0 0 0 3px rgba(233, 88, 12, 0.12);
