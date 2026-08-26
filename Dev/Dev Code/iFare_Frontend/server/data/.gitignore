@@ -1,2 +1,4 @@
 dynamic-pages.json
 dynamic-assets/
+# 查詢記錄含民眾自己打的字（可能寫到家庭境況），只用於改善搜尋，不進版控
+search-logs/

@@ -2360,6 +2360,51 @@ async function searchSummaryConversationPolicies(
   };
 }
 
+/**
+ * 送出這一輪的搜尋記錄（fire-and-forget）。
+ *
+ * 只是為了知道民眾實際搜什麼、系統理解成什麼、查到幾筆，用來決定後續要補哪些同義詞。
+ * 所以三件事一定要守住：
+ * 1. 不 await、不進 loading、失敗完全吞掉——畫面絕不能因為這支端點慢或掛掉而受影響。
+ * 2. 只送查詢內容與結果統計，不附加任何身分資訊（後端也不會記 IP／UA，見 search-log.post.ts）。
+ * 3. 只在「使用者真的做了一次搜尋」時送：有打關鍵字，或至少選了一項篩選條件。
+ *    純空條件的重新渲染送出去只會稀釋掉真正有分析價值的那些筆。
+ */
+function logSearchQuery(resolvedQuery: string, resultCount: number) {
+  if (!process.client) return;
+
+  // 直接讀最後定案的那組條件（buildPolicyConditionContext 已經把「全部／不限地區」
+  // 這種等於沒選的值正規化成空字串），不必自己再判一次哪些算「有選」。
+  const conditions = buildPolicyConditionContext();
+  const hasKeyword = Boolean(normalizeSummaryKeyword(conditions.query));
+  const hasFilter = Boolean(
+    conditions.policy ||
+    conditions.area ||
+    conditions.recipient ||
+    conditions.income ||
+    conditions.identity
+  );
+  if (!hasKeyword && !hasFilter) return;
+
+  void $fetch("/api/search-log", {
+    method: "POST",
+    body: {
+      query: conditions.query,
+      resolvedQuery,
+      beneficiary: resolvedPolicyBeneficiary.value,
+      resultCount,
+      hasKeyword,
+      filters: {
+        area: conditions.area,
+        recipient: conditions.recipient,
+        income: conditions.income,
+        identity: conditions.identity,
+        policy: conditions.policy,
+      },
+    },
+  }).catch(() => {});
+}
+
 async function SetDataInit() {
   const requestId = ++policySearchRequestId;
   clearResultPinTimers();
@@ -2492,6 +2537,11 @@ async function SetDataInit() {
     const _data = getUniquePolicySearchResults(rawItems);
     const _newsList = mapPolicySearchItems(_data);
     replacePolicySearchItems(_newsList);
+    // 結果已經定案（清單寫入、筆數已知），這裡送出查詢記錄。
+    // 位置選在 searchFailed 那道 return 之後：一路都沒查成功的情況早就退出了，
+    // 記錄裡的 0 筆一定是「站內真的沒有」，不會跟「連不上後端」混在一起——
+    // 這份資料是拿來找該補哪些同義詞的，混進連線失敗會直接把結論帶偏。
+    logSearchQuery(resolvedQuery, _newsList.length);
   } finally {
     if (requestId !== policySearchRequestId) return;
     isLoading.value = false;
