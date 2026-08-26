@@ -131,7 +131,10 @@ export function extractExplicitSearchConditions(value: unknown): ExplicitSearchC
   else if (/低收/u.test(text) && !isLowIncomeFalseFriend) conditions.income = "低收入戶";
   else if (/經濟弱勢/u.test(text)) conditions.income = "經濟弱勢";
 
-  if (/老人|長者|長輩|高齡|銀髮|失智|敬老/u.test(text)) conditions.recipient = "老人";
+  // 家族稱謂也算「字面明確講出年齡族群」：民眾說「我爺爺」「我阿嬤」時，
+  // 受助者是長輩這件事是他自己講的，不是系統推測。實測「我的爺爺癌症…」原本
+  // 連年齡都抽不到。刻意不收「爸爸／媽媽」——那不一定是老人（可能是中壯年）。
+  if (/老人|長者|長輩|高齡|銀髮|失智|敬老|爺爺|奶奶|阿公|阿嬤|外公|外婆|祖父|祖母/u.test(text)) conditions.recipient = "老人";
   else if (/嬰幼兒|嬰兒|新生兒|寶寶|幼兒|托嬰/u.test(text)) conditions.recipient = "嬰幼兒";
   else if (/兒童|兒少|青少年|學童|國小|國中|高中/u.test(text)) conditions.recipient = "兒童＆青少年";
   else if (/成人|青年|壯年/u.test(text)) conditions.recipient = "成人";
@@ -245,6 +248,10 @@ const SITUATION_VOCABULARY: Array<[RegExp, string]> = [
   // 「缺錢」「手頭緊」「入不敷出」這類最直白的經濟困難講法原本沒收，實測「我缺錢可以怎麼辦」
   // 因此展開不出站內詞、DB 查 0 筆。站內對應的是急難救助（65 筆）與生活扶助，一併補齊常見說法。
   [/缺錢|沒錢|沒有錢|快沒錢|手頭(?:很|有點)?緊|經濟(?:困難|壓力|拮据|吃緊)|生活(?:過不下去|困難|陷入困境|有困難)|撐不下去|快活不下去|入不敷出|家裡沒(?:收入|錢)|沒(?:有)?收入|付不出(?:醫藥費|錢)?|繳不出/u, "急難 生活扶助"],
+  // 重大傷病：民眾講「癌症」「洗腎」「化療」，政策寫的是「重大傷病」「重病」。
+  // 實測「我的爺爺癌症有可以甚麼申請的」四道防線全失效、查 0 筆——但站內有癌症慰問金
+  // 4 筆、重大傷病 137 筆、重病 60 筆。這裡只展開確認過查得到的詞。
+  [/癌症|罹癌|癌友|化療|放療|標靶治療|洗腎|透析|重大傷病|重症|安寧療護|器官移植/u, "重大傷病 重病 醫療"],
   [/獨居|沒人照顧|一個人住/u, "獨居"],
   [/往生|過世|辦後事|喪事/u, "喪葬"],
 ];
