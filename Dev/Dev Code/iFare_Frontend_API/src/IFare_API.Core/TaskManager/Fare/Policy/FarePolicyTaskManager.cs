@@ -349,6 +349,15 @@ namespace IFare_API.TaskManager.Fare.Policy
                         continue;
                     }
 
+                    // 沒有半個文字的片段（純數字、純符號）不是搜尋主題，不參與落地判定。
+                    // 少了這道，「12345」會因為 12、23、34、45 這些相鄰二字組真的出現在
+                    // 政策的金額文字裡（「補助 12,000 元」）而整條連鎖落地，被誤判成
+                    // 「站內有這個主題」，回出 88 筆完全不相關的政策。
+                    if (!fragment.Any(char.IsLetter))
+                    {
+                        continue;
+                    }
+
                     hasSpecificFragment = true;
                     var chainGrounded = true;
                     for (var i = 0; i + 1 < fragment.Length; i++)
@@ -367,7 +376,13 @@ namespace IFare_API.TaskManager.Fare.Policy
                 }
             }
 
-            return !hasSpecificFragment;
+            // 走到這裡代表沒有任何具體片段落地，分兩種情況：
+            //
+            //  (1) 純泛用詞查詢（只打了「補助」「津貼」）→ 放行，維持原本的寬列表行為。
+            //  (2) 查詢裡一個文字都沒有（純數字、純符號）→ 擋下。民眾打一串數字時並不是在
+            //      找某類福利，回一堆低收入戶醫療補助只會更困惑。注意「2024 補助」仍會放行，
+            //      因為整句話裡有「補助」這個文字。
+            return !hasSpecificFragment && (query ?? string.Empty).Any(char.IsLetter);
         }
 
         // ── 政策搜尋語料的行程內記憶化快取 ─────────────────────────────────────
