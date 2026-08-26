@@ -594,6 +594,40 @@ const activeController = shallowRef<AbortController | null>(null);
  */
 const CONVERSATION_HISTORY_LIMIT = 16;
 
+/**
+ * 把追問裡的「卡片編號」展開成政策名稱。
+ *
+ * 卡片上印的是 01 / 02 / 03（見 top-case-rank），摘要裡標的是 [參考 N]，所以使用者
+ * 很自然會打「02 要準備甚麼文件？」。但那樣送給 AI，它不知道 02 是哪一筆——實測會把
+ * 三筆政策全部答一遍、重點散掉，使用者指定的那筆反而被稀釋。
+ *
+ * 作法是在送出前把編號換成該政策的完整名稱（實測換完後回答就精準對到那一筆），
+ * 畫面上仍顯示使用者原本打的字，不會出現「我明明打 02、怎麼變成一長串」。
+ *
+ * 只認開頭的編號與明確的指代寫法，避免誤傷內容裡本來就有的數字
+ *（「2 萬元怎麼算」不該被當成第 2 筆）。
+ */
+const POLICY_INDEX_PATTERNS: RegExp[] = [
+  /^\s*(?:0?([1-9]))(?=[\s、,，.。:：]|$)/u,          // 開頭的 02 / 2
+  /第\s*0?([1-9])\s*(?:筆|項|個|張)/u,                // 第2筆／第 2 項
+  /參考\s*0?([1-9])/u,                                 // 參考2
+];
+
+function expandPolicyIndexReference(text: string) {
+  const source = String(text || "");
+  for (const pattern of POLICY_INDEX_PATTERNS) {
+    const matched = source.match(pattern);
+    if (!matched) continue;
+    const referenceNo = Number(matched[1]);
+    const target = referenceCases.value.find((item) => item.referenceNo === referenceNo);
+    if (!target?.title) continue;
+    // 保留原句其餘內容，只把編號換成政策名稱
+    const rest = source.replace(pattern, " ").replace(/\s+/gu, " ").trim();
+    return rest ? `「${target.title}」${rest}` : `請說明「${target.title}」`;
+  }
+  return source;
+}
+
 const conversationMessages = ref<SummaryConversationMessage[]>([]);
 const followUpInput = ref("");
 const followUpDraft = ref("");
@@ -1925,7 +1959,8 @@ async function submitFollowUp() {
       content: toPlainSummaryText(summaryDisplayText.value),
     });
   }
-  conversationMessages.value.push({ role: "user", content: userReply });
+  // 送給 AI 的版本會把「02」這種卡片編號展開成政策名稱；畫面上仍顯示使用者原本打的字
+  conversationMessages.value.push({ role: "user", content: expandPolicyIndexReference(userReply) });
   threadItems.value.push({ role: "user", content: userReply });
   isAnswerTurn.value = isFollowUpQuestion(userReply);
   followUpInput.value = "";
@@ -1934,7 +1969,7 @@ async function submitFollowUp() {
   failedFollowUpText.value = "";
   isFollowUpLoading.value = true;
 
-  const conversation: SummaryConversationMessage[] = conversationMessages.value.slice(-8);
+  const conversation: SummaryConversationMessage[] = conversationMessages.value.slice(-CONVERSATION_HISTORY_LIMIT);
   // 回覆要放哪裡由伺服器回報的 mode 決定，不在前端重算一次——
   // 兩邊各算一次就會出現「前端當成回答、後端其實只回了一句引導」的錯位。
   let replyMode = "";
