@@ -91,42 +91,9 @@
           </section>
           -->
 
-          <!-- 真人協助卡片暫時隱藏，避免初始畫面資訊過多。 -->
           <!--
-          <section class="contact-card">
-            <div class="contact-card-top">
-              <h5>需要真人協助？</h5>
-              <p>如果你的問題牽涉個案判斷或申請細節，建議直接聯絡基金會。</p>
-            </div>
-            <div class="contact-card-actions">
-              <a
-                href="tel:0227978383"
-                class="contact-pill"
-                data-island="撥打基金會電話"
-                data-island-style="button"
-              >
-                撥打電話
-              </a>
-              <a
-                href="https://lin.ee/eHw9VpL"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="contact-pill"
-                data-island="LINE 真人客服"
-                data-island-style="button"
-              >
-                LINE 客服
-              </a>
-              <NuxtLink
-                to="/collaborator"
-                class="contact-pill is-outline"
-                data-island="公益夥伴"
-                data-island-style="link"
-              >
-                公益夥伴
-              </NuxtLink>
-            </div>
-          </section>
+          真人協助卡片已移到下方對話區，只有芒寶答不出來時才出現。
+          初始畫面維持清爽（原本註解掉的理由「避免初始畫面資訊過多」仍然成立）。
           -->
         </template>
 
@@ -161,6 +128,51 @@
               </div>
             </div>
           </div>
+
+          <!--
+          真人協助卡片：只在芒寶答不出來時出現，避免民眾卡在死路上又沒有真人管道。
+          顯示條件見 script 的 showContactCard；出現後整段對話都會留著（sticky），
+          不會因為下一題答得好就把已經需要的求助管道收走。
+          -->
+          <section
+            v-if="showContactCard"
+            class="contact-card"
+            aria-labelledby="chatbot-contact-title"
+          >
+            <div class="contact-card-top">
+              <h5 id="chatbot-contact-title">需要真人協助？</h5>
+              <p>如果你的問題牽涉個案判斷或申請細節，建議直接聯絡基金會。</p>
+            </div>
+            <div class="contact-card-actions" role="group" aria-label="真人協助管道">
+              <a
+                href="tel:0227978383"
+                class="contact-pill"
+                data-island="撥打基金會電話"
+                data-island-style="button"
+              >
+                撥打電話
+              </a>
+              <a
+                href="https://lin.ee/eHw9VpL"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="contact-pill"
+                aria-label="LINE 客服（另開新視窗）"
+                data-island="LINE 真人客服"
+                data-island-style="button"
+              >
+                LINE 客服
+              </a>
+              <NuxtLink
+                to="/collaborator"
+                class="contact-pill is-outline"
+                data-island="公益夥伴"
+                data-island-style="link"
+              >
+                公益夥伴
+              </NuxtLink>
+            </div>
+          </section>
 
           <!--
           依需求取消站內導覽 follow-up 按鈕；保留 markup 方便後續恢復。
@@ -316,11 +328,20 @@ interface FollowUpGroup {
   actions: FollowUpAction[];
 }
 
+// === 聊天模式（script / ai / hybrid）：切換 UI 已移除，以下為刻意保留的殘留邏輯 ===
+// 前台原本有一排模式切換鈕讓使用者自選「快速導覽／智能回覆／綜合協助」，該 UI 已從 template 拿掉，
+// 所以現在實際執行的模式永遠是 CHATBOT_DEFAULT_MODE（'ai'），三種模式的切換邏輯都不會被觸發。
+// 相關殘留：chatbotModeOptions、isChatbotRunMode、persistChatbotMode、setChatbotMode
+// 以及 .chatbot-mode-switch 系列樣式。保留是為了日後可能恢復切換功能，請勿刪除。
+
 // Default runtime mode（三種模式都由後端 /api/chatbot 處理）。
 // - 'script': 只用答案卡，完全不呼叫 LLM
 // - 'ai'    : 答案卡 → LLM 選卡 → LLM 生成
 // - 'hybrid': 同 'ai'
 const CHATBOT_DEFAULT_MODE = 'ai' as ChatbotRunMode;
+// 這個 key 目前只會被「寫入」和「刪除」，永遠讀不到：
+// persistChatbotMode() 雖然會寫進 localStorage，但 onMounted 一掛載就無條件 removeItem 並強制回預設值，
+// 因此就算真的寫進去了，下次開頁面也一定會被清掉。保留 key 是為了日後恢復切換功能時沿用同一個名稱。
 const CHATBOT_MODE_STORAGE_KEY = 'ifare-chatbot-mode';
 
 // 「正在輸入」的最短顯示時間。
@@ -335,6 +356,41 @@ const FIXED_ANSWER_SOURCES = new Set(['card', 'card_llm']);
 const REQUEST_FAILED_REPLY =
   '芒寶這邊連線不太順，請稍等一下再問一次，或直接使用上方選單找找看。';
 
+/**
+ * 判斷「芒寶答不出來」的訊號：後端回傳的 source。
+ *
+ * /api/chatbot 是四層架構，每一條 return 都一定帶 source，語意固定：
+ * - 'card' / 'card_llm'：命中人工答案卡（Layer 1、2）→ 有好好回答
+ * - 'groq' / 'gemini'  ：LLM 依站內資料生成（Layer 3）→ 有好好回答
+ * - 'script_fallback'  ：Layer 4 罐頭兜底 → 前三層都沒能回答
+ *
+ * 選 source 而不是其他訊號的理由：
+ * 1. 不比對回覆字串。OUT_OF_SCOPE_REPLY／API_UNAVAILABLE_FALLBACK_REPLY／
+ *    NO_DETAIL_FOLLOWUP_REPLY 都是後端常數，前端複製一份會在後端改字時默默失效；
+ *    而且 normalizeDisplayedReply 還會去頭、壓空白，字串比對本來就不可靠。
+ * 2. 不只看 errorCode。LLM 明講「站內沒有完整列出、建議洽承辦單位」時
+ *    （NO_DETAIL_FOLLOWUP_REPLY）後端不帶 errorCode，只把 source 標成 script_fallback，
+ *    只看 errorCode 會漏掉這個最需要真人接手的情境。
+ * 3. 不會誤判。目前預設模式是 'ai'，走到 script_fallback 只有四種可能：
+ *    限流（local_rate_limit）、LLM 金鑰未設定（llm_auth）、LLM 全部失敗、
+ *    以及上面第 2 點的站內查無細節——每一種都確實是「AI 沒能好好回答」。
+ *
+ * 但只看 source 不夠（2026-08-26 實測）：芒寶自己回「芒寶沒辦法幫您判定資格喔」、
+ * 或問長照卻答成牌照稅減免時，source 仍是 'gemini'——它「有回答」但沒幫上忙，
+ * 而那正是最該給真人管道的時候。實測五個明顯需要真人協助的問法，卡片一個都不會出現。
+ *
+ * 這種「答了但沒用」無法從回覆字串可靠判斷（那句是模型自己講的、不是後端常數，
+ * 措詞會變）。改用行為訊號補上：使用者問到第二題還在問，代表第一個回答沒解決他的事。
+ * 卡片文案本來就寫「牽涉個案判斷或申請細節，建議直接聯絡基金會」——追問正是這種情境。
+ * 反過來，問一題就走的人（含站外閒聊如「今天天氣如何」）不會看到卡片，也不該看到。
+ */
+const UNRESOLVED_REPLY_SOURCE = 'script_fallback';
+
+/** 使用者問到第幾題還在問，就視為前面的回答沒能解決他的問題 */
+const FOLLOW_UP_QUESTION_THRESHOLD = 2;
+
+// 模式切換鈕的文案來源。切換 UI 已移除，template 裡沒有任何地方在讀這個陣列，
+// 保留是為了日後恢復切換功能時不必重寫文案。
 const chatbotModeOptions: Array<{ value: ChatbotRunMode; label: string; description: string }> = [
   { value: 'script', label: '快速導覽', description: '優先提供站內入口與常見問題方向' },
   { value: 'ai', label: '智能回覆', description: '協助整理開放式問題與站內資訊' },
@@ -392,6 +448,8 @@ const inputRef = ref<HTMLInputElement | null>(null);
 const lastPrompt = ref('');
 const lastErrorCode = ref('');
 const lastErrorRetryable = ref(false);
+// 這段對話裡是否至少發生過一次「答不出來」。預設 false，所以初始畫面不會出現真人協助卡片。
+const hasUnresolvedReply = ref(false);
 const chatSessionId = ref(0);
 const shouldResetAfterClose = ref(false);
 const selectedChatbotMode = ref<ChatbotRunMode>(CHATBOT_DEFAULT_MODE);
@@ -406,6 +464,22 @@ const welcomeTitle = computed(() => {
 });
 const welcomeCopy = computed(() => {
   return '';
+});
+
+/**
+ * 真人協助卡片的顯示條件。
+ * 一旦答不出來就固定顯示到這段對話結束（sticky），不會一閃即逝；
+ * 選擇「保留」而非「之後答對就收回」——民眾已經走進死路，
+ * 後面偶然答對一題不代表他不再需要真人管道，把入口收走反而更難找。
+ * 只有「清除對話」或關閉視窗後重置（resetConversation）才會收回。
+ */
+const showContactCard = computed(() => {
+  if (messages.value.length === 0) return false;
+  // (1) 系統層面答不出來（罐頭兜底、限流、LLM 全掛、站內查無細節）
+  if (hasUnresolvedReply.value) return true;
+  // (2) 有回答但沒幫上忙：使用者問到第二題還在問（見 UNRESOLVED_REPLY_SOURCE 的說明）
+  const userQuestionCount = messages.value.filter(item => item.role === 'user').length;
+  return userQuestionCount >= FOLLOW_UP_QUESTION_THRESHOLD;
 });
 
 const actionGroups = computed<FollowUpGroup[]>(() => {
@@ -508,10 +582,17 @@ function normalizeDisplayedReply(reply: string) {
     .trim();
 }
 
+// 原本用來驗證從 localStorage 讀出來的字串是不是合法模式。
+// onMounted 已改成「不再讀取、直接清除」，所以這個 type guard 目前沒有任何呼叫端；
+// 保留是為了日後恢復切換功能時可以直接接回讀取流程。
 function isChatbotRunMode(value: unknown): value is ChatbotRunMode {
   return value === 'script' || value === 'ai' || value === 'hybrid';
 }
 
+// 把使用者選的模式寫進 localStorage。
+// 切換 UI 移除後，唯一會呼叫它的是 setChatbotMode()，而 setChatbotMode() 自己也沒有呼叫點，
+// 等於整條寫入路徑都不會被執行；就算執行了，寫進去的值也會在下次 onMounted 被清掉，永遠讀不回來。
+// 保留是為了日後恢復切換功能，請勿刪除。
 function persistChatbotMode(mode: ChatbotRunMode) {
   if (!import.meta.client) return;
 
@@ -522,6 +603,9 @@ function persistChatbotMode(mode: ChatbotRunMode) {
   }
 }
 
+// 切換聊天模式並清空對話重新開始。
+// 整個 template 已經沒有任何按鈕會呼叫它（模式切換 UI 已移除），目前是不會被觸發的死碼。
+// 刻意保留，日後恢復切換功能時可直接接回按鈕的 @click，請勿刪除。
 function setChatbotMode(mode: ChatbotRunMode) {
   if (isBotTyping.value || selectedChatbotMode.value === mode) return;
   selectedChatbotMode.value = mode;
@@ -607,6 +691,11 @@ async function requestApiReply(prompt: string, sessionId: number, mode: ChatbotA
       lastErrorCode.value = response.errorCode;
       lastErrorRetryable.value = Boolean(response.retryable);
     }
+
+    // 只決定「真人協助卡片何時顯示」，不介入送出、API 呼叫或回覆解析。
+    if (response.source === UNRESOLVED_REPLY_SOURCE) {
+      hasUnresolvedReply.value = true;
+    }
   } catch (error) {
     console.warn('[chatbot] request fallback', error);
     await waitForThinkingDelay(startedAt);
@@ -614,6 +703,8 @@ async function requestApiReply(prompt: string, sessionId: number, mode: ChatbotA
     lastErrorCode.value = '';
     lastErrorRetryable.value = false;
     pushMessage('bot', REQUEST_FAILED_REPLY);
+    // 連線失敗根本拿不到 source，但這是最明確的「答不出來」，一樣開真人管道。
+    hasUnresolvedReply.value = true;
   }
 }
 
@@ -653,6 +744,8 @@ function resetConversation(options?: { focus?: boolean }) {
   lastPrompt.value = '';
   lastErrorCode.value = '';
   lastErrorRetryable.value = false;
+  // 新的一段對話重新開始判斷，真人協助卡片跟著收回。
+  hasUnresolvedReply.value = false;
   isBotTyping.value = false;
 
   if (options?.focus === false) {
@@ -675,6 +768,10 @@ function handleAfterLeave() {
   resetConversation({ focus: false });
 }
 
+// 模式切換 UI 移除後，這裡改成「每次掛載都無條件清掉舊設定並強制回 CHATBOT_DEFAULT_MODE」，
+// 為的是不讓早期版本殘留在使用者瀏覽器裡的 'script' / 'hybrid' 造成對話行為與現在不一致。
+// 也正因為是無條件清除，persistChatbotMode() 寫進去的值永遠不會被讀回來（寫入等同無效）。
+// 日後若要恢復模式切換，這段要改回「讀取 + isChatbotRunMode 驗證」，而不是 removeItem。
 onMounted(() => {
   if (!import.meta.client) return;
 
@@ -848,6 +945,11 @@ watch(isOpen, async (open, previousOpen) => {
   }
 }
 
+/*
+模式切換鈕的樣式（.chatbot-mode-switch / .mode-label / .mode-options / .mode-option）。
+對應的 template markup 已移除，這些 class 目前不會套到任何元素上；
+保留是為了日後恢復切換功能時不必重刻樣式。
+*/
 .chatbot-mode-switch {
   display: flex;
   align-items: center;
@@ -1097,6 +1199,8 @@ watch(isOpen, async (open, previousOpen) => {
 }
 
 .contact-card {
+  /* 卡片現在接在對話後面，補一段與 messages-list 相同的間距 */
+  margin-top: 10px;
   padding: 12px;
   border-radius: 16px;
   background: linear-gradient(145deg, rgba(23, 24, 24, 0.94), rgba(39, 39, 39, 0.88));
@@ -1124,6 +1228,12 @@ watch(isOpen, async (open, previousOpen) => {
     background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
     border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  /* 深色卡片上改用亮色 focus ring；站內其他地方的橘色外框在這個底色上看不清楚 */
+  &:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, 0.72);
+    outline-offset: 2px;
   }
 }
 
@@ -1339,6 +1449,11 @@ watch(isOpen, async (open, previousOpen) => {
 @media (max-width: 350px) {
   .quick-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* 三顆真人管道在極窄螢幕仍排得下一行；真的放不下時 flex-wrap 會自動換行，不會擠破卡片 */
+  .contact-pill {
+    padding: 0 9px;
   }
 }
 </style>
