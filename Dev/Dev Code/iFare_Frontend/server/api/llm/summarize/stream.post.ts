@@ -95,6 +95,93 @@ const streamRateLimiter = createRateLimiter({
   max: RATE_LIMIT_MAX,
 });
 
+// ---------------------------------------------------------------------------
+// 查無政策時的前置守門：這句話看得出是在找福利嗎
+//
+// 站內查無政策（cases 為空）本來一律走 overview_general，讓模型寫一份一般知識總覽。
+// 但這條路上完全沒有守門——實測打「12345」「ㄅㄆㄇ」「asdf」「？？？」「😀」，
+// 摘要卡照樣長出有粗體、有「### 常見的服務方向」、有 1957 專線的完整文章。
+// 那是最危險的形態：看起來很權威，內容卻跟本站一點關係都沒有，使用者無從分辨。
+//
+// 所以 overview_general 多這一關：看得出在找某類福利才交給模型，看不出來就回一段
+// 固定文案請使用者換個說法。寧可少寫一篇，也不要寫一篇沒有根據的。
+// ---------------------------------------------------------------------------
+
+/**
+ * 福利概念詞：只要命中任何一條，就當作「看得出在找某類福利」。
+ *
+ * 與前端 POLICY_CATEGORY_KEYWORDS、處境詞表同源，但刻意用複製而不是 import——
+ * 這是伺服器端最後一道守門，不該因為前端詞表為了排序、篩選之類的別的用途調鬆而跟著失效。
+ *
+ * 這是「放行清單」不是「阻擋清單」：收得寬一點只是讓查詢回到原本的行為，
+ * 收得太窄卻會把真的在求助的人擋在門外，所以寧可寬。
+ */
+const WELFARE_INTENT_PATTERNS: RegExp[] = [
+  // 長期照顧
+  /長期照顧|長照|照顧|看護|居家|日照|喘息|失能|失智|無法自理|臥床|中風|復健/u,
+  // 身心障礙、醫療
+  /身心障礙|身障|智能障礙|殘障|輔具|重大傷病|癌症|罕見疾病|醫療|就醫|看病|住院|手術|假牙/u,
+  // 兒少、生育
+  /兒少|兒童|少年|青少年|孩童|幼童|小孩|孩子|育兒|托育|托嬰|生育|懷孕|新生兒|嬰幼兒|學童|早產|發展遲緩/u,
+  // 老人
+  /老人|長者|長輩|高齡|銀髮|敬老|安養|養老/u,
+  // 社會救助、經濟處境
+  /社會救助|低收|中低收|經濟弱勢|急難|紓困|生活扶助|扶助|救助|喪葬|安葬/u,
+  // 社會保險
+  /社會保險|健保|全民健康保險|勞保|勞工保險|國民年金|農保|年金/u,
+  // 勞工、就業
+  /勞工|失業|就業|求職|職業訓練|職訓|非自願離職|資遣|裁員/u,
+  // 住宅
+  /住宅|租屋|租房|房租|租金|包租代管|購屋|房屋/u,
+  // 身分別
+  /原住民|原民|新住民|外籍配偶|特殊境遇|單親|婦女|家暴|受暴/u,
+  // 教育、就學
+  /教育|就學|學費|學雜費|獎助學金|助學/u,
+  // 泛用福利語彙：這幾個字本身就在講「我想申請某種給付」
+  /補助|補貼|津貼|給付|福利|服務|申請|減免|優惠|救濟/u,
+  // 家族稱謂：字面上已經講出受助者是誰（與前端 extractExplicitSearchConditions 同源）。
+  // 也順便接住「爸爸」「媽媽」這種疊字詞——它們過不了下面那條「兩個不同的漢字」。
+  /爸爸|媽媽|父親|母親|爺爺|奶奶|阿公|阿嬤|外公|外婆|祖父|祖母|兒子|女兒|孫子|孫女|先生|太太|配偶|老公|老婆|家人/u,
+];
+
+/**
+ * 漢字。注音符號（ㄅㄆㄇ，U+3100–U+312F）是 Script=Bopomofo 不是 Han，
+ * 全形標點（？）與 emoji 則是 Script=Common，三者都不會被算進來——這正是要的。
+ */
+const HAN_CHAR_PATTERN = /\p{Script=Han}/gu;
+
+function countDistinctHanChars(text: string) {
+  return new Set(text.match(HAN_CHAR_PATTERN) || []).size;
+}
+
+/**
+ * 這句查詢看不看得出「在找某一類福利」。任一條成立就放行：
+ *
+ * 1. 命中福利概念詞——最強的訊號，「長照」兩個字就夠。
+ * 2. 至少有兩個「不同的」漢字——「我缺錢」「我爸爸中風」一個福利詞都沒有，
+ *    但那是真的在講自己的處境，一定要放行。取「不同的」是為了順手擋掉
+ *    「哈哈哈」「呵呵」這種疊字雜訊；疊字的家族稱謂已經由第 1 條接住。
+ *
+ * 放行不等於保證有答案，只是「值得讓模型寫一份一般性總覽」。
+ * 總覽本身的資料紅線（不得杜撰、須標示為一般資訊）仍然由提示詞負責，這裡不碰。
+ */
+function looksLikeWelfareQuery(value: string) {
+  const text = String(value || "");
+  if (WELFARE_INTENT_PATTERNS.some((pattern) => pattern.test(text))) return true;
+  return countDistinctHanChars(text) >= 2;
+}
+
+/**
+ * 擋下來時回的固定文案。刻意不交給模型寫——這一格的重點就是「不要生成內容」。
+ * 也刻意不回空白：空白的摘要卡只會讓人以為系統壞了，這裡要告訴他下一步怎麼做。
+ */
+const UNCLEAR_QUERY_SUMMARY =
+  "這幾個字看不出您想找哪一類福利。可以試試描述您的狀況（例如「我媽媽需要人照顧」"
+  + "「我最近失業沒有收入」），或直接輸入「長照」「托育」「租金補貼」這類關鍵字。";
+
+/** 給前端辨識用的模式名。刻意不是 LlmSummaryMode 的成員——這一路根本沒有叫模型 */
+const UNCLEAR_QUERY_MODE = "unclear_query";
+
 export default defineEventHandler(async (event) => {
   // 【限流｜問題 A】這支平常回傳 SSE 串流，限流檢查放在 return createSseResponse 之前：
   // 超限直接回 429（並帶 Retry-After），完全不開串流。前端 plugins/llm.ts 會檢查
@@ -147,6 +234,58 @@ export default defineEventHandler(async (event) => {
         ?? "true"
     ).toLowerCase()
   );
+  // 【一般知識總覽的前置守門】首次搜尋（沒有對話）＋ 站內查無政策 ＋ 一般知識總覽開著，
+  // 才會走到 overview_general。到這一步先看查詢本身像不像在找福利：看不出來就不叫模型，
+  // 直接回固定文案。理由與判斷方式見檔案上方 looksLikeWelfareQuery。
+  //
+  // 只擋這一路：有查到政策（overview）、追問（answer / guidance）、以及用環境變數
+  // 關掉一般總覽後的 guidance，行為都跟以前一模一樣。
+  if (
+    conversation.length === 0
+    && enrichedCases.length === 0
+    && generalFallbackEnabled
+    && !looksLikeWelfareQuery(query)
+  ) {
+    return createSseResponse(async (push) => {
+      const startedAt = Date.now();
+      const requestBytes = getUtf8Bytes(JSON.stringify({ query, mode: UNCLEAR_QUERY_MODE }));
+      const responseBytes = getUtf8Bytes(UNCLEAR_QUERY_SUMMARY);
+      const identity = {
+        // provider/model 讓摘要卡把標題顯示成「快速摘要」而不是「AI 快速摘要」，
+        // 並附上「非 AI 生成」那行說明。這段話本來就不是模型寫的，不能冒充。
+        provider: "guard",
+        model: "script",
+        mode: UNCLEAR_QUERY_MODE,
+        // 沒有可推薦的條件。留空才會把上一輪的條件清掉——不然畫面上會浮著
+        // 一排跟這次查詢對不上的建議按鈕。
+        guidanceField: "",
+        guidanceFields: [],
+      };
+
+      push("meta", {
+        ...identity,
+        requestBytes,
+        requestKilobytes: toKilobytes(requestBytes),
+        streaming: false,
+      });
+      // 前端是累加 chunk、再用 done 的全文取代，兩個都要推才顯示得出來
+      push("chunk", { delta: UNCLEAR_QUERY_SUMMARY });
+      push("done", {
+        ...identity,
+        summary: UNCLEAR_QUERY_SUMMARY,
+        cached: false,
+        // 這不是降級：模型沒掛，是我們決定不叫它
+        fallback: false,
+        requestBytes,
+        requestKilobytes: toKilobytes(requestBytes),
+        responseBytes,
+        responseKilobytes: toKilobytes(responseBytes),
+        totalBytes: requestBytes + responseBytes,
+        totalKilobytes: toKilobytes(requestBytes + responseBytes),
+        durationMs: Date.now() - startedAt,
+      });
+    });
+  }
   // 追問回合：主題已經明確（問得出是哪一類福利）且有查到政策 → 一樣給引用版總覽，
   // 讓每一輪都是「這幾筆最相符 ＋ 下一個問題」；主題還不明確（例如只說了「新北市補助」）
   // → 只問不推薦，那時候的前三筆等於隨機挑。
