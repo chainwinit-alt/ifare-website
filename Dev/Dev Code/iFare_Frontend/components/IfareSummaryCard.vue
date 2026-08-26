@@ -608,24 +608,40 @@ const CONVERSATION_HISTORY_LIMIT = 16;
  *（「2 萬元怎麼算」不該被當成第 2 筆）。
  */
 const POLICY_INDEX_PATTERNS: RegExp[] = [
-  /^\s*(?:0?([1-9]))(?=[\s、,，.。:：]|$)/u,          // 開頭的 02 / 2
-  /第\s*0?([1-9])\s*(?:筆|項|個|張)/u,                // 第2筆／第 2 項
-  /參考\s*0?([1-9])/u,                                 // 參考2
+  // 開頭的 02 / 2。數字後面接量詞就不是編號——「2 萬元怎麼算」「3 個月沒工作」
+  // 「1 個人住可以嗎」都是使用者在講數量，不是在指第 N 張卡。
+  // （注意 lookahead 順序：排除量詞要寫在吃空白之前，否則空白先被吃掉、量詞就檢查不到。）
+  /^\s*0?([1-9])(?!\s*[萬千百個月歲天次年位人份元塊%％\d])(?=[\s、,，.。:：]|$)/u,
+  /第\s*0?([1-9])\s*(?:筆|項|張)/u,                    // 第2筆／第 2 項（「第2個」太像量詞，不收）
+  /參考\s*0?([1-9])/u,                                  // 參考2
 ];
 
+/**
+ * 把追問裡出現的每一個卡片編號都換成政策名稱。
+ *
+ * 全部展開而不是只換第一個：卡片上印著 01/02/03，使用者最自然的下一步就是叫它們
+ * 互相比較——「01 跟 02 差在哪」。只換第一個的話送出去會變成「「政策A」跟 02 差在哪」，
+ * AI 不知道 02 是誰，只能猜或只答一筆。
+ */
 function expandPolicyIndexReference(text: string) {
-  const source = String(text || "");
+  let result = String(text || "");
+  let replaced = false;
+
   for (const pattern of POLICY_INDEX_PATTERNS) {
-    const matched = source.match(pattern);
-    if (!matched) continue;
-    const referenceNo = Number(matched[1]);
-    const target = referenceCases.value.find((item) => item.referenceNo === referenceNo);
-    if (!target?.title) continue;
-    // 保留原句其餘內容，只把編號換成政策名稱
-    const rest = source.replace(pattern, " ").replace(/\s+/gu, " ").trim();
-    return rest ? `「${target.title}」${rest}` : `請說明「${target.title}」`;
+    // 同一種寫法可能出現多次（「參考1 跟 參考2」），逐一換掉
+    const globalPattern = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
+    result = result.replace(globalPattern, (matched, no) => {
+      const target = referenceCases.value.find((item) => item.referenceNo === Number(no));
+      if (!target?.title) return matched;
+      replaced = true;
+      return `「${target.title}」`;
+    });
   }
-  return source;
+
+  if (!replaced) return String(text || "");
+  const cleaned = result.replace(/\s+/gu, " ").trim();
+  // 只打了編號、沒有問題內容時補一句，免得送出去是一個沒有動詞的句子
+  return /^「[^」]+」$/u.test(cleaned) ? `請說明${cleaned}` : cleaned;
 }
 
 const conversationMessages = ref<SummaryConversationMessage[]>([]);
