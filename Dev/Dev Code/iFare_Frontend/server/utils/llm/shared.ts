@@ -352,9 +352,19 @@ export function sanitizeSummaryCases(value: unknown, take = 5): LlmSummaryCaseIt
     .filter(item => Number.isFinite(item.id) && item.id > 0 && Boolean(item.title));
 }
 
+/**
+ * 對話脈絡的保留上限（一問一答算兩則）。
+ *
+ * 原本是 8 則＝只撐得住四輪追問，第五次就會把最早的問答擠掉，AI 會忘記使用者
+ * 一開始在問什麼。放寬到 16 則（八輪），讓連續追問五次以上仍然是接續的。
+ * 這個值要與 IfareSummaryCard.vue 的 CONVERSATION_HISTORY_LIMIT 一致——
+ * 前端留著、後端仍截掉的話等於沒放寬。
+ */
+export const SUMMARY_CONVERSATION_LIMIT = 16;
+
 export function sanitizeSummaryConversation(
   value: unknown,
-  take = 8
+  take = SUMMARY_CONVERSATION_LIMIT
 ): LlmSummaryConversationMessage[] {
   if (!Array.isArray(value)) return [];
 

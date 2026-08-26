@@ -581,6 +581,19 @@ const isLoading = ref(false);
 const streamError = ref("");
 const summaryText = ref("");
 const activeController = shallowRef<AbortController | null>(null);
+/**
+ * 送去 AI 的對話脈絡最多保留幾則（一問一答算兩則）。
+ *
+ * 原本是 8 則＝只撐得住四輪，第五次追問就會把最早的問答擠掉，AI 會忘記使用者
+ * 一開始問什麼——追問到後面等於重新開始。放寬到 16 則（八輪）讓「連續問五次以上、
+ * 而且問題是接續的」成立。
+ *
+ * 沒有無上限保留是因為每一則都會進提示詞：對話越長，送出的 token 越多、也越容易
+ * 讓模型抓錯重點。八輪已足夠涵蓋一次完整的諮詢，且伺服器端 sanitizeSummaryConversation
+ * 的上限與這裡一致（兩邊要一起改，否則前端留著、後端仍然截掉，等於沒放寬）。
+ */
+const CONVERSATION_HISTORY_LIMIT = 16;
+
 const conversationMessages = ref<SummaryConversationMessage[]>([]);
 const followUpInput = ref("");
 const followUpDraft = ref("");
@@ -1988,7 +2001,7 @@ async function submitFollowUp() {
     const reply = followUpDraft.value.trim();
     if (reply) {
       conversationMessages.value.push({ role: "assistant", content: reply });
-      conversationMessages.value = conversationMessages.value.slice(-8);
+      conversationMessages.value = conversationMessages.value.slice(-CONVERSATION_HISTORY_LIMIT);
       if (replyMode === "answer") {
         // 問題的答案接在您那句話下面，由上往下讀才順；上方摘要不動，
         // 因為這一輪沒有改變搜尋條件，那份總覽仍然成立。
