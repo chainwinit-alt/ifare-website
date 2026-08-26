@@ -1,4 +1,14 @@
 /**
+ * 目前狀態：尚未接線（截至 2026-08-26）
+ * 全站 pages / components / layouts / app.vue / error.vue 全域搜尋皆無呼叫端，
+ * 下面 UIUX #5 描述的「搜尋首頁快速回填 chips」目前並沒有任何頁面在用，
+ * load / add / remove / clear 都不會被觸發，localStorage 裡也不會有資料。
+ *
+ * 保留原因：使用者決定保留。UIUX #5 是規劃中尚未接上的需求，不是廢棄程式碼，
+ * 日後 i-Fare 搜尋首頁要接回最近搜尋時可直接沿用，請勿因為「查無呼叫端」就刪掉。
+ */
+
+/**
  * 2026-05-25 UIUX #5 — 最近搜尋紀錄
  *
  * 儲存使用者最近 5 筆搜尋條件到 localStorage,在 ifare 搜尋首頁顯示快速回填 chips。
