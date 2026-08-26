@@ -186,6 +186,11 @@ export default defineNuxtConfig({
       llmProvider: (readEnv("NUXT_LLM_PROVIDER", "LLM_PROVIDER") || "groq").toLowerCase(),
       frontendApiBase: RESOLVED_PUBLIC_FRONTEND_API_BASE,
       enableIfareAiSummary: ENABLE_IFARE_AI_SUMMARY,
+      // /preview 頁只接受這些來源送來的預覽訊息（逗號分隔）。
+      // 未設定時 pages/preview.vue 會退回內建的 localhost:5173，dev 行為不變；
+      // 正式環境要讓後台預覽功能可用，必須設成後台實際的網域，
+      // 否則 /preview 會一直停在「等待後台連線中」。
+      previewAllowedOrigins: readEnv("NUXT_PUBLIC_PREVIEW_ALLOWED_ORIGINS") || "",
     },
   },
 
