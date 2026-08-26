@@ -138,6 +138,28 @@ function normalizeConditionText(value: unknown) {
     .replace(/[\s　]+/gu, "");
 }
 
+/**
+ * 這個條件詞是不是被使用者否定掉了。
+ *
+ * 實測「我不是低收入戶也可以申請嗎」會抽出 income=低收入戶，接著範圍探測把它當成
+ * 使用者想切過去的範圍、查回筆數送進 scopeHint，AI 就對一位剛聲明自己「不是低收」的人
+ * 回「本站低收入戶政策有 N 筆，把經濟條件改成低收入戶就看得到」，下面還附一顆切換鈕。
+ * 資格問題被答反，是這個網站最不該犯的錯。同型的還有「我沒有身心障礙手冊還能申請嗎」
+ *（抽出身心障礙）、「我不住台北市可以嗎」（抽出台北市）。
+ *
+ * 只看該詞「前方鄰近」的否定詞，不看整句：整句有「不」就全部不抽的話，
+ * 「低收入戶不知道能申請什麼」這種正常句子會被誤殺。視窗取 4 個字，
+ * 足以涵蓋「我不是」「我沒有」「並非」「不具備」，又不會跨到前一個子句。
+ */
+const NEGATION_PATTERN = /(?:不是|不住|不在|沒有|沒領|未領|未具|不具|不算|並非|非|無|不符合|不屬於)$/u;
+
+function isNegated(text: string, term: string) {
+  const index = text.indexOf(term);
+  if (index < 0) return false;
+  const before = text.slice(Math.max(0, index - 4), index);
+  return NEGATION_PATTERN.test(before);
+}
+
 export function extractExplicitSearchConditions(value: unknown): ExplicitSearchConditions {
   const text = normalizeConditionText(fixCommonTypos(value));
   const conditions: ExplicitSearchConditions = {
@@ -149,8 +171,8 @@ export function extractExplicitSearchConditions(value: unknown): ExplicitSearchC
   if (!text) return conditions;
 
   conditions.area =
-    TAIWAN_AREA_NAMES.find((area) => text.includes(area)) ||
-    UNIQUE_AREA_SHORT_NAMES.find(([short]) => text.includes(short))?.[1] ||
+    TAIWAN_AREA_NAMES.find((area) => text.includes(area) && !isNegated(text, area)) ||
+    UNIQUE_AREA_SHORT_NAMES.find(([short]) => text.includes(short) && !isNegated(text, short))?.[1] ||
     "";
 
   // 順序重要：先比對「中低收」再比對「低收」，避免誤判。
@@ -158,9 +180,9 @@ export function extractExplicitSearchConditions(value: unknown): ExplicitSearchC
   // 字面抽不到，下游就只剩 LLM 的猜測（實測猜成中低收入戶），白名單也攔不住。
   // 「降低收入／降低收費／低收費」是同字不同義，要排除。
   const isLowIncomeFalseFriend = /[降減壓調]低收|低收費/u.test(text);
-  if (/中低收/u.test(text)) conditions.income = "中低收入戶";
-  else if (/低收/u.test(text) && !isLowIncomeFalseFriend) conditions.income = "低收入戶";
-  else if (/經濟弱勢/u.test(text)) conditions.income = "經濟弱勢";
+  if (/中低收/u.test(text) && !isNegated(text, "中低收")) conditions.income = "中低收入戶";
+  else if (/低收/u.test(text) && !isLowIncomeFalseFriend && !isNegated(text, "低收")) conditions.income = "低收入戶";
+  else if (/經濟弱勢/u.test(text) && !isNegated(text, "經濟弱勢")) conditions.income = "經濟弱勢";
 
   // 家族稱謂也算「字面明確講出年齡族群」：民眾說「我爺爺」「我阿嬤」時，
   // 受助者是長輩這件事是他自己講的，不是系統推測。實測「我的爺爺癌症…」原本
@@ -170,11 +192,16 @@ export function extractExplicitSearchConditions(value: unknown): ExplicitSearchC
   else if (/兒童|兒少|青少年|學童|國小|國中|高中/u.test(text)) conditions.recipient = "兒童＆青少年";
   else if (/成人|青年|壯年/u.test(text)) conditions.recipient = "成人";
 
-  if (/身心障礙|智能障礙/u.test(text)) conditions.identities.push("身心障礙");
-  if (/特殊境遇/u.test(text)) conditions.identities.push("特殊境遇");
-  if (/重大傷病/u.test(text)) conditions.identities.push("重大傷病");
-  if (/原住民/u.test(text)) conditions.identities.push("原住民");
-  if (/新住民|外籍配偶/u.test(text)) conditions.identities.push("新住民");
+  // 身分同樣要看否定：「我沒有身心障礙手冊還能申請嗎」不該被抽成身心障礙身分，
+  // 否則下游會反過來推薦一堆需要手冊的政策給明說自己沒有的人。
+  const pushIdentity = (pattern: RegExp, term: string, label: string) => {
+    if (pattern.test(text) && !isNegated(text, term)) conditions.identities.push(label);
+  };
+  pushIdentity(/身心障礙|智能障礙/u, "身心障礙", "身心障礙");
+  pushIdentity(/特殊境遇/u, "特殊境遇", "特殊境遇");
+  pushIdentity(/重大傷病/u, "重大傷病", "重大傷病");
+  pushIdentity(/原住民/u, "原住民", "原住民");
+  pushIdentity(/新住民|外籍配偶/u, "新住民", "新住民");
 
   return conditions;
 }
@@ -412,7 +439,12 @@ export function matchPolicyCategory(value: unknown) {
 
 /** 字面上的疑問寫法。「需要準備甚麼文件」沒有問號也算，訪客本來就很少打問號 */
 const FOLLOW_UP_QUESTION_PATTERN =
-  /[?？]|嗎|呢|什麼|甚麼|如何|怎麼|怎樣|哪|多少|多久|何時|幾天|幾歲|幾個月|幾次|是否|能不能|可不可以|有沒有|要不要|為何|請問/u;
+  // A不A 句式（符不符合、能不能、夠不夠）是中文最常見的疑問寫法之一，但原本只收了
+  // 「能不能／可不可以／有沒有／要不要」四個特例。實測「我到底符不符合」「我符不符合資格」
+  // 判成 false → 被當成補條件 → 走重新搜尋 → 對話串只留下使用者那句話、沒有任何 AI 回覆，
+  // 上方摘要卻整份被換掉。使用者問的是最關鍵的一句，卻像被無視。
+  // 用 (.)不\1 通則涵蓋所有 A不A，另補「符合資格」「比較」這類沒有疑問詞的問法。
+  /[?？]|嗎|呢|什麼|甚麼|如何|怎麼|怎樣|哪|多少|多久|何時|幾天|幾歲|幾個月|幾次|是否|為何|請問|(.)不\1|符合資格|有資格|夠格|比較|差別|差在哪|哪個好|哪個比較/u;
 
 /**
  * 沒有疑問詞、但明顯是在問政策細節的說法（「應備文件」「申請流程」「補助金額」）。
