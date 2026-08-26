@@ -11,8 +11,39 @@ const commonTypoReplacements: Array<[RegExp, string]> = [
   [/假芽/gu, "假牙"],
 ];
 
-export function fixCommonTypos(value: unknown) {
+/**
+ * 簡體字 → 繁體字（只收會影響福利搜尋的常用字）。
+ *
+ * 站內政策全是繁體，簡體輸入完全查不到——實測「医疗补助」0 筆、「醫療補助」702 筆，
+ * 「低收入户」0 筆、「低收入戶」566 筆。陸配、陸生或使用簡體輸入法的民眾會直接撞到查無。
+ *
+ * 刻意不做全套簡繁轉換：那需要龐大對照表，且一對多的字（后→後/后、干→乾/幹）
+ * 轉錯反而會把正常查詢弄壞。這裡只收「站內高頻福利用語」裡出現、且簡繁一對一的字。
+ */
+const SIMPLIFIED_TO_TRADITIONAL: Array<[RegExp, string]> = [
+  [/医/gu, "醫"], [/疗/gu, "療"], [/补/gu, "補"], [/贴/gu, "貼"], [/户/gu, "戶"],
+  [/济/gu, "濟"], [/费/gu, "費"], [/务/gu, "務"], [/护/gu, "護"], [/养/gu, "養"],
+  [/儿/gu, "兒"], [/岁/gu, "歲"], [/龄/gu, "齡"], [/残/gu, "殘"], [/碍/gu, "礙"],
+  [/请/gu, "請"], [/证/gu, "證"], [/书/gu, "書"], [/县/gu, "縣"], [/长/gu, "長"],
+  [/顾/gu, "顧"], [/学/gu, "學"], [/亲/gu, "親"], [/属/gu, "屬"], [/单/gu, "單"],
+  [/结/gu, "結"], [/关/gu, "關"], [/务/gu, "務"], [/员/gu, "員"], [/资/gu, "資"],
+  [/额/gu, "額"], [/领/gu, "領"], [/给/gu, "給"], [/条/gu, "條"], [/则/gu, "則"],
+  [/伤/gu, "傷"], [/风/gu, "風"], [/发/gu, "發"], [/达/gu, "達"], [/迟/gu, "遲"],
+  [/缓/gu, "緩"], [/术/gu, "術"], [/业/gu, "業"], [/产/gu, "產"], [/义/gu, "義"],
+  [/绍/gu, "紹"], [/统/gu, "統"], [/务/gu, "務"], [/县/gu, "縣"], [/济/gu, "濟"],
+];
+
+export function normalizeSimplifiedChinese(value: unknown) {
   let normalized = String(value ?? "");
+  for (const [pattern, replacement] of SIMPLIFIED_TO_TRADITIONAL) {
+    normalized = normalized.replace(pattern, replacement);
+  }
+  return normalized;
+}
+
+export function fixCommonTypos(value: unknown) {
+  // 先轉簡體再修錯字：錯字表寫的是繁體，簡體輸入不先轉就一條都對不上
+  let normalized = normalizeSimplifiedChinese(value);
   for (const [pattern, replacement] of commonTypoReplacements) {
     normalized = normalized.replace(pattern, replacement);
   }

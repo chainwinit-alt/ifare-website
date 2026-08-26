@@ -285,6 +285,7 @@ import {
   isAreaOnlySegment,
   isConditionOnlyText,
   matchPolicyCategory,
+  normalizeSimplifiedChinese,
   stripTrailingParticles,
 } from "~/utils/ifareIntent";
 import type { PolicyConditionContext, PolicyConditionFacts } from "~/utils/ifarePolicyFit";
@@ -379,7 +380,9 @@ const activeSummaryState = reactive({
 });
 
 function normalizeSummaryKeyword(value: unknown) {
-  const keyword = String(value ?? "").trim();
+  // 簡體輸入先轉繁體：站內政策全是繁體，不轉的話「医疗补助」查 0 筆、
+  //「醫療補助」卻有 702 筆（實測）。這裡是所有查詢路徑的共同入口，轉一次就全涵蓋。
+  const keyword = normalizeSimplifiedChinese(String(value ?? "")).trim();
   if (!keyword || /^(?:未指定|undefined|null)$/iu.test(keyword)) return "";
   return keyword;
 }
