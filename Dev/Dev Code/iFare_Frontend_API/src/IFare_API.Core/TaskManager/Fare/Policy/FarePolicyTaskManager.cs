@@ -159,7 +159,7 @@ namespace IFare_API.TaskManager.Fare.Policy
                             CreateTime = p.CreateTime,
                             ReleaseTime = p.ReleaseTime.Value,
                             DiscontinuedTime = p.DiscontinuedTime.Value,
-                            UpdateTime = p.UpdateTime,   // 給搜尋語料快取做失效判斷的版本戳（實體 p 有此欄位）
+                            UpdateTime = p.UpdateTime,   // 政策自身的更新時間（回傳欄位；搜尋語料快取已改用語料原文當版本戳）
                         })
                         .OrderByDescending(p => p.ReleaseTime)
                         .ThenByDescending(p => p.CreateTime)
@@ -213,11 +213,16 @@ namespace IFare_API.TaskManager.Fare.Policy
                     documentFrequencies,
                     searchCorpus.Count);
 
+                // 查詢側的正規化與 Jieba 斷詞只由查詢字串決定，卻被下面的計分迴圈對「每一筆政策
+                // 的每一個欄位」重算一次（每筆 8 次、整份語料就是 8N 次）。先算一次重複使用，
+                // 傳給 Score 的輸入字串與算式都沒變，每筆分數與原本逐一相同。
+                var queryScoringContext = TraditionalChineseFuzzyMatcher.CreateQueryScoringContext(normalizedQuery);
+
                 var maxBm25Score = 0d;
                 var searchScores = searchCorpus
                     .Select(item =>
                     {
-                        var fuzzyScore = GetSearchScore(normalizedQuery, item.Item);
+                        var fuzzyScore = GetSearchScore(queryScoringContext, normalizedQuery, item.Item);
                         var bm25Score = TraditionalChineseFuzzyMatcher.ComputeBm25Score(
                             queryTokens,
                             item.TermFrequencies,
@@ -261,21 +266,23 @@ namespace IFare_API.TaskManager.Fare.Policy
             return new FarePolicyResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), list);
         }
 
-        private static double GetSearchScore(string normalizedQuery, FarePolicyData item)
+        // queryScoringContext 是 normalizedQuery 的前處理結果（見 CreateQueryScoringContext），
+        // normalizedQuery 本身仍留著只為維持原本「查詢為空就回 0」的短路判斷。
+        private static double GetSearchScore(TraditionalChineseFuzzyMatcher.QueryScoringContext queryScoringContext, string normalizedQuery, FarePolicyData item)
         {
             if (string.IsNullOrEmpty(normalizedQuery))
             {
                 return 0d;
             }
 
-            var titleScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, item.Title);
-            var qualificationScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, item.Qualification);
-            var keywordScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, string.Join(" ", item.CodeKeywordList.Select(p => p.CodeName)));
-            var policyScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, item.CodePolicy_LabelName);
-            var domicileScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, item.CodeDomicile_LabelName);
-            var recipientScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, string.Join(" ", item.CodeRecipientList.Select(p => p.CodeName)));
-            var identityScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, string.Join(" ", item.CodeIdentityList.Select(p => p.CodeName)));
-            var incomeScore = TraditionalChineseFuzzyMatcher.Score(normalizedQuery, string.Join(" ", item.CodeIncomeList.Select(p => p.CodeName)));
+            var titleScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, item.Title);
+            var qualificationScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, item.Qualification);
+            var keywordScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, string.Join(" ", item.CodeKeywordList.Select(p => p.CodeName)));
+            var policyScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, item.CodePolicy_LabelName);
+            var domicileScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, item.CodeDomicile_LabelName);
+            var recipientScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, string.Join(" ", item.CodeRecipientList.Select(p => p.CodeName)));
+            var identityScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, string.Join(" ", item.CodeIdentityList.Select(p => p.CodeName)));
+            var incomeScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, string.Join(" ", item.CodeIncomeList.Select(p => p.CodeName)));
 
             return (titleScore * 0.5d) +
                    (qualificationScore * 0.12d) +
@@ -390,37 +397,36 @@ namespace IFare_API.TaskManager.Fare.Policy
         // DocumentLength、摺疊後全文 FoldedSearchText）都只由「政策內容」決定，與使用者輸入的
         // 查詢字串完全無關；同一筆政策不論被哪個查詢命中，這些純 CPU 的前處理結果都一樣，
         // 因此可跨請求重用，把每次請求從零重算 BuildSearchDocument→Tokenize→TF 的成本省下來。
-        // 失效怎麼判：以政策 Id 為 key、以該政策的 UpdateTime 當版本戳。命中且「版本戳相同」
-        // 且「快取年齡 < TTL」才重用；否則用與原本完全相同的算式重算後寫回。
-        // TTL（10 分鐘）只是保險：防「政策沒 bump UpdateTime、但底層關鍵字／身份別等標籤被改」
-        // 這種版本戳抓不到的邊角。快取以 Id 為 key，天然上限＝政策數，不需額外淘汰機制。
+        // 失效怎麼判：以政策 Id 為 key、以「這次組出來的語料原文（BuildSearchDocument 結果）」當版本戳。
+        // 舊做法用政策自身的 UpdateTime 當版本戳，抓不到「政策沒動、但底下關鍵字／身份別／補助對象
+        // 等標籤的 LabelName 被改」的情況——那些字也在語料裡，改了卻不會 bump 政策的 UpdateTime，
+        // 快取就會拿舊分詞去比對新內容（舊碼只能靠 10 分鐘 TTL 沖掉，這段期間搜尋結果是錯的）。
+        // 改用語料原文當版本戳可以完全避開這個問題：BuildSearchDocument 只是字串串接（便宜），
+        // 真正貴的是 Jieba 斷詞與詞頻表（快取的就是這一段）；原文相同 ⇒ 後續全部推導結果必然相同，
+        // 因此不再需要 TTL 這層保險。快取以 Id 為 key，天然上限＝政策數，不需額外淘汰機制。
         private static readonly ConcurrentDictionary<long, SearchCorpusCacheEntry> SearchCorpusCache =
             new ConcurrentDictionary<long, SearchCorpusCacheEntry>();
 
-        private static readonly TimeSpan SearchCorpusCacheTtl = TimeSpan.FromMinutes(10);
-
         private static SearchCorpusCacheEntry GetOrBuildSearchCorpusEntry(FarePolicyData item)
         {
-            // 命中且版本戳相同且未過 TTL → 直接重用。
-            // 注意：DateTime.UtcNow 只用來計算「快取年齡」，與任何業務時間比較（如 ReleaseTime）無關。
+            var searchText = BuildSearchDocument(item);
+
+            // 命中且語料原文一字不差 → 直接重用。
             if (SearchCorpusCache.TryGetValue(item.ID, out var cached) &&
-                cached.Version == item.UpdateTime &&
-                (DateTime.UtcNow - cached.CachedAtUtc) < SearchCorpusCacheTtl)
+                string.Equals(cached.SourceDocument, searchText, StringComparison.Ordinal))
             {
                 return cached;
             }
 
-            // 未命中或已失效：用與原本 searchCorpus 完全一致的算式重算後寫回快取。
-            var searchText = BuildSearchDocument(item);
+            // 未命中或內容已變：用與原本 searchCorpus 完全一致的算式重算後寫回快取。
             var tokens = TraditionalChineseFuzzyMatcher.TokenizeForBm25(searchText);
             var entry = new SearchCorpusCacheEntry
             {
-                Version = item.UpdateTime,
+                SourceDocument = searchText,
                 Tokens = tokens,
                 TermFrequencies = TraditionalChineseFuzzyMatcher.BuildTermFrequencyMap(tokens),
                 DocumentLength = tokens.Count,
-                FoldedSearchText = FoldSearchText(TraditionalChineseFuzzyMatcher.Normalize(searchText)),
-                CachedAtUtc = DateTime.UtcNow
+                FoldedSearchText = FoldSearchText(TraditionalChineseFuzzyMatcher.Normalize(searchText))
             };
             SearchCorpusCache[item.ID] = entry;
             return entry;
@@ -430,12 +436,11 @@ namespace IFare_API.TaskManager.Fare.Policy
         // 寫入後不再修改，所有欄位皆為唯讀取用，可安全跨執行緒共享。
         private sealed class SearchCorpusCacheEntry
         {
-            public DateTime? Version { get; set; }             // = 該政策的 UpdateTime（版本戳）
+            public string SourceDocument { get; set; }         // = 組出這份快取的語料原文（版本戳）
             public List<string> Tokens { get; set; }
             public Dictionary<string, int> TermFrequencies { get; set; }
             public int DocumentLength { get; set; }
             public string FoldedSearchText { get; set; }
-            public DateTime CachedAtUtc { get; set; }          // 快取寫入時間（UtcNow），僅用來算年齡
         }
 
         private static string BuildSearchDocument(FarePolicyData item)
@@ -461,6 +466,35 @@ namespace IFare_API.TaskManager.Fare.Policy
                 is "1" or "true" or "on";
         private static string _searchMetricsDirectory;
         private static readonly object _searchMetricsDirectoryLock = new object();
+        // 寫檔鎖：前台公開 API，多請求會同時 append 同一個日檔。FileShare.ReadWrite 只允許同時開檔，
+        // 不保證寫入不交錯，實務上會出現半行相接的壞資料。行程內序列化寫入（一行只有數百位元組、
+        // 持鎖時間極短）即可讓每行完整。跨行程仍需靠檔名分日與外部工具處理。
+        private static readonly object _searchMetricsWriteLock = new object();
+
+        /// <summary>
+        /// 把使用者 query 逸出成單行、可安全落檔的字串。
+        /// 換行／歸位／Tab 會讓一筆記錄被拆成多行、混進其他請求的內容裡（log 注入），
+        /// 引號會破壞 query="..." 的欄位邊界，一併轉義；同時截斷過長輸入避免單行爆量。
+        /// </summary>
+        private static string EscapeSearchMetricsQuery(string query)
+        {
+            if (string.IsNullOrEmpty(query))
+            {
+                return string.Empty;
+            }
+
+            const int MaxLoggedQueryLength = 200;
+            var escaped = query
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n")
+                .Replace("\t", "\\t");
+
+            return escaped.Length > MaxLoggedQueryLength
+                ? escaped.Substring(0, MaxLoggedQueryLength) + "…(truncated)"
+                : escaped;
+        }
 
         private void WriteSearchMetricsLog(FarePolicyFilterParam param, long elapsedMilliseconds, int resultCount)
         {
@@ -472,7 +506,7 @@ namespace IFare_API.TaskManager.Fare.Policy
 
                 var logLine =
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [FarePolicySearchMetrics] " +
-                    $"query=\"{param?.Query ?? string.Empty}\", " +
+                    $"query=\"{EscapeSearchMetricsQuery(param?.Query)}\", " +
                     $"elapsed_ms={elapsedMilliseconds}, " +
                     $"result_count={resultCount}, " +
                     $"api_working_set_mb={currentProcess.WorkingSet64 / 1024d / 1024d:F2}, " +
@@ -486,13 +520,17 @@ namespace IFare_API.TaskManager.Fare.Policy
                 var searchMetricsFilePath = Path.Combine(
                     searchMetricsDirectory,
                     $"SearchMetrics-{DateTime.Now:yyyyMMdd}.txt");
-                using var stream = new FileStream(
-                    searchMetricsFilePath,
-                    FileMode.Append,
-                    FileAccess.Write,
-                    FileShare.ReadWrite);
-                using var writer = new StreamWriter(stream);
-                writer.WriteLine(logLine);
+                // 開檔與寫入一起放進鎖裡：只鎖 append 這一小段，SQL 快照與字串組裝仍在鎖外並行。
+                lock (_searchMetricsWriteLock)
+                {
+                    using var stream = new FileStream(
+                        searchMetricsFilePath,
+                        FileMode.Append,
+                        FileAccess.Write,
+                        FileShare.ReadWrite);
+                    using var writer = new StreamWriter(stream);
+                    writer.WriteLine(logLine);
+                }
             }
             catch (Exception ex)
             {
@@ -742,32 +780,36 @@ FROM sys.dm_os_process_memory;";
             // 依序用四層意圖補滿，最多回 TTLCOUNT（3）筆相關政策；每層以 currentList 去重、
             // 並用剩餘名額 takeNum 續補。_query_All/_quer_All_Contains/_quer_All_Or/_query 現在都是
             // 記憶體 List，故改用 .Count 屬性（與原 .Count() 值完全相同）。
+            // 修正舊碼 bug：_relationList.Count 是「累計筆數」，舊寫法 takeNum -= _relationList.Count
+            // 會把前面幾層已補的筆數重複扣掉（第一層補 2 筆後 takeNum 剩 1，第二層再補 1 筆變 3 筆、
+            // takeNum 卻被扣成 -2），導致後面的層數提早被 takeNum > 0 擋掉、名額補不滿。
+            // 剩餘名額應該直接以總額扣掉累計筆數：takeNum = TTLCOUNT - _relationList.Count。
             // All same.
             if (_query_All.Count > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_query_All, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count;
+                takeNum = TTLCOUNT - _relationList.Count;
             }
 
             // All Contains same.
             if (_quer_All_Contains.Count > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_quer_All_Contains, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count;
+                takeNum = TTLCOUNT - _relationList.Count;
             }
 
             // All Or.
             if (_quer_All_Or.Count > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_quer_All_Or, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count;
+                takeNum = TTLCOUNT - _relationList.Count;
             }
 
             // All random.
             if (_query.Count > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_query, takeNum, currentList: _relationList, isRandom: true));
-                takeNum = takeNum - _relationList.Count;
+                takeNum = TTLCOUNT - _relationList.Count;
             }
 
             return new FarePolicyResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), _relationList);

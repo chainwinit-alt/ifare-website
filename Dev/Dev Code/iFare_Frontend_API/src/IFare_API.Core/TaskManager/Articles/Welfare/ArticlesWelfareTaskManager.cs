@@ -179,32 +179,34 @@ namespace IFare_API.TaskManager.Articles.Welfare
             const int TTLCOUNT = 3;
             var takeNum = TTLCOUNT;
 
+            // 剩餘名額＝總額扣掉「累計」筆數；舊寫法 takeNum -= _relationList.Count() 會把
+            // 前面幾層已補的筆數重複扣掉，讓後面的層數被 takeNum > 0 提早擋掉、名額補不滿。
             // All same.
             if (_query_All.Count() > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_query_All, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = TTLCOUNT - _relationList.Count();
             }
 
             // All Contains same.
             if (_quer_All_Contains.Count() > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_quer_All_Contains, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = TTLCOUNT - _relationList.Count();
             }
 
             // All Or.
             if (_query_or.Count() > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_query_or, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = TTLCOUNT - _relationList.Count();
             }
 
             // All random.
-            if (_query.Count() > 0 && takeNum > 0) 
+            if (_query.Count() > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_query, takeNum, currentList: _relationList, isRandom: true));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = TTLCOUNT - _relationList.Count();
             }
 
             return new ArticlesWelfareResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), _relationList);

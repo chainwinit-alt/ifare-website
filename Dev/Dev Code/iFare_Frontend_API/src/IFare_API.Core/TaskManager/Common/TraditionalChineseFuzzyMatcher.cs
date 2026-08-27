@@ -47,9 +47,42 @@ namespace IFare_API.TaskManager.Common
             return builder.ToString();
         }
 
-        public static double Score(string query, string candidate)
+        /// <summary>
+        /// 查詢側的前處理結果。Score 裡的 Normalize(query)、TokenizeTerms(query)（＝Jieba 斷詞）
+        /// 與查詢的 n-gram 集合都只由 query 決定，與候選字串無關；一次搜尋要對「每一筆政策的
+        /// 每一個欄位」呼叫 Score，等於把這些完全相同的計算重跑數百上千次。
+        /// 先算一次存進這個物件重複使用，算式與輸入字串完全不變，分數逐筆相同。
+        /// 建立後不再修改，可安全跨候選字串共用。
+        /// </summary>
+        public sealed class QueryScoringContext
+        {
+            internal string NormalizedQuery;
+            internal List<string> QueryTerms;
+            internal HashSet<string> QueryBigrams;
+            internal HashSet<string> QueryUnigrams;
+        }
+
+        public static QueryScoringContext CreateQueryScoringContext(string query)
         {
             var normalizedQuery = Normalize(query);
+            return new QueryScoringContext
+            {
+                NormalizedQuery = normalizedQuery,
+                // 沿用原本 Score 的傳入值：terms 用原始 query、n-gram 用正規化後的字串。
+                QueryTerms = TokenizeTerms(query),
+                QueryBigrams = BuildNgrams(normalizedQuery, 2),
+                QueryUnigrams = BuildNgrams(normalizedQuery, 1)
+            };
+        }
+
+        public static double Score(string query, string candidate)
+        {
+            return Score(CreateQueryScoringContext(query), candidate);
+        }
+
+        public static double Score(QueryScoringContext queryContext, string candidate)
+        {
+            var normalizedQuery = queryContext.NormalizedQuery;
             var normalizedCandidate = Normalize(candidate);
 
             if (string.IsNullOrEmpty(normalizedQuery) || string.IsNullOrEmpty(normalizedCandidate))
@@ -58,11 +91,10 @@ namespace IFare_API.TaskManager.Common
             }
 
             var exactContainsBoost = normalizedCandidate.Contains(normalizedQuery, StringComparison.Ordinal) ? 0.35d : 0d;
-            var queryTerms = TokenizeTerms(query);
             var candidateTerms = TokenizeTerms(candidate);
-            var termScore = WeightedTokenOverlapScore(queryTerms, candidateTerms);
-            var bigramScore = DiceCoefficient(BuildNgrams(normalizedQuery, 2), BuildNgrams(normalizedCandidate, 2));
-            var unigramScore = DiceCoefficient(BuildNgrams(normalizedQuery, 1), BuildNgrams(normalizedCandidate, 1));
+            var termScore = WeightedTokenOverlapScore(queryContext.QueryTerms, candidateTerms);
+            var bigramScore = DiceCoefficient(queryContext.QueryBigrams, BuildNgrams(normalizedCandidate, 2));
+            var unigramScore = DiceCoefficient(queryContext.QueryUnigrams, BuildNgrams(normalizedCandidate, 1));
 
             return Math.Min(1d, exactContainsBoost + (termScore * 0.65d) + (bigramScore * 0.25d) + (unigramScore * 0.1d));
         }
