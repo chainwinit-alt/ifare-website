@@ -1417,9 +1417,19 @@ function buildRankQuery() {
   const conversationQuery = normalizeSummaryKeyword(conversationSearchQuery.value);
   const keyword = normalizeSummaryKeyword(props.searchContext?.query);
   const query = normalizeSummaryKeyword(props.query);
+  const primary = conversationQuery || keyword || query;
+  // props.query 是實際查出下方清單的詞（result.vue 的 summaryQuery，意圖解析的結果優先），
+  // 排序依據必須把它併進來，不能只拿使用者打的原字。只用原字的話：查「ㄓㄤˇㄓㄠˋ」時
+  // 清單靠解析出的「長期照顧」查到 170 筆，但注音符號不是 \p{Script=Han}，normalizeText
+  // 會把整串刷掉，每一筆都算 0 分，referenceCases 把候選全數濾掉、送出的 cases 成了
+  // 空陣列，伺服器便誤判「站內查無政策」改寫一般知識總覽——畫面變成上半部說站內沒有、
+  // 下半部同時列著 170 筆。同音錯字死法相同（「掌照」解析成「長照」查到 173 筆）。
+  // 詞彙表（buildRelevanceQuery）救不了這種輸入：表裡對得到的是「長照」「沒錢」這類
+  // 站內講法，注音與錯字只有意圖解析認得，所以清單靠哪些詞查到、排序就要看得到那些詞。
+  const rankBasis = primary === query ? primary : [primary, query].filter(Boolean).join(" ");
   // 地區是獨立的篩選條件；留在排序關鍵字裡會讓每一筆都因為標題的【新北市】而命中，
   // 引用政策就會排出一堆跟主題無關的東西。順便把訪客用語換成站內用詞。
-  return buildRelevanceQuery(conversationQuery || keyword || query);
+  return buildRelevanceQuery(rankBasis);
 }
 
 const overSpecificSummaryGuards: Array<{ allowedBy: RegExp; blockedInSummary: RegExp }> = [
