@@ -103,12 +103,18 @@
         </div>
         <div class="part-body">
           <div class="btn-tag-list">
+            <!-- #15 這排分類本來只是 span @click，鍵盤完全點不到；比照 pages/ifare.vue 的做法補上按鈕語意 -->
             <span
               class="btn btn-tag transition-general"
               :class="{ active: _tag.isActive }"
+              role="button"
+              tabindex="0"
+              :aria-pressed="_tag.isActive"
               v-for="_tag in codePolicyList"
               :key="_tag.id"
               @click="switchPolicy(_tag.id)"
+              @keydown.enter.prevent="switchPolicy(_tag.id)"
+              @keydown.space.prevent="switchPolicy(_tag.id)"
               >{{ _tag.codeName }}</span
             >
           </div>
@@ -252,21 +258,24 @@ onBeforeUnmount(() => {
   clearHeroResume();
 });
 
-const topNews = $WebApiGet("/News/GetTopsNewsList");
-topNews.then((res: any) => {
-  const _data = getApiResultArray<any>(res);
+function LoadTopNews() {
+  const topNews = $WebApiGet("/News/GetTopsNewsList");
+  topNews.then((res: any) => {
+    const _data = getApiResultArray<any>(res);
 
-  let _newsList: Array<newsItem> = _data.map((item: any, i: number) => {
-    return {
-      id: item.id,
-      title: item.title,
-      releaseTime: item.releaseTime,
-      content: item.content,
-    };
-  });
+    let _newsList: Array<newsItem> = _data.map((item: any, i: number) => {
+      return {
+        id: item.id,
+        title: item.title,
+        releaseTime: item.releaseTime,
+        content: item.content,
+      };
+    });
 
-  newsList.push(..._newsList);
-}).catch((e: any) => console.warn('[index] 熱門消息載入失敗', e)); // 2026-06-08 UIUX #186 — 補錯誤處理，避免靜默失敗/未處理 rejection
+    newsList.splice(0);
+    newsList.push(..._newsList);
+  }).catch((e: any) => console.warn('[index] 熱門消息載入失敗', e)); // 2026-06-08 UIUX #186 — 補錯誤處理，避免靜默失敗/未處理 rejection
+}
 
 function SetWelfareData() {
   const topWelfare = $WebApiGet("/ArticlesWelfare/GetArticlesWelfareTops", {
@@ -293,22 +302,31 @@ function SetWelfareData() {
   }).catch((e: any) => console.warn('[index] 福利專欄載入失敗', e)); // 2026-06-08 UIUX #186
 }
 
-SetWelfareData();
+function LoadCodePolicy() {
+  const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
+  codePolicy.then((res: any) => {
+    const _data = getApiResultArray<any>(res);
 
-const codePolicy = $WebApiGet("/Code/GetCodePolicyList");
-codePolicy.then((res: any) => {
-  const _data = getApiResultArray<any>(res);
+    let _list: Array<codeItem> = _data.map((item: any, i: number) => {
+      return {
+        codeName: item.codeName,
+        id: item.id,
+        isActive: i == 0,
+      };
+    });
 
-  let _list: Array<codeItem> = _data.map((item: any, i: number) => {
-    return {
-      codeName: item.codeName,
-      id: item.id,
-      isActive: i == 0,
-    };
-  });
+    codePolicyList.splice(0);
+    codePolicyList.push(..._list);
+  }).catch((e: any) => console.warn('[index] 政策分類載入失敗', e)); // 2026-06-08 UIUX #186
+}
 
-  codePolicyList.push(..._list);
-}).catch((e: any) => console.warn('[index] 政策分類載入失敗', e)); // 2026-06-08 UIUX #186
+// #19 這三份資料都只餵畫面、不影響 SEO（原本就是 fire-and-forget，SSR 根本不會等它們，
+// 伺服器打完的結果直接丟掉，瀏覽器再打第二次）。改掛 onMounted 只在瀏覽器打一次。
+onMounted(() => {
+  LoadTopNews();
+  SetWelfareData();
+  LoadCodePolicy();
+});
 
 function switchPolicy(id: number) {
   codePolicyList.forEach((_code: any, i: number) => {

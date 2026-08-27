@@ -35,27 +35,42 @@
           </div>
           <div class="part-filter-list">
             <div class="filter-group">
-              <label class="filter-title">經濟條件</label>
-              <div class="btn-tag-list">
+              <label class="filter-title" :id="dialogId ? `${dialogId}-income` : undefined">經濟條件</label>
+              <!--
+                純 span 只綁 @click 的話，鍵盤與讀屏使用者在這裡一項都選不到。
+                補 role/tabindex/aria-pressed 與 enter、space（寫法比照 pages/ifare.vue）。
+                鍵盤事件要 .stop：外層 combobox 也綁了 enter/space，冒泡上去會把對話框關掉。
+              -->
+              <div class="btn-tag-list" role="group" :aria-labelledby="dialogId ? `${dialogId}-income` : undefined">
                 <span
                   class="btn btn-tag"
                   :class="{ active: selectItems.findIndex((p:any) => p.name == _item.name) >= 0 }"
+                  role="button"
+                  tabindex="0"
+                  :aria-pressed="selectItems.findIndex((p:any) => p.name == _item.name) >= 0"
                   v-for="_item in selectListIncome"
                   :key="_item.val"
                   @click="ClickSelectItem(_item.name, _item.val, 'Income')"
+                  @keydown.enter.prevent.stop="ClickSelectItem(_item.name, _item.val, 'Income')"
+                  @keydown.space.prevent.stop="ClickSelectItem(_item.name, _item.val, 'Income')"
                   >{{ _item.name }}</span
                 >
               </div>
             </div>
             <div class="filter-group">
-              <label class="filter-title" name="identity">特殊身分</label>
-              <div class="btn-tag-list">
+              <label class="filter-title" name="identity" :id="dialogId ? `${dialogId}-identity` : undefined">特殊身分</label>
+              <div class="btn-tag-list" role="group" :aria-labelledby="dialogId ? `${dialogId}-identity` : undefined">
                 <span
                   class="btn btn-tag"
                   :class="{ active: selectItems.findIndex((p:any) => p.name == _item.name) >= 0 }"
+                  role="button"
+                  tabindex="0"
+                  :aria-pressed="selectItems.findIndex((p:any) => p.name == _item.name) >= 0"
                   v-for="_item in selectListIdentity"
                   :key="_item.val"
                   @click="ClickSelectItem(_item.name, _item.val, 'Identity')"
+                  @keydown.enter.prevent.stop="ClickSelectItem(_item.name, _item.val, 'Identity')"
+                  @keydown.space.prevent.stop="ClickSelectItem(_item.name, _item.val, 'Identity')"
                   >{{ _item.name }}</span
                 >
               </div>

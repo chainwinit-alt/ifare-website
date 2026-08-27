@@ -8,7 +8,8 @@
       </p>
     </div>
 
-    <ol class="list-unstyled policy-ask-thread" v-if="threadItems.length > 0">
+    <!-- 回答是逐字長出來的，讀屏使用者要靠 aria-live 才知道有新內容（比照摘要卡的對話串） -->
+    <ol class="list-unstyled policy-ask-thread" v-if="threadItems.length > 0" aria-live="polite">
       <li class="policy-ask-turn" v-for="(turn, index) in threadItems" :key="index">
         <p class="policy-ask-question">{{ turn.question }}</p>
         <div class="policy-ask-answer" v-if="turn.answer" v-html="renderAnswer(turn.answer)"></div>
@@ -95,17 +96,33 @@ const threadItems = ref<AskTurn[]>([]);
 const inputText = ref("");
 const isLoading = ref(false);
 const errorMessage = ref("");
+// 正在跑的那一次串流。比照 IfareSummaryCard 的 activeController：換政策或離開頁面時
+// 要真的把連線切掉，否則舊政策的答案會繼續寫進已經換掉的畫面，isLoading 也可能卡住。
+const activeController = shallowRef<AbortController | null>(null);
+let askRequestId = 0;
+
+/** 中止進行中的提問並解鎖輸入框（換政策、離開頁面時用） */
+function abortActiveAsk() {
+  askRequestId += 1;
+  activeController.value?.abort();
+  activeController.value = null;
+  isLoading.value = false;
+}
 
 // 換一筆政策就把對話清掉。這頁換 id 時是同一個元件實例重抓資料（見本頁的 route.query.id watcher），
 // 不清的話上一筆的問答會留在新政策底下，看起來像是在講這一筆。
 watch(
   () => props.policy?.id,
   () => {
+    abortActiveAsk();
     threadItems.value = [];
     inputText.value = "";
     errorMessage.value = "";
   }
 );
+
+// 元件被拆掉時同樣要收線，不然使用者離開明細頁之後那個請求還在跑
+onBeforeUnmount(abortActiveAsk);
 
 function renderAnswer(text: string) {
   return useSanitize(renderMarkdownBlocks(text, renderInlineMarkdownWithoutReferences));
@@ -119,6 +136,11 @@ async function ask(rawQuestion: string) {
   errorMessage.value = "";
   inputText.value = "";
   isLoading.value = true;
+
+  const currentRequestId = ++askRequestId;
+  activeController.value?.abort();
+  const controller = new AbortController();
+  activeController.value = controller;
 
   const turn = reactive<AskTurn>({ question, answer: "", isStreaming: true, error: "" });
   threadItems.value.push(turn);
@@ -149,20 +171,29 @@ async function ask(rawQuestion: string) {
       ],
       conversation: [...history, { role: "user", content: question }],
       focusPolicy: true,
+      signal: controller.signal,
       onChunk: (_chunk: string, fullText: string) => {
+        if (currentRequestId !== askRequestId) return;
         turn.answer = fullText;
       },
     });
 
+    if (currentRequestId !== askRequestId) return;
     turn.answer = finalText || turn.answer;
     if (!turn.answer) turn.error = ASK_ERROR_MESSAGE;
-  } catch (error) {
+  } catch (error: any) {
+    // 自己中止的（換政策、離開頁面）不算失敗，那一輪連同對話串本來就要收掉
+    if (currentRequestId !== askRequestId || error?.name === "AbortError") return;
     // 沒答出來就把那一輪標成失敗，不要靜靜留一個空泡泡讓使用者以為還在跑
     turn.error = ASK_ERROR_MESSAGE;
     errorMessage.value = ASK_ERROR_MESSAGE;
   } finally {
     turn.isStreaming = false;
-    isLoading.value = false;
+    // 已經被新的一輪或 abortActiveAsk 接手時不要回頭改狀態，免得把新的載入中關掉
+    if (currentRequestId === askRequestId) {
+      isLoading.value = false;
+      activeController.value = null;
+    }
   }
 }
 </script>

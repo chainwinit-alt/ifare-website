@@ -383,7 +383,12 @@ async function loadPolicyList() {
   policySelectList.splice(1);
   policySelectList.push(..._list);
 }
-loadPolicyList();
+// #19 這頁五份清單都只餵畫面、沒有 SEO 需求，而且原本就是 setup 頂層的 fire-and-forget：
+// SSR 不會等它們，伺服器打出去的那一輪結果直接被丟掉，客戶端還得再打一次。
+// 改掛 onMounted 之後只在瀏覽器打一次，後端負載少一半，畫面表現與原本相同。
+onMounted(() => {
+  loadPolicyList();
+});
 
 // Code area
 const areaError = ref("");
@@ -407,7 +412,9 @@ async function loadAreaList() {
   areaSelectList.splice(1);
   areaSelectList.push(..._list);
 }
-loadAreaList();
+onMounted(() => {
+  loadAreaList();
+});
 
 // Code recipient
 const recipientError = ref("");
@@ -436,7 +443,9 @@ async function loadRecipientList() {
   recipientSelectList.splice(0);
   recipientSelectList.push(..._list);
 }
-loadRecipientList();
+onMounted(() => {
+  loadRecipientList();
+});
 
 function SwitchRecipient(codeVal: any) {
   const selectedItem = recipientSelectList.find((item) => item.val == codeVal);
@@ -533,7 +542,10 @@ async function loadOfficeList() {
   );
 
   // Num page init.
-  for (let n = 0; n <= officeList.length / PAGEITEMMAX_OFFICE; n++) {
+  // #18 頁數要用 storage 全量長度算：officeList 這時已被截成當頁 6 筆，拿它算永遠只有 1～2 頁，
+  // 機構超過 12 筆時第 3 頁以後根本不會產生。改用 Math.ceil 也順便修掉整除時多一頁空白。
+  const totalPages_office = Math.ceil(storageOfficeList.length / PAGEITEMMAX_OFFICE);
+  for (let n = 0; n < totalPages_office; n++) {
     pageNums_office.push({
       num: n + 1,
       isActive: n == 0,
@@ -541,7 +553,9 @@ async function loadOfficeList() {
     });
   }
 }
-loadOfficeList();
+onMounted(() => {
+  loadOfficeList();
+});
 
 function PageChange_Office(pageNum: number) {
   officeList.splice(0);
@@ -634,7 +648,9 @@ async function loadQAList() {
     });
   }
 }
-loadQAList();
+onMounted(() => {
+  loadQAList();
+});
 
 function PageChange_QA(pageNum: number) {
   qaList.splice(0);

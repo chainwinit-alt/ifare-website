@@ -97,13 +97,14 @@
           <div class="card-list" v-else>
             <div class="card-partner transition-general" v-for="_coll in filteredList" :key="_coll.id" :data-mascot-tip="`這裡可以查看 ${_coll.title} 的服務內容與網站。`">
               <div class="card-title">
-                <img width="56" height="52" :src="_coll.imageFile" :alt="`${_coll.title} logo`" loading="lazy" />
+                <!-- #7 imageFile／url 都已在 LoadCollaborators 過白名單，不合法會是空字串，直接不渲染 -->
+                <img v-if="_coll.imageFile" width="56" height="52" :src="_coll.imageFile" :alt="`${_coll.title} logo`" loading="lazy" />
                 <h4 class="partner-title">{{ _coll.title }}</h4>
               </div>
               <ul class="list-unstyled card-infos">
                 <li name="tel">{{ _coll.tel }}</li>
                 <li name="service">{{ _coll.serviceItem }}</li>
-                <li name="website">
+                <li name="website" v-if="_coll.url">
                   <a
                     :href="_coll.url"
                     target="_blank"
@@ -177,6 +178,32 @@ const CATEGORIES: category[] = [
 ];
 
 const collaboratorList = reactive<Array<collaboratorItem>>([]);
+
+// #7 外連與圖片一律先過 scheme 白名單再進畫面。
+// 後端資料若被塞入 `javascript:` 之類的位址，直接綁在 :href／:src 上，
+// 訪客點一下「前往官網」就等於執行那段字串（stored XSS）。
+// 寫法比照 pages/articles/lazy.vue 的 normalizeImageSrc：不合法就回空字串，
+// 由 template 的 v-if 決定整個連結／圖片不渲染。
+function safeText(value: unknown) {
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
+function normalizeExternalUrl(value: unknown) {
+  const url = safeText(value).trim();
+  // 官網連結一定是絕對位址，只放行 http(s)
+  return /^https?:\/\//i.test(url) ? url : '';
+}
+
+function normalizeImageSrc(value: unknown) {
+  const src = safeText(value).trim();
+  // 另外放行本站根相對路徑（開頭單一斜線）：沒有 scheme 就不可能是 javascript:，
+  // 後端若回的是站內圖檔路徑也不會被誤擋。protocol-relative(//) 不算。
+  if (/^(https?:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,|\/(?!\/))/i.test(src)) {
+    return src;
+  }
+  return '';
+}
 
 // #38 — 載入狀態 + 錯誤狀態,搭配 skeleton + retry
 const isLoading = ref(true);
@@ -353,8 +380,8 @@ async function LoadCollaborators() {
       title: item.title,
       serviceItem: item.serviceItem,
       tel: item.tel,
-      url: item.url,
-      imageFile: item.imageFile,
+      url: normalizeExternalUrl(item.url),
+      imageFile: normalizeImageSrc(item.imageFile),
     }));
     collaboratorList.push(..._collaboratorList);
   } catch (error) {

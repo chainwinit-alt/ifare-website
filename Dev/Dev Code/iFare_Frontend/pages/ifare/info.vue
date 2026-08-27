@@ -250,6 +250,25 @@ const metaUrl = computed(() =>
     : metaSiteUrl
 );
 
+// #32 siteUrl 現在只吃環境變數，沒設就是空字串。og:url 與 og:image 都必須是絕對網址——
+// 空字串或相對路徑爬蟲一樣讀不出東西，還會被當成壞值，不如整條不輸出（canonical 原本就已這樣處理）。
+const shareUrlMeta = computed(() =>
+  metaUrl.value ? [{ property: "og:url", content: metaUrl.value }] : []
+);
+
+// 全站共用的品牌圖。政策本身沒有圖，與其配一張不相干的照片讓人以為那是政策內容，
+// 不如放一張說明本站是什麼的圖。之後若要做動態產圖（政策名 + 縣市），從這裡換掉即可。
+const shareImageMeta = computed(() =>
+  metaSiteUrl
+    ? [
+        { property: "og:image", content: `${metaSiteUrl}/og-ifare.png` },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { property: "og:image:alt", content: `${SITE_NAME}－整合全臺社會福利政策` },
+      ]
+    : []
+);
+
 useHead(() => ({
   title: metaTitle.value,
   meta: [
@@ -258,13 +277,8 @@ useHead(() => ({
     { property: "og:site_name", content: SITE_NAME },
     { property: "og:title", content: shareTitle.value },
     { property: "og:description", content: metaDescription.value },
-    { property: "og:url", content: metaUrl.value },
-    // 全站共用的品牌圖。政策本身沒有圖，與其配一張不相干的照片讓人以為那是政策內容，
-    // 不如放一張說明本站是什麼的圖。之後若要做動態產圖（政策名 + 縣市），從這裡換掉即可。
-    { property: "og:image", content: metaSiteUrl ? `${metaSiteUrl}/og-ifare.png` : "/og-ifare.png" },
-    { property: "og:image:width", content: "1200" },
-    { property: "og:image:height", content: "630" },
-    { property: "og:image:alt", content: `${SITE_NAME}－整合全臺社會福利政策` },
+    ...shareUrlMeta.value,
+    ...shareImageMeta.value,
     { property: "og:locale", content: "zh_TW" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:title", content: shareTitle.value },
@@ -330,8 +344,15 @@ const _welfareItem = reactive<infoItem>({
   codeRecipientIDs: [],
 });
 
-// 問答元件要的政策形狀。has* 三項明細 API 沒有直接給，用限制代碼的陣列長度推——
-// 有列到代碼就代表這筆設了該項限制，跟列表頁的判斷一致。
+// #33 「不限」佔位項（UNRESTRICTED_CODE_ID）不是限制，要先排除掉再判斷有沒有設條件。
+// 只看陣列長度的話，只掛著佔位項的政策會被當成「有限制」，判斷方式與同檔 hasSpecificCode
+// 及列表頁不一致，只是這裡拿到的是 id 陣列。
+function hasRestrictionIds(ids: number[]) {
+  return ids.some((id) => Number(id) !== UNRESTRICTED_CODE_ID);
+}
+
+// 問答元件要的政策形狀。has* 三項明細 API 沒有直接給，用限制代碼推——
+// 有列到「不限」以外的代碼就代表這筆設了該項限制，跟列表頁的判斷一致。
 const askPolicy = computed(() => {
   if (!hasPolicy.value || !_welfareItem.id) return null;
   return {
@@ -339,9 +360,9 @@ const askPolicy = computed(() => {
     title: _welfareItem.title,
     area: _welfareItem.area,
     qualification: _welfareItem.qualification,
-    hasRecipient: _welfareItem.codeRecipientIDs.length > 0,
-    hasIncome: _welfareItem.codeIncomeIDs.length > 0,
-    hasIndentity: _welfareItem.codeIdentityIDs.length > 0,
+    hasRecipient: hasRestrictionIds(_welfareItem.codeRecipientIDs),
+    hasIncome: hasRestrictionIds(_welfareItem.codeIncomeIDs),
+    hasIndentity: hasRestrictionIds(_welfareItem.codeIdentityIDs),
   };
 });
 
@@ -644,11 +665,19 @@ function retryLoad() {
   loadRelationList(infoID);
 }
 
-loadOfficeList();
+// #19 洽辦單位清單只是 officeUnitInfo 缺值時的備援文字，沒有 SEO 需求；
+// 留在頂層等於伺服器白打一次（SSR 不會等它，結果直接丟掉），瀏覽器再打第二次。
+onMounted(() => {
+  loadOfficeList();
+});
 
 watch(
   () => [currentPolicyId.value, String(route.query.reload ?? "")] as const,
   async ([infoID]) => {
+    // #19 這是裸露的 async 副作用，SSR 階段不會被 await——伺服器那一輪的結果進不了
+    // 吐出去的 HTML，只是白打一次後端。轉傳／SEO 需要的欄位由上方的 useAsyncData 負責，
+    // 那支才是會被 await 的正解，這裡只在瀏覽器跑就好。
+    if (!import.meta.client) return;
     await Promise.all([loadPolicyDetail(infoID), loadRelationList(infoID)]);
   },
   { immediate: true }

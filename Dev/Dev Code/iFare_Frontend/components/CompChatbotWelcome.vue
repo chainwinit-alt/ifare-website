@@ -666,7 +666,19 @@ async function requestHybridModeReply(prompt: string, sessionId: number, started
   await requestApiReply(prompt, sessionId, 'hybrid', startedAt);
 }
 
+/**
+ * 一次問答最多等多久（毫秒）。
+ *
+ * $fetch 沒有預設逾時：後端或模型那端卡住時這個 await 永遠不會回來，
+ * isBotTyping 就一直是 true、輸入框從此送不出下一句，只能關掉分頁重來。
+ * 逾時之後走原本的連線失敗路徑（顯示重試訊息並開啟真人管道），至少還問得下去。
+ */
+const CHATBOT_REQUEST_TIMEOUT_MS = 30000;
+
 async function requestApiReply(prompt: string, sessionId: number, mode: ChatbotApiMode, startedAt: number) {
+  const controller = new AbortController();
+  const timeoutTimer = setTimeout(() => controller.abort(), CHATBOT_REQUEST_TIMEOUT_MS);
+
   try {
     const response = await $fetch<ChatbotApiResponse>('/api/chatbot', {
       method: 'POST',
@@ -678,6 +690,7 @@ async function requestApiReply(prompt: string, sessionId: number, mode: ChatbotA
           content: message.content,
         })),
       },
+      signal: controller.signal,
     });
 
     await waitForThinkingDelay(startedAt, response.source);
@@ -705,6 +718,8 @@ async function requestApiReply(prompt: string, sessionId: number, mode: ChatbotA
     pushMessage('bot', REQUEST_FAILED_REPLY);
     // 連線失敗根本拿不到 source，但這是最明確的「答不出來」，一樣開真人管道。
     hasUnresolvedReply.value = true;
+  } finally {
+    clearTimeout(timeoutTimer);
   }
 }
 

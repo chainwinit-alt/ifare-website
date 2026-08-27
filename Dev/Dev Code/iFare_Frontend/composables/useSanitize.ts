@@ -33,6 +33,16 @@ const DEFAULT_CONFIG: DOMPurify.Config = {
   FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
 }
 
+/**
+ * inline style 裡會對外連線或執行程式的寫法。
+ *
+ * DOMPurify 不解析 CSS，style="background:url(https://tracker/x.gif)" 會原封不動留下來——
+ * admin 貼一段內容就能在民眾的瀏覽器上載入外部追蹤像素。這裡不整個拿掉 style
+ * （既有內容的表格寬度、對齊都靠它排版，拿掉會破版），只把「會載外部資源或執行程式」
+ * 的那幾條宣告刪掉，排版用的宣告照舊保留。
+ */
+const UNSAFE_CSS_DECLARATION = /url\s*\(|expression\s*\(|image-set\s*\(|-moz-binding|@import|javascript\s*:/i
+
 let hookRegistered = false
 function ensureHook() {
   if (hookRegistered) return
@@ -51,6 +61,19 @@ function ensureHook() {
         // allow 屬性如果有就保留 (先前已在 ALLOWED_ATTR)
       }
     }
+  })
+  // inline CSS 淨化：只留排版用的宣告，會載外部資源或執行程式的整條刪掉
+  DOMPurify.addHook('afterSanitizeAttributes', (node: any) => {
+    const style = node.getAttribute?.('style')
+    if (!style) return
+
+    const safe = style
+      .split(';')
+      .filter((declaration: string) => declaration.trim() && !UNSAFE_CSS_DECLARATION.test(declaration))
+      .join(';')
+
+    if (safe) node.setAttribute('style', safe)
+    else node.removeAttribute('style')
   })
   hookRegistered = true
 }
