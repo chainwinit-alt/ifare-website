@@ -52,17 +52,39 @@ function loadSituationVocabulary() {
 const SITUATION_VOCABULARY = loadSituationVocabulary();
 
 /**
- * 站內認得的福利概念詞（result.vue 的 policySearchConceptPattern 複本）。
- * 用途：從連續中文長句抽出主題詞當兜底查詢路徑。
- * ⚠ 那邊改了記得同步這裡。
+ * 站內認得的福利概念詞與「過度通用、單獨查等於沒篩」的排除名單，
+ * 直接從 pages/ifare/result.vue 抽出 policySearchConceptPattern 與 GENERIC_CONCEPT_TERMS。
+ *
+ * 理由同 loadSituationVocabulary：原本是手抄複本、靠註解提醒同步，而註解攔不住任何人。
+ * 兩邊一旦不一致，eval 量到的就不是站上真正的兜底能力。抽不出來就當場丟錯。
  */
-const CONCEPT_PATTERN =
-  /長期照顧|長照|照顧者|照顧|生育|懷孕|孕婦|新生兒|育兒|托育|身心障礙|智能障礙|身障|老人|長者|高齡|兒少|兒童|青少年|低收入|中低收入|經濟弱勢|原住民|新住民|醫療|教育|就學|學費|租屋|住宅|失業|就業|急難|喪葬|交通|輔具|看護|居家|喘息|假牙|癌症|重大傷病|重病|洗腎|補助|津貼/gu;
+function loadFromResultVue() {
+  const source = readFileSync(new URL("../../pages/ifare/result.vue", import.meta.url), "utf8");
 
-// 對應 result.vue 的 GENERIC_CONCEPT_TERMS，改那邊記得同步這裡
-const GENERIC_CONCEPT_TERMS = new Set([
-  "補助", "津貼", "醫療", "教育", "交通", "居家", "照顧", "就業", "住宅",
-]);
+  const patternMatch = source.match(/const policySearchConceptPattern\s*=\s*(\/[^\n]*\/[a-z]*)\s*;/u);
+  if (!patternMatch) {
+    throw new Error("result.vue 找不到 policySearchConceptPattern 宣告——常數名或寫法改了，請同步更新 eval.mjs 的抽取標記");
+  }
+  const conceptPattern = new Function(`return ${patternMatch[1]};`)();
+  if (!(conceptPattern instanceof RegExp) || !conceptPattern.global) {
+    throw new Error("抽出的 policySearchConceptPattern 不是帶 g 旗標的正則（matchAll 需要 g）");
+  }
+
+  const marker = "const GENERIC_CONCEPT_TERMS = new Set([";
+  const start = source.indexOf(marker);
+  const end = start < 0 ? -1 : source.indexOf("]);", start);
+  if (start < 0 || end < 0) {
+    throw new Error("result.vue 找不到 GENERIC_CONCEPT_TERMS 宣告——請同步更新 eval.mjs 的抽取標記");
+  }
+  const genericTerms = new Function(`return new Set([${source.slice(start + marker.length, end)}]);`)();
+  if (!(genericTerms instanceof Set) || genericTerms.size === 0) {
+    throw new Error("抽出的 GENERIC_CONCEPT_TERMS 形狀不對（應為非空 Set）");
+  }
+
+  return { conceptPattern, genericTerms };
+}
+
+const { conceptPattern: CONCEPT_PATTERN, genericTerms: GENERIC_CONCEPT_TERMS } = loadFromResultVue();
 
 function extractConceptTerms(text) {
   const source = String(text || "");
@@ -141,7 +163,10 @@ async function queryBackend(query) {
 async function search(query) {
   if (RAW_MODE) return queryBackend(query);
 
-  const paths = [query];
+  // 「守門路」：原始字、AI 核心詞、概念詞兜底。這幾路有沒有結果，決定站上要不要
+  // 採用 AI 召回概念詞（見下方 hasGroundedHit）。
+  const groundedPaths = [query];
+  let recallPath = "";
 
   // 第一路：AI 意圖判讀（修錯字、整句抽核心詞）。失敗就跳過，不要讓評估掛掉——
   // 沒有金鑰或 LLM 全掛時，站上本來也是退回原始字那一路。
@@ -154,10 +179,11 @@ async function search(query) {
     });
     if (res.ok) {
       const intent = await res.json();
-      if (intent?.searchQuery) paths.push(intent.searchQuery);
-      // 召回概念詞（v.1.7.19）：AI 給的站內福利用語，站上也會拿去查一路
+      if (intent?.searchQuery) groundedPaths.push(intent.searchQuery);
+      // 召回概念詞（v.1.7.19）：AI 給的站內福利用語，站上也會拿去查一路，
+      // 但要先過守門，所以這裡只先記下來、不急著併進查詢清單。
       if (Array.isArray(intent?.recallConcepts) && intent.recallConcepts.length) {
-        paths.push(intent.recallConcepts.join(" "));
+        recallPath = intent.recallConcepts.join(" ").trim();
       }
     }
   } catch {
@@ -167,24 +193,57 @@ async function search(query) {
   // 概念詞兜底：從原句抽出站內認得的福利概念詞各查一路（對應 result.vue 的
   // conceptFallbackPlans）。意圖 LLM 的輸出會浮動——同一句「我媽媽80歲想裝假牙」
   // 可能回乾淨的「假牙」也可能回「媽媽80歲假牙」（後者查無），這一路是那時候的救命索。
-  for (const term of extractConceptTerms(query)) paths.push(term);
+  for (const term of extractConceptTerms(query)) groundedPaths.push(term);
 
   // 第二路：處境對照擴充（缺錢→急難 生活扶助、忘東忘西→失智 長期照顧…）。
   // 這層在前端 utils/ifareIntent.ts，直接 import 會把 Nuxt 的相依一起拉進來，
   // 所以走 nuxt server 的意圖端點拿不到——這裡改用同一份對照表的最小複本。
+  // 刻意不算進守門判準：它的詞都是人工確認過站內查得到的，本來就是為了救「原句查無」，
+  // 拿它當判準會讓守門失去意義（與 result.vue 的處理一致）。
+  const situationPaths = [];
   const expanded = expandSituation(query);
-  if (expanded && expanded !== query) paths.push(expanded);
+  if (expanded && expanded !== query) situationPaths.push(expanded);
 
   const merged = new Map();
-  for (const path of [...new Set(paths)].filter(Boolean)) {
+  let hasGroundedHit = false;
+  const runPath = async (path, counted) => {
     try {
-      for (const item of await queryBackend(path)) {
+      const items = await queryBackend(path);
+      if (counted && items.length) hasGroundedHit = true;
+      for (const item of items) {
         if (!merged.has(item.id)) merged.set(item.id, item);
       }
     } catch {
       // 單一路失敗不影響其他路
     }
+  };
+
+  const seen = new Set();
+  for (const path of groundedPaths.filter(Boolean)) {
+    if (seen.has(path)) continue;
+    seen.add(path);
+    await runPath(path, true);
   }
+  for (const path of situationPaths.filter(Boolean)) {
+    if (seen.has(path)) continue;
+    seen.add(path);
+    await runPath(path, false);
+  }
+
+  /**
+   * AI 召回概念詞的守門：複製 result.vue（policySearch 的 hasGroundedHit）的判準。
+   *
+   * 原本這裡是無條件併路，跟站上行為對不上：模型會硬湊——「電動車充電樁」被對成
+   * ["住宅","無障礙"]，那一路查回幾百筆。站上會擋掉、eval 不會，於是三題 expectZero
+   * 的通過與否隨當天 LLM 漂移，變成假陽性／假陰性，量到的不是站上真正的系統。
+   *
+   * 判準：守門路（原始字／AI 核心詞／概念詞兜底）只要有任何一筆結果，代表站內真的
+   * 有這個主題，召回詞是在既有主題上補漏，可以採用；全部 0 筆則不採用。
+   */
+  if (hasGroundedHit && recallPath && !seen.has(recallPath)) {
+    await runPath(recallPath, false);
+  }
+
   return [...merged.values()];
 }
 

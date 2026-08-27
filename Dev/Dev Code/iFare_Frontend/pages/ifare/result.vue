@@ -16,15 +16,24 @@
               />
             </div>
             <div class="filter-group">
-              <label class="filter-title">受助者年齡區間</label>
-              <div class="btn-tag-list">
+              <label class="filter-title" id="result-label-recipient">受助者年齡區間</label>
+              <!--
+                純 span 只綁 @click 的話，鍵盤與讀屏使用者在結果頁一個條件都選不到。
+                補上 role/tabindex/aria-pressed 與 enter、space（寫法比照 pages/ifare.vue）。
+              -->
+              <div class="btn-tag-list" role="group" aria-labelledby="result-label-recipient">
                 <span
                   class="btn btn-tag transition-general"
                   :class="{ active: _recipient.isActive}"
+                  role="button"
+                  tabindex="0"
+                  :aria-pressed="Boolean(_recipient.isActive)"
                   :name="_recipient.name"
                   v-for="_recipient in recipientSelectList"
                   :key="_recipient.val"
                   @click="SwitchRecipient(_recipient.val)"
+                  @keydown.enter.prevent="SwitchRecipient(_recipient.val)"
+                  @keydown.space.prevent="SwitchRecipient(_recipient.val)"
                   >{{ _recipient.name }}</span
                 >
               </div>
@@ -72,27 +81,37 @@
           </div>
           <div class="part-bottom" v-show="isOpts">
             <div class="filter-group">
-              <label class="filter-title" name="multiple">經濟條件</label>
-              <div class="btn-tag-list">
+              <label class="filter-title" name="multiple" id="result-label-income">經濟條件</label>
+              <div class="btn-tag-list" role="group" aria-labelledby="result-label-income">
                 <span
                   class="btn btn-tag transition-general"
                   :class="{ active: _income.isActive }"
+                  role="button"
+                  tabindex="0"
+                  :aria-pressed="Boolean(_income.isActive)"
                   v-for="_income in incomeSelectList"
                   :key="_income.val"
                   @click="SwitchIncome(_income.val)"
+                  @keydown.enter.prevent="SwitchIncome(_income.val)"
+                  @keydown.space.prevent="SwitchIncome(_income.val)"
                   >{{ _income.name }}</span
                 >
               </div>
             </div>
             <div class="filter-group">
-              <label class="filter-title" name="identity">特殊身分</label>
-              <div class="btn-tag-list">
+              <label class="filter-title" name="identity" id="result-label-identity">特殊身分</label>
+              <div class="btn-tag-list" role="group" aria-labelledby="result-label-identity">
                 <span
                   class="btn btn-tag transition-general"
                   :class="{ active: _identity.isActive }"
+                  role="button"
+                  tabindex="0"
+                  :aria-pressed="Boolean(_identity.isActive)"
                   v-for="_identity in identitySelectList"
                   :key="_identity.val"
                   @click="SwitchIdentity(_identity.val)"
+                  @keydown.enter.prevent="SwitchIdentity(_identity.val)"
+                  @keydown.space.prevent="SwitchIdentity(_identity.val)"
                   >{{ _identity.name }}</span
                 >
               </div>
@@ -196,6 +215,7 @@
           :result-breakdown="summaryResultBreakdown"
           :relax-suggestions="relaxSuggestions"
           :search-failed="searchFailed"
+          :recall-concepts="resolvedPolicyRecallConcepts"
           @summary-complete="handleSummaryComplete"
           @select-quick-option="applySummaryQuickOption"
           @apply-conditions="applySummaryConditions"
@@ -357,6 +377,14 @@ const resolvedPolicySearchQuery = ref("");
 // 這一輪 LLM 解析出的受助對象排序提示（"self"|"child"|"elder"|"family"|"unknown"）。
 // 只用來塞進 summarySearchContext 給摘要卡讀；排序的安全閥另外從 resolvedIntent 直接取用。
 const resolvedPolicyBeneficiary = ref("unknown");
+/**
+ * 這一輪真的拿去查詢的召回概念詞（recallConceptPlans 那一路）。
+ *
+ * 傳給摘要卡當排序依據的一部分：長尾處境句常常整份清單都是靠這條路撈到的，
+ * 摘要卡若看不到這些詞，每一筆都會算 0 分、引用政策濾成空的，於是寫出
+ * 「站內查無」而下方清單同時列著上百筆。守門沒過（沒採用）時維持空陣列。
+ */
+const resolvedPolicyRecallConcepts = ref<string[]>([]);
 /**
  * 推薦區探測筆數時要用的關鍵字，以及它的基準筆數。
  *
@@ -1213,6 +1241,12 @@ const FILTER_OPTION_BASE_LENGTHS = {
 
 /** 走 Detailed 版本才分得出「這個選單真的沒選項」與「根本沒連上」 */
 async function loadCodeList(path: string) {
+  // SSR 期間不打這幾支。這五份代碼表是在 setup 頂層 fire-and-forget 發出去的，
+  // 伺服器端渲染早在它們回來之前就結束了，結果只會被丟掉——等於每一次頁面請求
+  // 都白打五支 API，還讓 SSR 與 client 的初始清單不一致。改成只在瀏覽器端抓，
+  // 呼叫時機與既有行為完全相同（回 null 時各 loader 的 .then 本來就會直接 return）。
+  if (!process.client) return null;
+
   const { data, error } = await $WebApiGetDetailed(path);
   if (error || !data?.result?.result) {
     filterOptionsFailed.value = true;
@@ -1335,7 +1369,11 @@ function loadIdentityOptions() {
   const _data = res.result.result;
   let _list: Array<selectItem> = _data.slice(1).map((item: any, i: number) => {
     return {
-      name: item.codeName == '?券' ? '銝?' : item.codeName,
+      // 這裡原本有一個改寫代碼名稱的三元，但比對的字與要換上的字都是壞掉的編碼，
+      // 條件永遠不成立、原始意圖已無從得知，等同沒有作用。留著只會讓人以為
+      // 特殊身分有某種特例對照。日後若確認某個代碼名稱真的需要改寫，請以正確的
+      // 中文重新加回來。【待人工確認】
+      name: item.codeName,
       val: String(item.id),
       isActive: false,
     };
@@ -2576,6 +2614,8 @@ async function SetDataInit() {
     : prefetchedOriginalResponse;
   resolvedPolicySearchQuery.value = resolvedQuery;
   resolvedPolicyBeneficiary.value = resolvedIntent.beneficiary || "unknown";
+  // 先清掉上一輪的；這一輪的召回詞要等守門判完（見下方 usedRecallPlans）才知道有沒有採用
+  resolvedPolicyRecallConcepts.value = [];
   const hasAiExpansion = Boolean(resolvedQuery && resolvedQuery !== originalQuery);
   const originalWeight = hasAiExpansion ? 0.7 : 1;
   const requestPlans: PolicySearchRequestPlan[] = originalQueries.map((query) => ({
@@ -2691,6 +2731,8 @@ async function SetDataInit() {
       : [];
     const usedRecallPlans = recallOutcomes.length ? recallConceptPlans : [];
     if (requestId !== policySearchRequestId) return;
+    // 真的採用了才傳給摘要卡當排序依據；沒採用的話那些詞本來就沒撈到任何一筆
+    resolvedPolicyRecallConcepts.value = usedRecallPlans.length ? [...recallConcepts] : [];
     extraPlans.push(...usedRecallPlans);
     extraOutcomes.push(...recallOutcomes);
 
@@ -2743,6 +2785,13 @@ async function SetDataInit() {
     // 記錄裡的 0 筆一定是「站內真的沒有」，不會跟「連不上後端」混在一起——
     // 這份資料是拿來找該補哪些同義詞的，混進連線失敗會直接把結論帶偏。
     logSearchQuery(resolvedQuery, _newsList.length);
+  } catch (error) {
+    // 這裡原本只有 finally。意外的例外（合併排序、對映欄位出錯）會整個繞過上面那道
+    // searchFailed 判定，清單留在空的、畫面卻照樣顯示「找到 0 筆」——等於替一個
+    // 程式錯誤背書說本站沒有這類補助。走既有的搜尋失敗路徑，至少講的是實話。
+    if (requestId !== policySearchRequestId) return;
+    console.warn("[iFare][result] SetDataInit", error);
+    searchFailed.value = true;
   } finally {
     if (requestId !== policySearchRequestId) return;
     isLoading.value = false;

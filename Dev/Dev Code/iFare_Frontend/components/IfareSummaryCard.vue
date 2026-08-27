@@ -396,6 +396,7 @@ import {
   normalizeFallbackIntentTopic,
 } from "~/utils/ifareIntent";
 import {
+  isOverSpecificPolicyForIntent,
   isUnsetPolicyCondition as isUnsetCondition,
   policyDeclares,
   scorePolicyConditionFit,
@@ -453,7 +454,16 @@ type SummarySearchContext = {
 
 type SummaryConversationMessage = {
   role: "user" | "assistant";
+  /** 使用者原本打的字。字面條件抽取、重新搜尋一律看這一欄，絕不能是改寫過的版本 */
   content: string;
+  /**
+   * 送進模型提示詞時要改用的字（目前只有「把 02 展開成政策全名」會用到）。
+   *
+   * 兩欄分開的理由：展開後的文字含政策全名，裡面的【桃園市】【老人】會被
+   * result.vue 的 extractExplicitSearchConditions 當成「使用者這次自己打出來的條件」，
+   * 於是使用者自選的台東縣被悄悄換成桃園市、整份清單重搜，畫面上卻只顯示「02」。
+   */
+  promptContent?: string;
 };
 
 /** 追問問到目前條件以外的範圍時，頁面查回來的「換過去會有幾筆」 */
@@ -582,9 +592,18 @@ const props = withDefaults(
      * 但站內其實有 52 筆。那條路是誤導的來源，這裡直接不讓它走到。
      */
     searchFailed?: boolean;
+    /**
+     * 這一輪實際採用的召回概念詞（結果頁 recallConceptPlans 那一路查詢用的詞）。
+     *
+     * 清單有可能整份都是靠這條路撈到的，但那些詞不會出現在 query 裡。排序依據
+     * 看不到它們的話，每一筆都算 0 分、引用政策被濾成空的，摘要就會寫出
+     * 「站內查無」而下方清單同時列著結果。
+     */
+    recallConcepts?: string[];
   }>(),
   {
     query: "",
+    recallConcepts: () => [],
     quickOptions: () => ({}),
     areaOptions: () => [],
     probeBaselineCount: 0,
@@ -606,6 +625,11 @@ const router = useRouter();
 const selectedProvider = ref<ProviderName>("groq");
 const isLoading = ref(false);
 const streamError = ref("");
+/**
+ * 這一份摘要是不是「沒跑完的」——模型半途噴錯、或伺服器要求整段丟掉。
+ * 只影響要不要寫快取與要不要提示，不影響已經顯示出來的內容。
+ */
+const summaryDegraded = ref(false);
 const summaryText = ref("");
 const activeController = shallowRef<AbortController | null>(null);
 /**
@@ -634,21 +658,36 @@ const CONVERSATION_HISTORY_LIMIT = 16;
  * 只認開頭的編號與明確的指代寫法，避免誤傷內容裡本來就有的數字
  *（「2 萬元怎麼算」不該被當成第 2 筆）。
  */
+// 數字後面接量詞就不是卡片編號——「2 萬元怎麼算」「3 個月沒工作」「2 週內要申請嗎」
+// 都是使用者在講數量或時間，不是在指第 N 張卡。時間單位（週／星期／分鐘／小時）與
+// 樓層原本沒收，「2 週內要申請嗎」的「2」就會被換成政策全名，整句話變成另一個問題。
+const POLICY_INDEX_QUANTIFIERS = "萬千百個月歲天次年位人份元塊週星期分秒小時樓日%％\\d";
+
 const POLICY_INDEX_PATTERNS: RegExp[] = [
-  // 開頭的 02 / 2。數字後面接量詞就不是編號——「2 萬元怎麼算」「3 個月沒工作」
-  // 「1 個人住可以嗎」都是使用者在講數量，不是在指第 N 張卡。
+  // 開頭的 02 / 2。
   // （注意 lookahead 順序：排除量詞要寫在吃空白之前，否則空白先被吃掉、量詞就檢查不到。）
-  /^\s*0?([1-9])(?!\s*[萬千百個月歲天次年位人份元塊%％\d])(?=[\s、,，.。:：]|$)/u,
-  /第\s*0?([1-9])\s*(?:筆|項|張)/u,                    // 第2筆／第 2 項（「第2個」太像量詞，不收）
-  /參考\s*0?([1-9])/u,                                  // 參考2
+  new RegExp(`^\\s*0?(?<no>[1-9])(?!\\s*[${POLICY_INDEX_QUANTIFIERS}])(?=[\\s、,，.。:：]|$)`, "u"),
+  /第\s*0?(?<no>[1-9])\s*(?:筆|項|張)/u,                // 第2筆／第 2 項（「第2個」太像量詞，不收）
+  /參考\s*0?(?<no>[1-9])/u,                             // 參考2
+  // 句中的第二個編號：「01 跟 02 差在哪」。開頭那條有 ^ 錨定，接不住後面這個 02，
+  // 只換第一個的話送出去是「「政策A」跟 02 差在哪」，AI 不知道 02 是誰。
+  // 前面刻意只認連接詞（跟／和／與／及／、／,），不認單純的空白：空白太寬，
+  // 「台北市 2 家醫院」的「2」也會被換成政策名，那正是這次要修掉的錯誤方向。
+  new RegExp(
+    `(?<lead>[跟和與及、,，]\\s*)0?(?<no>[1-9])(?!\\s*[${POLICY_INDEX_QUANTIFIERS}])(?=[\\s、,，.。:：]|$)`,
+    "u"
+  ),
 ];
 
 /**
  * 把追問裡出現的每一個卡片編號都換成政策名稱。
  *
  * 全部展開而不是只換第一個：卡片上印著 01/02/03，使用者最自然的下一步就是叫它們
- * 互相比較——「01 跟 02 差在哪」。只換第一個的話送出去會變成「「政策A」跟 02 差在哪」，
- * AI 不知道 02 是誰，只能猜或只答一筆。
+ * 互相比較——「01 跟 02 差在哪」。
+ *
+ * 回傳分成兩欄：expanded 代表這一句真的有指到某張卡。呼叫端要靠它把「畫面上顯示的字」
+ * 與「送去模型的字」分開存——展開後的字裡有政策全名（含【桃園市】這種地名），
+ * 一旦進了對話紀錄就會被結果頁的字面條件抽取當成「使用者親口說的條件」。
  */
 function expandPolicyIndexReference(text: string) {
   let result = String(text || "");
@@ -657,18 +696,27 @@ function expandPolicyIndexReference(text: string) {
   for (const pattern of POLICY_INDEX_PATTERNS) {
     // 同一種寫法可能出現多次（「參考1 跟 參考2」），逐一換掉
     const globalPattern = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
-    result = result.replace(globalPattern, (matched, no) => {
-      const target = referenceCases.value.find((item) => item.referenceNo === Number(no));
+    result = result.replace(globalPattern, (...args: any[]) => {
+      // 各條 pattern 的捕獲位置不同，一律用具名群組取值（no＝編號、lead＝要保留的連接詞）
+      const groups = args[args.length - 1] as { no?: string; lead?: string } | undefined;
+      const matched = String(args[0] ?? "");
+      const target = referenceCases.value.find((item) => item.referenceNo === Number(groups?.no));
       if (!target?.title) return matched;
       replaced = true;
-      return `「${target.title}」`;
+      return `${groups?.lead ?? ""}「${target.title}」`;
     });
   }
 
-  if (!replaced) return String(text || "");
+  if (!replaced) return { text: String(text || ""), expanded: false };
   const cleaned = result.replace(/\s+/gu, " ").trim();
-  // 只打了編號、沒有問題內容時補一句，免得送出去是一個沒有動詞的句子
-  return /^「[^」]+」$/u.test(cleaned) ? `請說明${cleaned}` : cleaned;
+  // 只打了編號、沒有問題內容時補一句，免得送出去是一個沒有動詞的句子。
+  // 補成疑問句而不是「請說明…」：伺服器也用 isFollowUpQuestion 判這一輪是不是在問問題
+  //（見 server/utils/llm/shared.ts 的 isSummaryAnswerTurn），沒有疑問詞會被判成補條件，
+  // 前後端就會一個當回答、一個當重寫摘要，回覆最後落到錯的位置。
+  return {
+    text: /^「[^」]+」$/u.test(cleaned) ? `請問${cleaned}的重點是什麼？` : cleaned,
+    expanded: true,
+  };
 }
 
 const conversationMessages = ref<SummaryConversationMessage[]>([]);
@@ -716,6 +764,16 @@ const summaryModelLabel = computed(() => {
 const isScriptFallback = computed(
   () => summaryProvider.value === "fallback" || summaryModel.value === "script"
 );
+
+/**
+ * 這一份摘要能不能寫進 30 分鐘快取。
+ *
+ * 半截答案（模型中途噴錯）與本地腳本兜底都不算完整結果——存下去的話，30 分鐘內
+ * 重新整理只會一再還原同一份「非 AI 生成」的內容，連重試的機會都沒有。
+ */
+function shouldSkipSummaryCache() {
+  return summaryDegraded.value || isScriptFallback.value;
+}
 const SCRIPT_FALLBACK_NOTICE = "本摘要由系統依站內資料整理，非 AI 生成，僅供參考。";
 
 const hasKeyword = computed(() => Boolean(normalizeSummaryKeyword(props.query)));
@@ -1426,22 +1484,19 @@ function buildRankQuery() {
   // 下半部同時列著 170 筆。同音錯字死法相同（「掌照」解析成「長照」查到 173 筆）。
   // 詞彙表（buildRelevanceQuery）救不了這種輸入：表裡對得到的是「長照」「沒錢」這類
   // 站內講法，注音與錯字只有意圖解析認得，所以清單靠哪些詞查到、排序就要看得到那些詞。
-  const rankBasis = primary === query ? primary : [primary, query].filter(Boolean).join(" ");
+  // 這一輪實際採用的召回概念詞（result.vue 的 recallConceptPlans）也要算進來。
+  // 長尾處境句常常整份清單都是靠那一路撈到的，但那些詞不在 primary 也不在 query 裡：
+  // rankCases 於是每一筆都算 0 分 → referenceCases 濾成空的 → 送出空 cases →
+  // 伺服器判成站內查無政策，摘要寫「本站沒有」，畫面下半部卻正列著上百筆。
+  const recall = (props.recallConcepts || [])
+    .map((item) => normalizeSummaryKeyword(item))
+    .filter(Boolean)
+    .join(" ");
+  const rankBasis = [...new Set([primary, query, recall].filter(Boolean))].join(" ");
   // 地區是獨立的篩選條件；留在排序關鍵字裡會讓每一筆都因為標題的【新北市】而命中，
   // 引用政策就會排出一堆跟主題無關的東西。順便把訪客用語換成站內用詞。
   return buildRelevanceQuery(rankBasis);
 }
-
-const overSpecificSummaryGuards: Array<{ allowedBy: RegExp; blockedInSummary: RegExp }> = [
-  {
-    allowedBy: /牙|假牙|口腔|牙科|齒/u,
-    blockedInSummary: /牙|假牙|口腔|牙科|齒/u,
-  },
-  {
-    allowedBy: /托育|幼兒|兒童|青少年|兒少|育兒|生育|早療/u,
-    blockedInSummary: /托育|幼兒|兒童|青少年|兒少|育兒|生育|早療/u,
-  },
-];
 
 function buildIntentSource() {
   return [
@@ -1468,13 +1523,14 @@ function buildCaseIntentText(item: SummaryCaseItem) {
     .join(" ");
 }
 
+/**
+ * 「主題太窄、跟這次查詢無關」的守衛（假牙、托育）。
+ *
+ * 判斷本身改用 utils/ifarePolicyFit 的共用版本：原本這裡另外維護一份一模一樣的
+ * 規則，兩份各改各的就會讓摘要推薦與下方清單排出不同結果。
+ */
 function isOverSpecificCaseForIntent(item: SummaryCaseItem, intent: string) {
-  const normalizedIntent = normalizeText(intent || "");
-  const normalizedCase = normalizeText(buildCaseIntentText(item));
-
-  return overSpecificSummaryGuards.some((guard) => {
-    return !guard.allowedBy.test(normalizedIntent) && guard.blockedInSummary.test(normalizedCase);
-  });
+  return isOverSpecificPolicyForIntent(buildCaseIntentText(item), intent);
 }
 
 const rankQuery = computed(() => buildRankQuery());
@@ -1608,33 +1664,66 @@ function needsUndeclaredIdentity(item: SummaryCaseItem) {
   return Boolean(item.hasIndentity) && isUnsetCondition(props.searchContext?.identity);
 }
 
-const referenceCases = computed<ReferencedCaseItem[]>(() => {
-  const usedPolicyKeys = new Set<string>();
+/**
+ * 這筆政策的受助對象跟這次查詢對不上（政策主要是給「子女就學」那一類的）。
+ *
+ * 只用來降權、不用來過濾：台灣老人福利的資格欄位常寫「未受子女扶養」，會被判成
+ * 「給子女的」，硬過濾掉的話，長輩自己查詢時最相關的那筆會直接從「最相符 3 筆」消失。
+ * 安全閥：上游已判斷受助對象就是子女時不降權（見 isChildBeneficiaryQuery）。
+ */
+function isBeneficiaryMismatch(item: SummaryCaseItem, intentSource: string) {
+  if (isChildBeneficiaryQuery.value) return false;
+  return beneficiaryMismatchPenalty(intentSource, item) !== 0;
+}
 
-  return rankedCases.value
-    // 純篩選搜尋的結果集本來就是篩選器選出來的，這時再用字面比對砍掉零分政策，
-    // 會讓明明有結果的搜尋送出空的 cases，被伺服器判成站內查無政策而走一般知識總覽。
-    .filter((item) => !rankQuery.value || !hasTypedKeyword.value || item.similarityScore > 0)
-    .filter((item) => !isOverSpecificCaseForIntent(item, buildIntentSource()))
-    // 受助對象守衛改由 ifareIntent 的共用 helper 過濾：政策主要給「子女就學」類、
-    // 但查詢沒提到子女時，就不讓它出現在摘要推薦的前三筆。原本靠 overSpecificSummaryGuards
-    // 第三條的 blockedInSummary 過濾，改用 helper 後行為等價，且與結果清單同一套判斷。
-    // 安全閥：上游已判斷受助對象就是子女時放行，子女政策照常出現（見 isChildBeneficiaryQuery）。
-    .filter((item) => isChildBeneficiaryQuery.value || beneficiaryMismatchPenalty(buildIntentSource(), item) === 0)
-    .filter((item) => {
+const referenceCases = computed<ReferencedCaseItem[]>(() => {
+  const intentSource = buildIntentSource();
+  const dedupe = <T extends SummaryCaseItem>(items: T[]) => {
+    const usedPolicyKeys = new Set<string>();
+    return items.filter((item) => {
       const key = `${normalizeText(item.title)}:${normalizeText(item.area)}`;
       if (usedPolicyKeys.has(key)) return false;
       usedPolicyKeys.add(key);
       return true;
-    })
-    // 需要「使用者沒宣告的特殊身分」的政策往後排，湊不滿三張才拿它們補。
+    });
+  };
+
+  const allCases = dedupe(rankedCases.value);
+  const onTopic = allCases.filter((item) => !isOverSpecificCaseForIntent(item, intentSource));
+  // 純篩選搜尋的結果集本來就是篩選器選出來的，這時再用字面比對砍掉零分政策，
+  // 會讓明明有結果的搜尋送出空的 cases，被伺服器判成站內查無政策而走一般知識總覽。
+  const scored = onTopic.filter(
+    (item) => !rankQuery.value || !hasTypedKeyword.value || item.similarityScore > 0
+  );
+
+  /**
+   * 一路退讓，就是不交出空陣列。
+   *
+   * 下方清單正列著結果、上方摘要卻寫「站內查無」是本站最嚴重的一種錯誤——送出去的
+   * cases 一空，伺服器就會改寫成一般知識總覽並講出「本站沒有這類補助」。長尾處境句
+   * 特別容易踩到：清單是靠召回概念詞撈到的，字面比對每一筆都 0 分。
+   * 所以濾到空的時候依序退回「只去重複」的候選，寧可推薦得不夠精準，也不能否認站內有資料。
+   */
+  const picked = scored.length ? scored : (onTopic.length ? onTopic : allCases);
+  // 先算好再排序：比較函式會被呼叫 O(n log n) 次，每次重算受助對象判定太浪費
+  const beneficiaryMismatched = new Map(
+    picked.map((item) => [item, isBeneficiaryMismatch(item, intentSource)])
+  );
+
+  return [...picked]
+    // 受助對象對不上的往後排（只降權、不移除，見 isBeneficiaryMismatch）；
+    // 其次是需要「使用者沒宣告的特殊身分」的政策，湊不滿三張才拿它們補。
     //
-    // 這件事用扣分壓不住：實測「長照＋台北市」的原住民交通費補助，資格欄位裡
+    // 後者用扣分壓不住：實測「長照＋台北市」的原住民交通費補助，資格欄位裡
     // 「長照」出現三次，關鍵字分數遠高於其他候選，扣 20 分仍排進前三。但使用者
     // 從沒說過自己是原住民，推薦一筆他八成用不上的政策，比少推一筆更糟。
     // 身分只有五種且很少適用，跟「幾乎每筆都有」的年齡限制性質不同，才適用這條規則；
     // 候選全都有身分門檻時兩組合併後順序不變，不會把卡片變空。
-    .sort((a, b) => Number(needsUndeclaredIdentity(a)) - Number(needsUndeclaredIdentity(b)))
+    .sort(
+      (a, b) =>
+        Number(beneficiaryMismatched.get(a)) - Number(beneficiaryMismatched.get(b))
+        || Number(needsUndeclaredIdentity(a)) - Number(needsUndeclaredIdentity(b))
+    )
     .slice(0, 3)
     .map((item, index) => ({
       ...item,
@@ -1759,7 +1848,14 @@ function sanitizeCachedConversation(value: unknown): SummaryConversationMessage[
       && item.content
     )
     .slice(-CONVERSATION_HISTORY_LIMIT)
-    .map((item: any) => ({ role: item.role, content: item.content }));
+    .map((item: any) => ({
+      role: item.role,
+      content: item.content,
+      // 卡片編號展開後的版本（只送模型用）；舊快取沒有這一欄，缺了就當沒展開過
+      ...(typeof item.promptContent === "string" && item.promptContent
+        ? { promptContent: item.promptContent }
+        : {}),
+    }));
 }
 
 function readSummaryCache() {
@@ -1841,6 +1937,8 @@ function restoreCachedSummary() {
   threadItems.value = cached.thread;
   conversationMessages.value = cached.conversation;
   streamError.value = "";
+  // 快取裡的一定是完整結果（壞掉的那幾種根本不會被寫進去）
+  summaryDegraded.value = false;
   isLoading.value = false;
   return true;
 }
@@ -1929,6 +2027,7 @@ async function loadSummary(forceRefresh = false) {
   summaryText.value = "";
   summaryProvider.value = "";
   summaryModel.value = "";
+  summaryDegraded.value = false;
   let completedByStream = false;
 
   try {
@@ -1948,6 +2047,12 @@ async function loadSummary(forceRefresh = false) {
       },
       onMeta: (meta) => {
         if (currentRequestId !== requestId) return;
+        // 模型半途噴錯（streamError）或伺服器要求整段丟掉（discard）：這一份摘要
+        // 不算完整結果，等一下不寫快取，畫面上也要講出來（見下方 finally）。
+        if (meta?.streamError || meta?.discard) {
+          summaryDegraded.value = true;
+          if (meta?.discard) summaryText.value = "";
+        }
         if (meta?.guidanceFields !== undefined) {
           guidanceFields.value = sanitizeGuidanceFields(meta.guidanceFields);
         }
@@ -1965,6 +2070,7 @@ async function loadSummary(forceRefresh = false) {
     streamError.value = "AI 判斷暫時忙碌，已切換成本地判斷。";
     summaryProvider.value = "fallback";
     summaryModel.value = "script";
+    summaryDegraded.value = true;
     if (!summaryText.value.trim()) {
       summaryText.value = fallbackText.value;
     }
@@ -1975,7 +2081,17 @@ async function loadSummary(forceRefresh = false) {
     if (!summaryText.value.trim()) {
       summaryText.value = fallbackText.value;
     }
-    writeSummaryCache(summaryText.value);
+    // 半截答案與本地腳本兜底都不是完整結果。寫進快取的話，30 分鐘內每次重新整理
+    // 都會還原同一份殘缺內容、而且不再重試——使用者只會覺得這個功能就是這樣壞的。
+    if (shouldSkipSummaryCache()) {
+      // 本地腳本兜底已經有自己的「非 AI 生成」說明，不必再補一句；
+      // 這裡只替「跑到一半壞掉」的情況講話。
+      if (summaryDegraded.value && !streamError.value) {
+        streamError.value = "這次的摘要沒有完成，請按「重新摘要」再試一次。";
+      }
+    } else {
+      writeSummaryCache(summaryText.value);
+    }
     if (completedByStream) {
       emitSummaryComplete();
     }
@@ -2033,10 +2149,19 @@ async function submitFollowUp() {
       content: toPlainSummaryText(summaryDisplayText.value),
     });
   }
-  // 送給 AI 的版本會把「02」這種卡片編號展開成政策名稱；畫面上仍顯示使用者原本打的字
-  conversationMessages.value.push({ role: "user", content: expandPolicyIndexReference(userReply) });
+  // 送給 AI 的版本會把「02」這種卡片編號展開成政策名稱，但只放在 promptContent；
+  // content 一律留使用者原本打的字。展開後的字含政策全名，寫進 content 的話，
+  // 重新搜尋時會被當成「使用者親口說了桃園市、老人」而改掉他自己選的篩選條件。
+  const expandedReply = expandPolicyIndexReference(userReply);
+  conversationMessages.value.push(
+    expandedReply.expanded
+      ? { role: "user", content: userReply, promptContent: expandedReply.text }
+      : { role: "user", content: userReply }
+  );
   threadItems.value.push({ role: "user", content: userReply });
-  isAnswerTurn.value = isFollowUpQuestion(userReply);
+  // 指名了某一張卡（「02」「第2筆」），那一定是要看那筆的說明。原本拿原字去判，
+  // 「02」沒有疑問詞會被判成補條件而走重新搜尋，問題等於被吞掉、也沒有任何回答。
+  isAnswerTurn.value = expandedReply.expanded || isFollowUpQuestion(userReply);
   followUpInput.value = "";
   followUpDraft.value = "";
   followUpDraftMode.value = "";
@@ -2045,10 +2170,18 @@ async function submitFollowUp() {
   isFollowUpLoading.value = true;
 
   const conversation: SummaryConversationMessage[] = conversationMessages.value.slice(-CONVERSATION_HISTORY_LIMIT);
+  // 只有送進模型提示詞的這一份才代入展開後的政策全名；重新搜尋與字面條件抽取
+  // 拿到的仍然是使用者原本打的字（見 SummaryConversationMessage.promptContent）。
+  const promptConversation: SummaryConversationMessage[] = conversation.map((message) =>
+    message.promptContent ? { role: message.role, content: message.promptContent } : message
+  );
   // 回覆要放哪裡由伺服器回報的 mode 決定，不在前端重算一次——
   // 兩邊各算一次就會出現「前端當成回答、後端其實只回了一句引導」的錯位。
   let replyMode = "";
   let scopeShift: SummaryScopeShift | null = null;
+  // 這一輪的回覆是不是壞掉的：伺服器推了 error 事件，或 done 帶 discard。
+  // 壞掉的半截草稿不能當成回答留在對話串裡，也不能跟著寫進 30 分鐘快取。
+  let replyDegraded = false;
 
   try {
     // 問問題的回合不重新搜尋。您問的是畫面上這幾筆政策，重搜會換掉引用的政策卡，
@@ -2076,7 +2209,7 @@ async function submitFollowUp() {
       query: conversationSearchQuery.value || normalizeSummaryKeyword(props.query),
       context: props.searchContext,
       cases: referenceCases.value,
-      conversation,
+      conversation: promptConversation,
       scopeHint: scopeShift
         ? {
             field: scopeShift.field,
@@ -2093,6 +2226,12 @@ async function submitFollowUp() {
       },
       onMeta: (meta) => {
         if (currentRequestId !== followUpRequestId) return;
+        // 模型半途噴錯（streamError）或伺服器要求整段丟掉（discard）：
+        // 已經逐字長出來的那半截不是答案，不能留在畫面上，也不能寫進快取。
+        if (meta?.streamError || meta?.discard) {
+          replyDegraded = true;
+          if (meta?.discard) followUpDraft.value = "";
+        }
         if (meta?.mode) {
           replyMode = String(meta.mode);
           followUpDraftMode.value = replyMode;
@@ -2111,7 +2250,9 @@ async function submitFollowUp() {
     });
 
     if (currentRequestId !== followUpRequestId) return;
-    const reply = followUpDraft.value.trim();
+    // 壞掉的那一輪一律當成沒有回覆：寧可講「這次沒答完」讓他重送，
+    // 也不要把半截句子當成 AI 的正式回答貼在對話串裡。
+    const reply = replyDegraded ? "" : followUpDraft.value.trim();
     if (reply) {
       conversationMessages.value.push({ role: "assistant", content: reply });
       conversationMessages.value = conversationMessages.value.slice(-CONVERSATION_HISTORY_LIMIT);
@@ -2135,7 +2276,9 @@ async function submitFollowUp() {
         threadItems.value = threadItems.value.slice(-1);
       }
     } else {
-      followUpError.value = "目前暫時無法繼續整理，請稍後再試。";
+      followUpError.value = replyDegraded
+        ? "這次的回答沒有完成，請按「重試」再問一次。"
+        : "目前暫時無法繼續整理，請稍後再試。";
       failedFollowUpText.value = userReply;
     }
   } catch (error: any) {
@@ -2149,8 +2292,10 @@ async function submitFollowUp() {
     followUpDraftMode.value = "";
     isFollowUpLoading.value = false;
     followUpController.value = null;
-    // 摘要與對話串一起寫回快取，重新整理才接得下去
-    writeSummaryCache(summaryText.value);
+    // 摘要與對話串一起寫回快取，重新整理才接得下去。
+    // 這一輪壞掉（半截或整段丟棄）就不要覆蓋：寫下去的話 30 分鐘內重新整理都會
+    // 還原這份殘缺內容，而且不再重試——留著上一次成功的版本比較誠實。
+    if (!replyDegraded) writeSummaryCache(summaryText.value);
   }
 }
 
