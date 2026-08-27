@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
@@ -15,6 +16,7 @@ using IFare_BDAPI.Authentication.External;
 using IFare_BDAPI.Authentication.JwtBearer;
 using IFare_BDAPI.Authorization;
 using IFare_BDAPI.Authorization.Users;
+using IFare_BDAPI.Constants;
 using IFare_BDAPI.Models.TokenAuth;
 using IFare_BDAPI.MultiTenancy;
 using IFare_BDAPI.TaskManager.Auth;
@@ -46,6 +48,28 @@ namespace IFare_BDAPI.Controllers
         private readonly UserRegistrationManager _userRegistrationManager;
         // 自訂驗證任務管理器，封裝自訂使用者驗證邏輯
         private readonly IAuthTaskManager _authTaskManager;
+
+        #region [登入失敗節流]
+        // 同一組「帳號 + 來源 IP」連續失敗達此次數即暫時鎖定
+        private const int _maxFailedLoginAttempts = 5;
+        // 鎖定時間，以及失敗次數的計算視窗（超過視窗未再失敗即歸零）
+        private static readonly TimeSpan _loginLockoutDuration = TimeSpan.FromMinutes(15);
+        // 記憶體層級的失敗紀錄。單機部署足夠；多站台或需跨程序共用時應改為分散式快取（待確認）
+        private static readonly ConcurrentDictionary<string, LoginFailureRecord> _loginFailures =
+            new ConcurrentDictionary<string, LoginFailureRecord>();
+        // 紀錄筆數超過此上限時，順手清掉已過期的項目，避免被大量假帳號灌爆記憶體
+        private const int _loginFailureCleanupThreshold = 2000;
+
+        /// <summary>
+        /// 單一「帳號 + 來源 IP」的登入失敗紀錄。
+        /// </summary>
+        private class LoginFailureRecord
+        {
+            public int Count { get; set; }
+            public DateTime LastFailedTime { get; set; }
+            public DateTime? LockedUntil { get; set; }
+        }
+        #endregion
 
         /// <summary>
         /// 建構子，透過相依性注入初始化所有依賴項目。
@@ -109,14 +133,32 @@ namespace IFare_BDAPI.Controllers
         [HttpPost]
         public async Task<AuthenticateResultModel> Authenticate([FromBody] AuthenticateModel model)
         {
+            // 以「帳號 + 來源 IP」為單位做失敗節流，避免帳密被無限次暴力嘗試
+            var throttleKey = GetLoginThrottleKey(model.UserNameOrEmailAddress);
+            TimeSpan remainingLockout;
+            if (IsLoginLocked(throttleKey, out remainingLockout))
+            {
+                throw new UserFriendlyException($"登入失敗次數過多，請於 {Math.Ceiling(remainingLockout.TotalMinutes)} 分鐘後再試");
+            }
+
             // 使用自訂驗證管理器驗證帳號密碼，取得使用者資訊（非 ABP 預設登入流程）
             var userInfo = _authTaskManager.GetAuthUser(model.UserNameOrEmailAddress, model.Password);
 
             // 若使用者資訊為 null，表示帳號密碼錯誤，拋出友善錯誤例外
             if (userInfo == null)
             {
+                RegisterLoginFailure(throttleKey);
                 throw new UserFriendlyException("Authentication failed!!");
             }
+
+            // 帳號被停用時不得取得 token（帳密雖然正確，但不視為攻擊，故不累計失敗次數）
+            if (userInfo.State == DataState.Disabled)
+            {
+                throw new UserFriendlyException("此帳號已被停用，請洽系統管理員");
+            }
+
+            // 驗證通過即清除該組合的失敗紀錄
+            ClearLoginFailure(throttleKey);
 
             // 根據驗證通過的使用者資訊，建立 ClaimsIdentity 身份聲明集合
             var loginResult = await GetLoginClaimIdentityAsync(userInfo);
@@ -161,8 +203,99 @@ namespace IFare_BDAPI.Controllers
             return new ClaimsIdentity(claims, "Login");
         }
 
+        #region [登入失敗節流]
+        /// <summary>
+        /// 產生失敗節流用的鍵值：帳號 + 來源 IP。
+        /// 只鎖帳號會讓攻擊者用來癱瘓別人的帳號，只鎖 IP 又擋不住換帳號嘗試，故兩者併用。
+        /// </summary>
+        private string GetLoginThrottleKey(string account)
+        {
+            var ip = HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "unknown";
+            return $"{(account ?? string.Empty).ToLowerInvariant()}|{ip}";
+        }
 
+        /// <summary>
+        /// 判斷此組合目前是否處於鎖定中。
+        /// </summary>
+        /// <param name="key">節流鍵值</param>
+        /// <param name="remainingLockout">剩餘鎖定時間</param>
+        private static bool IsLoginLocked(string key, out TimeSpan remainingLockout)
+        {
+            remainingLockout = TimeSpan.Zero;
 
+            LoginFailureRecord record;
+            if (!_loginFailures.TryGetValue(key, out record)) return false;
+
+            if (record.LockedUntil.HasValue && record.LockedUntil.Value > DateTime.UtcNow)
+            {
+                remainingLockout = record.LockedUntil.Value - DateTime.UtcNow;
+                return true;
+            }
+
+            // 鎖定已到期，紀錄一併清掉讓計數重新開始
+            if (record.LockedUntil.HasValue) _loginFailures.TryRemove(key, out _);
+
+            return false;
+        }
+
+        /// <summary>
+        /// 累計一次登入失敗，達上限即開始鎖定。
+        /// </summary>
+        private static void RegisterLoginFailure(string key)
+        {
+            var now = DateTime.UtcNow;
+
+            _loginFailures.AddOrUpdate(
+                key,
+                _ => new LoginFailureRecord { Count = 1, LastFailedTime = now },
+                (_, record) =>
+                {
+                    // 距離上次失敗已超過計算視窗，視為新的一輪
+                    if (now - record.LastFailedTime > _loginLockoutDuration)
+                    {
+                        record.Count = 1;
+                        record.LockedUntil = null;
+                    }
+                    else
+                    {
+                        record.Count++;
+                    }
+
+                    record.LastFailedTime = now;
+                    if (record.Count >= _maxFailedLoginAttempts) record.LockedUntil = now.Add(_loginLockoutDuration);
+
+                    return record;
+                });
+
+            CleanupLoginFailures();
+        }
+
+        /// <summary>
+        /// 驗證成功後清除失敗紀錄。
+        /// </summary>
+        private static void ClearLoginFailure(string key)
+        {
+            _loginFailures.TryRemove(key, out _);
+        }
+
+        /// <summary>
+        /// 紀錄過多時清掉已過期項目，避免記憶體無限成長。
+        /// </summary>
+        private static void CleanupLoginFailures()
+        {
+            if (_loginFailures.Count < _loginFailureCleanupThreshold) return;
+
+            var expiredBefore = DateTime.UtcNow.Subtract(_loginLockoutDuration);
+            foreach (var item in _loginFailures.ToArray())
+            {
+                if (item.Value.LastFailedTime < expiredBefore &&
+                    (!item.Value.LockedUntil.HasValue || item.Value.LockedUntil.Value < DateTime.UtcNow))
+                {
+                    _loginFailures.TryRemove(item.Key, out _);
+                }
+            }
+        }
+        #endregion
 
         /// <summary>
         /// 取得目前系統設定的所有外部登入提供者清單（GET api/TokenAuth/GetExternalAuthenticationProviders）。

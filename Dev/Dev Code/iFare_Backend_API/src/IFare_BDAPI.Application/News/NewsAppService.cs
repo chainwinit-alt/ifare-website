@@ -32,6 +32,7 @@ namespace IFare_BDAPI.News
             return ObjectMapper.Map<NewsResultDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> InsertNews(NewsInsertDataDto insertData)
         {
@@ -42,6 +43,7 @@ namespace IFare_BDAPI.News
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> UpdateNews(NewsEditorDataDto editorData)
         {
@@ -52,6 +54,7 @@ namespace IFare_BDAPI.News
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> DeleteNews(NewsDeleteDataDto deleteData)
         {

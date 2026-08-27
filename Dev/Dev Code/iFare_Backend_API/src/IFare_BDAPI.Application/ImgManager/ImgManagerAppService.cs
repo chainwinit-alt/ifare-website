@@ -25,6 +25,7 @@ namespace IFare_BDAPI.ImgManager
             _httpContextAccessor = httpContextAccessor;
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public ErrorInfoBaseDto InsertImg(ImgManagerInsertDataDto insertData)
         {
@@ -35,6 +36,7 @@ namespace IFare_BDAPI.ImgManager
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public ErrorInfoBaseDto EditImg(ImgManagerEditDataDto editData)
         {
@@ -45,6 +47,7 @@ namespace IFare_BDAPI.ImgManager
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpDelete]
         public ErrorInfoBaseDto DeleteImg(long imgID)
         {

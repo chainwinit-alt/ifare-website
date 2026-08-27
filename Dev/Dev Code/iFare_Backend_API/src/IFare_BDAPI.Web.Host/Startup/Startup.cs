@@ -91,13 +91,7 @@ namespace IFare_BDAPI.Web.Host.Startup
                 options => options.AddPolicy(
                     _defaultCorsPolicyName,
                     builder => builder
-                        .WithOrigins(
-                            // App:CorsOrigins in appsettings.json can contain more than one address separated by comma.
-                            _appConfiguration["App:CorsOrigins"]
-                                .Split(",", StringSplitOptions.RemoveEmptyEntries)
-                                .Select(o => o.RemovePostFix("/"))
-                                .ToArray()
-                        )
+                        .WithOrigins(GetCorsOrigins())
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials()
@@ -170,6 +164,39 @@ namespace IFare_BDAPI.Web.Host.Startup
             }); // URL: /swagger
         }
         
+        /// <summary>
+        /// 取得 CORS 白名單來源。
+        ///
+        /// 目前的來源仍以 App:CorsOrigins 為主，內容混雜多個 localhost 開發網域；
+        /// 這在正式環境等於把開發用來源一起放行。為了不影響本機開發，這裡改成「依環境挑設定鍵」：
+        ///   - 非 Development 且設定檔有 App:CorsOrigins_Production → 只採用該清單（正式網域）。
+        ///   - 其餘情況維持原本的 App:CorsOrigins，行為與修改前完全相同。
+        ///
+        /// ⚠️【待確認】App:CorsOrigins_Production 目前尚未建立，需由部署方在
+        /// appsettings.Production.json 或環境變數 App__CorsOrigins_Production 補上正式網域清單，
+        /// 補上之後正式站才會真正收斂 CORS 白名單。
+        /// </summary>
+        /// <returns>可跨來源呼叫本 API 的網域陣列</returns>
+        private string[] GetCorsOrigins()
+        {
+            // App:CorsOrigins in appsettings.json can contain more than one address separated by comma.
+            var origins = _appConfiguration["App:CorsOrigins"];
+
+            if (!_hostingEnvironment.IsDevelopment())
+            {
+                var productionOrigins = _appConfiguration["App:CorsOrigins_Production"];
+                if (!productionOrigins.IsNullOrWhiteSpace()) origins = productionOrigins;
+            }
+
+            if (origins.IsNullOrWhiteSpace()) return new string[0];
+
+            return origins
+                    .Split(",", StringSplitOptions.RemoveEmptyEntries)
+                    .Select(o => o.Trim().RemovePostFix("/"))
+                    .Where(o => !o.IsNullOrWhiteSpace())
+                    .ToArray();
+        }
+
         /// <summary>
         /// 設定 Swagger / OpenAPI 文件。
         /// 集中維護 API 文件版本、JWT 安全性定義，以及 XML 註解匯入規則。

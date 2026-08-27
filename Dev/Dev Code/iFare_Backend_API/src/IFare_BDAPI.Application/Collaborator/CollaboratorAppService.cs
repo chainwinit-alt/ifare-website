@@ -33,6 +33,7 @@ namespace IFare_BDAPI.Collaborator
             return ObjectMapper.Map<CollaboratorResultDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         [UnitOfWork(isTransactional: false)]
         public async Task<ErrorInfoBaseDto> InsertCollaborator(CollaboratorInsertDataDto insertData)
@@ -44,6 +45,7 @@ namespace IFare_BDAPI.Collaborator
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         [UnitOfWork(isTransactional: false)]
         public async Task<ErrorInfoBaseDto> UpdateCollaborator(CollaboratorEditorDataDto editorData)
@@ -55,6 +57,7 @@ namespace IFare_BDAPI.Collaborator
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> DeleteCollaborator(CollaboratorDeleteDataDto deleteData)
         {
