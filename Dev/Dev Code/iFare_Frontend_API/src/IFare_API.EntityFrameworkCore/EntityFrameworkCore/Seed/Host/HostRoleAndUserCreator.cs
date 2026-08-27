@@ -81,7 +81,8 @@ namespace IFare_API.EntityFrameworkCore.Seed.Host
                     IsActive = true
                 };
 
-                user.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(user, "123qwe");
+                // 初始密碼改由環境變數 IFARE_API_SEED_ADMIN_PASSWORD 提供，沒設才回退原預設值。
+                user.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(user, SeedPasswordProvider.GetInitialAdminPassword());
                 user.SetNormalizedNames();
 
                 adminUserForHost = _context.Users.Add(user).Entity;

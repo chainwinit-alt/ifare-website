@@ -73,7 +73,8 @@ namespace IFare_API.EntityFrameworkCore.Seed.Tenants
             if (adminUser == null)
             {
                 adminUser = User.CreateTenantAdminUser(_tenantId, "admin@defaulttenant.com");
-                adminUser.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(adminUser, "123qwe");
+                // 初始密碼改由環境變數 IFARE_API_SEED_ADMIN_PASSWORD 提供，沒設才回退原預設值。
+                adminUser.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(adminUser, SeedPasswordProvider.GetInitialAdminPassword());
                 adminUser.IsEmailConfirmed = true;
                 adminUser.IsActive = true;
 
