@@ -1,5 +1,5 @@
 // Markdown → Word converter for iFare docs.
-// Reads every iFare_*.md in /docs and writes a same-named .docx using `marked` + `docx`.
+// Reads every iFare_*.md in /docs/src and writes a same-named .docx into /docs, using `marked` + `docx`.
 // Run from repo root: `node scripts/convert-docs.mjs`
 
 import { marked } from 'marked';
@@ -22,7 +22,10 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '..');
+// Markdown 來源放在 docs/src，產生的 .docx 放在 docs/。
+// 這樣 docs/ 底下只留給人看的 Word 檔，來源檔不會混在一起。
 const DOCS_DIR = path.join(REPO_ROOT, 'docs');
+const SRC_DIR = path.join(DOCS_DIR, 'src');
 
 const HEADING_MAP = {
   1: HeadingLevel.HEADING_1,
@@ -251,17 +254,17 @@ async function convertFile(mdPath, docxPath) {
 }
 
 async function main() {
-  const files = await fs.readdir(DOCS_DIR);
+  const files = await fs.readdir(SRC_DIR);
   const mds = files.filter((f) => f.startsWith('iFare_') && f.endsWith('.md')).sort();
   if (mds.length === 0) {
-    console.log('No iFare_*.md files found in', DOCS_DIR);
+    console.log('No iFare_*.md files found in', SRC_DIR);
     return;
   }
-  console.log(`Converting ${mds.length} markdown files in ${DOCS_DIR}`);
+  console.log(`Converting ${mds.length} markdown files: ${SRC_DIR} -> ${DOCS_DIR}`);
   console.log('---');
   let totalOut = 0;
   for (const md of mds) {
-    const mdPath = path.join(DOCS_DIR, md);
+    const mdPath = path.join(SRC_DIR, md);
     const docxName = md.replace(/\.md$/, '.docx');
     const docxPath = path.join(DOCS_DIR, docxName);
     try {
