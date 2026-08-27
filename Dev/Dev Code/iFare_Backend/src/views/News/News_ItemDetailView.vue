@@ -23,7 +23,7 @@
     <div class="section-main-card card-fullsize card-news card-input-format">
       <div class="card-info">
         <h2 class="raw-html">{{ title }}</h2>
-        <div class="raw-html" v-html="detail">
+        <div class="raw-html" v-html="sanitizeHtml(detail)">
         </div>
       </div>
     </div>
@@ -57,6 +57,8 @@ import { ElButton, ElScrollbar, ElText, ElTag, ElUpload } from "element-plus";
 import { EditPen, ArrowLeft } from "@element-plus/icons-vue";
 import MainHeader from "@/components/MainHeader.vue";
 import { useUserStore } from "@/stores/user";
+// 富文本淨化，避免 v-html 造成 XSS
+import { sanitizeHtml } from "@/utils/sanitize";
 
 const app = getCurrentInstance();
 const _global = app?.appContext.config.globalProperties
