@@ -31,8 +31,67 @@ export const ANSWER_SYSTEM_PROMPT =
 const GENERAL_OVERVIEW_DISCLAIMER =
   "目前站內沒有與這次搜尋相符的政策，以下為 AI 整理的一般資訊，實際規定請以政府公告為準。";
 
-const OLLAMA_SUMMARY_SYSTEM_PROMPT =
-  "You are the i-Fare welfare search answer assistant. Reply only in gentle, patient, reliable and conversational Traditional Chinese. Use only explicitly supplied user content and directly matching website records; never infer or add an unstated topic, identity, condition, or service. In follow-up conversation, answer the newest message first and retain previously confirmed facts. Ask one unresolved question only when it helps the website search. Avoid bureaucratic or system-like wording. Do not use canned openings, greetings, headings, Markdown, or invented information.";
+// ---------------------------------------------------------------------------
+// 逾時與中止
+//
+// 摘要的 Groq／Gemini 請求以前沒有任何上限：對方吊住不回、或串流開著卻不送資料，
+// 這支請求就一路吊著，連帶把 SSE 連線、Node 的 socket 與供應商額度一起佔住。
+// 比照 chatbot.post.ts 的 15 秒 AbortController 補上上限。
+//
+// 串流走的是「多久沒有新資料」而不是「整趟多久」：摘要是逐字長出來的，用整趟上限
+// 會把正常寫到一半的長總覽硬砍斷，那比沒有上限更糟。只要對方還在吐字就繼續等，
+// 真的停住 15 秒才中止。
+// ---------------------------------------------------------------------------
+const SUMMARY_REQUEST_TIMEOUT_MS = 15_000;
+const SUMMARY_STREAM_IDLE_TIMEOUT_MS = 15_000;
+
+interface SummaryAbort {
+  signal: AbortSignal;
+  /** 串流收到新資料時重新計時（沒有資料流動超過上限才算逾時） */
+  keepAlive: () => void;
+  /** 請求結束後清掉計時器與監聽，避免把行程吊著 */
+  dispose: () => void;
+}
+
+/**
+ * 逾時／斷線中止用的 AbortSignal。
+ * upstream 是呼叫端給的訊號（例如 SSE 的 client 斷線），一併轉成中止，
+ * 民眾關掉頁面時上游那趟 LLM 請求才會真的停下來，而不是繼續寫完再丟掉。
+ */
+function createSummaryAbort(timeoutMs: number, upstream?: AbortSignal): SummaryAbort {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const onUpstreamAbort = () => controller.abort();
+
+  const clear = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+  const arm = () => {
+    clear();
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+    if (typeof (timer as { unref?: () => void })?.unref === "function") {
+      (timer as unknown as { unref: () => void }).unref();
+    }
+  };
+
+  if (upstream) {
+    if (upstream.aborted) controller.abort();
+    else upstream.addEventListener("abort", onUpstreamAbort, { once: true });
+  }
+  arm();
+
+  return {
+    signal: controller.signal,
+    keepAlive: arm,
+    dispose: () => {
+      clear();
+      upstream?.removeEventListener("abort", onUpstreamAbort);
+    },
+  };
+}
 
 function normalizeSummary(text: string, input: LlmSummaryInput) {
   const normalized = (text || "")
@@ -85,18 +144,6 @@ function normalizeSummary(text: string, input: LlmSummaryInput) {
       .slice(0, maxLength - 1)
       .join("")
       .replace(/[，、；：,;:\s]+$/u, "")}。`,
-    input
-  );
-}
-
-function sanitizeOllamaSummary(text: string, input: LlmSummaryInput) {
-  return normalizeSummary(
-    (text || "")
-      .replace(/^(您好|哈囉|嗨|您好呀|您好，|您好。)\s*/u, "")
-      .replace(/^我已閱讀您提供的相關資訊[。！!\s]*/u, "")
-      .replace(/^以下是(?:根據|依據)?您提供資料的?(?:摘要|整理)[：:\s]*/u, "")
-      .replace(/^請問您希望我針對這些資料做些什麼？[\s\S]*$/u, "")
-      .replace(/^請告訴我您的具體需求[\s\S]*$/u, ""),
     input
   );
 }
@@ -230,46 +277,57 @@ async function readErrorText(response: Response) {
   }
 }
 
-export function createOpenAIClient(config: {
-  apiKey: string;
-  model: string;
-}): LlmClient {
-  return {
-    async summarize(input: LlmSummaryInput) {
-      if (!config.apiKey) {
-        throw new Error("OpenAI API key is not configured.");
-      }
+/**
+ * 從一個 SSE 事件區塊裡取出 data 欄位。
+ *
+ * data 可以分成好幾行（SSE 規格：多行 data 以 \n 串接成同一筆內容），
+ * 原本只用 find 取第一行、其餘直接丟掉——JSON 一旦被對方切成兩行 data，
+ * 那一筆就永遠解析失敗，等於整段字憑空消失。這裡改成全部串起來。
+ */
+function readSseData(block: string) {
+  const lines = block
+    .split("\n")
+    .filter((item) => item.startsWith("data:"))
+    // "data: {json}" 與 "data:{json}" 兩種寫法都要接得住
+    .map((item) => item.slice(5).replace(/^ /u, ""));
+  return lines.length ? lines.join("\n") : "";
+}
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: config.model,
-          temperature: 0.3,
-          messages: [
-            {
-              role: "developer",
-              content: resolveSystemPrompt(input),
-            },
-            {
-              role: "user",
-              content: buildUserPrompt(input),
-            },
-          ],
-        }),
-      });
+/**
+ * 讀 SSE 串流，逐個事件把 data 內容交給 onData。
+ *
+ * 網路封包不保證切在事件邊界上，所以要保留尾巴等下一輪補齊；迴圈結束後 buffer
+ * 裡可能還留著最後一個事件（對方沒有以空行收尾時就會這樣），一定要再 flush 一次，
+ * 否則摘要最後一小段字會被吃掉。keepAlive 讓「還在吐字」的串流不會被閒置逾時砍掉。
+ */
+async function readSseStream(
+  response: Response,
+  onData: (payload: string) => void,
+  keepAlive?: () => void
+) {
+  const reader = response.body?.getReader();
+  if (!reader) return;
 
-      if (!response.ok) {
-        throw new Error(`OpenAI request failed with status ${response.status}.`);
-      }
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
 
-      const data: any = await response.json();
-      return finalizeSummary(data?.choices?.[0]?.message?.content ?? "", input);
-    },
-  };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    keepAlive?.();
+    // Google 的 SSE 用 \r\n 換行，統一成 \n 才切得到事件邊界
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/gu, "\n");
+
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) {
+      const payload = readSseData(block);
+      if (payload) onData(payload);
+    }
+  }
+
+  const tail = readSseData(buffer);
+  if (tail) onData(tail);
 }
 
 /**
@@ -277,42 +335,42 @@ export function createOpenAIClient(config: {
  *
  * 與 Groq 的差別只在 JSON 的形狀：Gemini 每一筆 data 是一個完整的
  * GenerateContentResponse，新增的字在 candidates[0].content.parts[*].text，
- * 而且 parts 可能不只一段，要全部串起來。切包、尾巴保留、解析失敗就跳過的
- * 處理方式與 readGroqStream 相同，理由見那邊的說明。
+ * 而且 parts 可能不只一段，要全部串起來。
  */
-async function readGeminiStream(response: Response, onDelta: LlmSummaryDeltaHandler) {
-  const reader = response.body?.getReader();
-  if (!reader) return "";
-
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
+async function readGeminiStream(
+  response: Response,
+  onDelta: LlmSummaryDeltaHandler,
+  keepAlive?: () => void
+) {
   let full = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    // Google 的 SSE 用 \r\n 換行，統一成 \n 才切得到事件邊界
-    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/gu, "\n");
-
-    const blocks = buffer.split("\n\n");
-    buffer = blocks.pop() ?? "";
-    for (const block of blocks) {
-      const line = block.split("\n").find((item) => item.startsWith("data: "));
-      if (!line) continue;
+  await readSseStream(
+    response,
+    (payload) => {
       try {
-        const parts = JSON.parse(line.slice(6))?.candidates?.[0]?.content?.parts ?? [];
+        const parts = JSON.parse(payload)?.candidates?.[0]?.content?.parts ?? [];
         const delta = parts.map((part: any) => part?.text ?? "").join("");
         if (delta) {
           full += delta;
           onDelta(delta, full);
         }
       } catch {
-        // 這一段還沒收完整，等下一輪
+        // 這一段不是完整的 JSON（或不是內容事件），跳過
       }
-    }
-  }
+    },
+    keepAlive
+  );
 
   return full;
+}
+
+/**
+ * Gemini 的輸出上限。這是「跑掉了的保險絲」不是預算控管——正常輸出遠低於這個數字，
+ * 開太緊反而會把還沒寫完的總覽截斷，接著被當成失敗退讓到下一個候選。
+ * 摘要最終也會被 normalizeOverview 收到 1600 字以內，所以上限抓在同一個量級。
+ */
+function resolveGeminiMaxOutputTokens(input: LlmSummaryInput) {
+  return isMarkdownSummaryMode(input) ? 1600 : 512;
 }
 
 export function createGeminiClient(config: {
@@ -320,7 +378,11 @@ export function createGeminiClient(config: {
   model: string;
 }): LlmClient {
   return {
-    async summarize(input: LlmSummaryInput, onDelta?: LlmSummaryDeltaHandler) {
+    async summarize(
+      input: LlmSummaryInput,
+      onDelta?: LlmSummaryDeltaHandler,
+      signal?: AbortSignal
+    ) {
       if (!config.apiKey) {
         throw new Error("Gemini API key is not configured.");
       }
@@ -331,56 +393,74 @@ export function createGeminiClient(config: {
       // 補上串流之前，摘要卡實際上從來沒有逐字長出來過——民眾按下送出後只看得到
       // 一句「整理中」，十幾秒後整段answer才一次蹦出來，看起來像當掉。
       const endpoint = onDelta ? "streamGenerateContent?alt=sse" : "generateContent";
-      // 金鑰改走 x-goog-api-key header，不放進 URL query——避免 proxy／IIS 存取記錄
-      // 或帶 URL 的錯誤堆疊把金鑰明文寫進日誌（與 chatbot.post.ts 的作法一致）。
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:${endpoint}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": config.apiKey,
-          },
-          body: JSON.stringify({
-            systemInstruction: {
-              parts: [
-                {
-                  text: resolveSystemPrompt(input),
-                },
-              ],
+      // 逾時／斷線都要能中止這趟請求，串流則以「閒置多久」計時（見上方常數說明）
+      const abort = createSummaryAbort(
+        onDelta ? SUMMARY_STREAM_IDLE_TIMEOUT_MS : SUMMARY_REQUEST_TIMEOUT_MS,
+        signal
+      );
+      try {
+        // 金鑰改走 x-goog-api-key header，不放進 URL query——避免 proxy／IIS 存取記錄
+        // 或帶 URL 的錯誤堆疊把金鑰明文寫進日誌（與 chatbot.post.ts 的作法一致）。
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:${endpoint}`,
+          {
+            method: "POST",
+            signal: abort.signal,
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": config.apiKey,
             },
-            contents: [
-              {
-                role: "user",
+            body: JSON.stringify({
+              systemInstruction: {
                 parts: [
                   {
-                    text: buildUserPrompt(input),
+                    text: resolveSystemPrompt(input),
                   },
                 ],
               },
-            ],
-          }),
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      text: buildUserPrompt(input),
+                    },
+                  ],
+                },
+              ],
+              // 輸出上限（比照 chatbot.post.ts）。原本完全沒設，模型一旦跑掉就會一路
+              // 寫下去，額度與延遲都無上限。
+              generationConfig: {
+                maxOutputTokens: resolveGeminiMaxOutputTokens(input),
+              },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await readErrorText(response);
+          throw new Error(`Gemini request failed with status ${response.status}. ${errorText}`.trim());
         }
-      );
 
-      if (!response.ok) {
-        const errorText = await readErrorText(response);
-        throw new Error(`Gemini request failed with status ${response.status}. ${errorText}`.trim());
+        if (onDelta) {
+          // 串流回來的是模型的原始輸出；結尾的引導問句、空白收斂與長度上限都要等全文
+          // 收完才算得出來，所以畫面上先逐字長出原文，最後由 done 事件換成整理過的版本。
+          return finalizeSummary(
+            await readGeminiStream(response, onDelta, abort.keepAlive),
+            input
+          );
+        }
+
+        const data: any = await response.json();
+        const parts = data?.candidates?.[0]?.content?.parts ?? [];
+        const text = parts
+          .map((part: any) => part?.text ?? "")
+          .join("")
+          .trim();
+        return finalizeSummary(text, input);
+      } finally {
+        abort.dispose();
       }
-
-      if (onDelta) {
-        // 串流回來的是模型的原始輸出；結尾的引導問句、空白收斂與長度上限都要等全文
-        // 收完才算得出來，所以畫面上先逐字長出原文，最後由 done 事件換成整理過的版本。
-        return finalizeSummary(await readGeminiStream(response, onDelta), input);
-      }
-
-      const data: any = await response.json();
-      const parts = data?.candidates?.[0]?.content?.parts ?? [];
-      const text = parts
-        .map((part: any) => part?.text ?? "")
-        .join("")
-        .trim();
-      return finalizeSummary(text, input);
     },
   };
 }
@@ -389,38 +469,32 @@ export function createGeminiClient(config: {
  * 讀 Groq 的 SSE 串流，逐段回呼並回傳累積的全文。
  *
  * Groq 的格式是 OpenAI 相容的 `data: {json}`，以空行分隔，最後一筆是 `data: [DONE]`。
- * 網路封包不保證切在事件邊界上，所以要保留尾巴等下一輪補齊；JSON 解析失敗就跳過，
- * 那代表這一段還沒收完，不是壞掉。
+ * 切包、尾巴 flush 與多行 data 的處理都在 readSseStream，理由見那邊的說明；
+ * JSON 解析失敗就跳過，那代表這一筆不是內容事件，不是壞掉。
  */
-async function readGroqStream(response: Response, onDelta: LlmSummaryDeltaHandler) {
-  const reader = response.body?.getReader();
-  if (!reader) return "";
-
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
+async function readGroqStream(
+  response: Response,
+  onDelta: LlmSummaryDeltaHandler,
+  keepAlive?: () => void
+) {
   let full = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    const blocks = buffer.split("\n\n");
-    buffer = blocks.pop() ?? "";
-    for (const block of blocks) {
-      const line = block.split("\n").find((item) => item.startsWith("data: "));
-      if (!line || line === "data: [DONE]") continue;
+  await readSseStream(
+    response,
+    (payload) => {
+      if (payload === "[DONE]") return;
       try {
-        const delta = JSON.parse(line.slice(6))?.choices?.[0]?.delta?.content ?? "";
+        const delta = JSON.parse(payload)?.choices?.[0]?.delta?.content ?? "";
         if (delta) {
           full += delta;
           onDelta(delta, full);
         }
       } catch {
-        // 這一段還沒收完整，等下一輪
+        // 這一筆不是完整的 JSON（或不是內容事件），跳過
       }
-    }
-  }
+    },
+    keepAlive
+  );
 
   return full;
 }
@@ -430,7 +504,11 @@ export function createGroqClient(config: {
   model: string;
 }): LlmClient {
   return {
-    async summarize(input: LlmSummaryInput, onDelta?: LlmSummaryDeltaHandler) {
+    async summarize(
+      input: LlmSummaryInput,
+      onDelta?: LlmSummaryDeltaHandler,
+      signal?: AbortSignal
+    ) {
       if (!config.apiKey) {
         throw new Error("Groq API key is not configured.");
       }
@@ -453,90 +531,63 @@ export function createGroqClient(config: {
       // 不取 500 是因為先前 28 次基準測試中 gpt-oss-20b 最長寫到 877 字，
       // 500 很可能中途截斷；900 已省下約三成額度，離實測最長值仍有餘裕。
       const maxCompletionTokens = isOverview ? 900 : (isQwen ? 500 : 300);
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: config.model,
-          ...(isGptOss
-            ? { reasoning_effort: "low" }
-            : isQwen
-              ? { reasoning_effort: "none" }
-              : {}),
-          temperature: 0.3,
-          max_completion_tokens: maxCompletionTokens,
-          // 有人要逐段更新畫面才開串流；沒有 onDelta 就維持一次回傳，行為與原本相同
-          stream: Boolean(onDelta),
-          messages: [
-            {
-              role: "system",
-              content: resolveSystemPrompt(input),
-            },
-            {
-              role: "user",
-              content: buildUserPrompt(input),
-            },
-          ],
-        }),
-      });
+      // 逾時／斷線都要能中止這趟請求，串流則以「閒置多久」計時（見上方常數說明）
+      const abort = createSummaryAbort(
+        onDelta ? SUMMARY_STREAM_IDLE_TIMEOUT_MS : SUMMARY_REQUEST_TIMEOUT_MS,
+        signal
+      );
+      try {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          signal: abort.signal,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: config.model,
+            ...(isGptOss
+              ? { reasoning_effort: "low" }
+              : isQwen
+                ? { reasoning_effort: "none" }
+                : {}),
+            temperature: 0.3,
+            max_completion_tokens: maxCompletionTokens,
+            // 有人要逐段更新畫面才開串流；沒有 onDelta 就維持一次回傳，行為與原本相同
+            stream: Boolean(onDelta),
+            messages: [
+              {
+                role: "system",
+                content: resolveSystemPrompt(input),
+              },
+              {
+                role: "user",
+                content: buildUserPrompt(input),
+              },
+            ],
+          }),
+        });
 
-      if (!response.ok) {
-        const errorText = await readErrorText(response);
-        throw new Error(`Groq request failed with status ${response.status}. ${errorText}`.trim());
+        if (!response.ok) {
+          const errorText = await readErrorText(response);
+          throw new Error(`Groq request failed with status ${response.status}. ${errorText}`.trim());
+        }
+
+        if (onDelta) {
+          // 串流回來的是模型的原始輸出。finalizeSummary 會補上結尾的引導問句、
+          // 收斂空白並套上長度上限——那些只能等全文收完才算得出來，所以畫面上
+          // 使用者先看到逐字長出來的原文，最後由 done 事件換成整理過的版本。
+          return finalizeSummary(
+            await readGroqStream(response, onDelta, abort.keepAlive),
+            input
+          );
+        }
+
+        const data: any = await response.json();
+        return finalizeSummary(data?.choices?.[0]?.message?.content ?? "", input);
+      } finally {
+        abort.dispose();
       }
-
-      if (onDelta) {
-        // 串流回來的是模型的原始輸出。finalizeSummary 會補上結尾的引導問句、
-        // 收斂空白並套上長度上限——那些只能等全文收完才算得出來，所以畫面上
-        // 使用者先看到逐字長出來的原文，最後由 done 事件換成整理過的版本。
-        return finalizeSummary(await readGroqStream(response, onDelta), input);
-      }
-
-      const data: any = await response.json();
-      return finalizeSummary(data?.choices?.[0]?.message?.content ?? "", input);
-    },
-  };
-}
-
-export function createOllamaClient(config: {
-  baseUrl: string;
-  model: string;
-}): LlmClient {
-  return {
-    async summarize(input: LlmSummaryInput) {
-      const response = await fetch(`${config.baseUrl.replace(/\/$/, "")}/api/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: config.model,
-          stream: false,
-          messages: [
-            {
-              role: "system",
-              content: isMarkdownSummaryMode(input) ? resolveSystemPrompt(input) : OLLAMA_SUMMARY_SYSTEM_PROMPT,
-            },
-            {
-              role: "user",
-              content: buildUserPrompt(input),
-            },
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await readErrorText(response);
-        throw new Error(`Ollama request failed with status ${response.status}. ${errorText}`.trim());
-      }
-
-      const data: any = await response.json();
-      return isMarkdownSummaryMode(input)
-        ? finalizeSummary(data?.message?.content ?? "", input)
-        : sanitizeOllamaSummary(data?.message?.content ?? "", input);
     },
   };
 }

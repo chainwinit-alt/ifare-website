@@ -184,16 +184,44 @@ function parseSearchIntent(text: string): SearchIntentResponse {
 }
 
 /**
+ * 縣市名與純年齡詞不可以當召回詞。
+ *
+ * 提示詞已經寫明「不得把地區、年齡、經濟、身分放進 recallConcepts」，但模型照樣會塞——
+ * 而這些詞進了召回路等於災難：每一筆政策的標題都以【新北市】開頭，拿「新北市」去召回
+ * 會把該縣市的政策整批撈進來，真正的主題詞（長照、托育）被稀釋到看不見；
+ * 年齡詞（「80歲」「三歲」）同理，命中的是一堆不相干政策裡的數字。
+ * 地區與年齡本來就各有自己的結構化欄位（area／recipient），不需要靠召回詞再撈一次。
+ */
+const AREA_RECALL_PATTERN = new RegExp(
+  `^(?:${TAIWAN_AREAS.map(area => area.replace(/市$|縣$/u, "")).join("|")})[市縣]?$`,
+  "u"
+);
+// 純年齡詞：「65歲」「六十五歲以上」「未滿18歲」「3-5歲」都算，
+// 但「老人」「嬰幼兒」這種族群詞不在此列（它們本來就是站內用語）。
+const AGE_ONLY_RECALL_PATTERN =
+  /^(?:未滿|滿|年滿|超過|以上|以下|約)?[\d０-９一二三四五六七八九十百零兩～~\-—至到]+(?:歲|足歲)(?:以上|以下|之間|前|後)?$/u;
+
+function isFilterOnlyRecallConcept(value: string) {
+  const normalized = normalizeAreaText(value);
+  if (!normalized) return true;
+  if (AREA_RECALL_PATTERN.test(normalized)) return true;
+  // 臺→台 已由 normalizeAreaText 處理，年齡詞只要去掉空白即可
+  return AGE_ONLY_RECALL_PATTERN.test(normalized);
+}
+
+/**
  * recallConcepts 是「擴大搜尋召回」用的站內福利概念詞，不參與任何篩選條件，
  * 因此不必過字面白名單（keepLiteralCondition），也不會被套成篩選器；只做基本清洗。
  * 模型偶爾會回非陣列、夾雜空白、或多到爆的清單，這裡一律收斂成
  * 「最多 5 個、每個至多 10 字、去重、去空」的字串陣列；不是陣列就當空陣列。
+ * 縣市名與純年齡詞另外剔除，理由見 isFilterOnlyRecallConcept。
  */
 function sanitizeRecallConcepts(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const cleaned = value
     .map((item) => String(item ?? "").trim().slice(0, 10))
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((item) => !isFilterOnlyRecallConcept(item));
   return [...new Set(cleaned)].slice(0, 5);
 }
 
@@ -315,53 +343,96 @@ function buildIntentPrompt(
   ].join("\n");
 }
 
+// 意圖判讀擋在搜尋結果前面：使用者等的是政策清單，不是這一步。以前這兩支呼叫
+// 完全沒有上限，供應商吊住不回就整個搜尋卡住（畫面只能一直轉圈）。比照
+// chatbot.post.ts 的作法補上中止；失敗會退讓到下一個候選，最後還有本地正則兜底。
+const INTENT_REQUEST_TIMEOUT_MS = 10_000;
+
+/**
+ * SDK 呼叫的逾時保險。
+ * abortSignal 已經傳給 SDK，這一層只是確保呼叫端一定脫得了身
+ *（萬一某個版本沒有處理 abortSignal，光靠它就會一直等下去）。
+ */
+function withIntentTimeout<T>(task: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const guard = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} intent request timed out after ${ms}ms.`)),
+      ms
+    );
+  });
+  return Promise.race([task, guard]).finally(() => {
+    if (timer) clearTimeout(timer);
+  }) as Promise<T>;
+}
+
 async function requestGroqIntent(apiKey: string, model: string, prompt: string) {
   const isGptOss = /^openai\/gpt-oss-/iu.test(model);
   const isQwen = /^qwen\//iu.test(model);
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      ...(isGptOss
-        ? { reasoning_effort: "low" }
-        : isQwen
-          ? { reasoning_effort: "none" }
-          : {}),
-      temperature: 0.1,
-      max_completion_tokens: isGptOss ? 320 : 180,
-      messages: [
-        { role: "system", content: SEARCH_INTENT_SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), INTENT_REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        ...(isGptOss
+          ? { reasoning_effort: "low" }
+          : isQwen
+            ? { reasoning_effort: "none" }
+            : {}),
+        temperature: 0.1,
+        max_completion_tokens: isGptOss ? 320 : 180,
+        messages: [
+          { role: "system", content: SEARCH_INTENT_SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
 
-  const data: any = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(
-      `Groq intent request failed with status ${response.status}. ${
-        data?.error?.message || ""
-      }`.trim()
-    );
+    const data: any = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        `Groq intent request failed with status ${response.status}. ${
+          data?.error?.message || ""
+        }`.trim()
+      );
+    }
+    return String(data?.choices?.[0]?.message?.content || "");
+  } finally {
+    clearTimeout(timeout);
   }
-  return String(data?.choices?.[0]?.message?.content || "");
 }
 
 async function requestGeminiIntent(apiKey: string, model: string, prompt: string) {
-  const ai = new GoogleGenAI({ apiKey, apiVersion: "v1beta" });
-  const response = await ai.models.generateContent({
-    model,
-    contents: prompt,
-    config: {
-      systemInstruction: SEARCH_INTENT_SYSTEM_PROMPT,
-      responseMimeType: "application/json",
-    },
-  });
-  return response.text || "";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), INTENT_REQUEST_TIMEOUT_MS);
+  try {
+    const ai = new GoogleGenAI({ apiKey, apiVersion: "v1beta" });
+    const response = await withIntentTimeout(
+      ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          systemInstruction: SEARCH_INTENT_SYSTEM_PROMPT,
+          responseMimeType: "application/json",
+          // SDK 支援的中止訊號。注意 Google 官方說明：中止只發生在用戶端，
+          // 服務端仍可能跑完並計費——但至少不會把使用者的搜尋一直吊著。
+          abortSignal: controller.signal,
+        },
+      }),
+      INTENT_REQUEST_TIMEOUT_MS,
+      "Gemini"
+    );
+    return response.text || "";
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export default defineEventHandler(async (event) => {

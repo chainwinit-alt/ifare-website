@@ -176,7 +176,13 @@ export async function summarizeWithFreeTier(
   config: FreeTierLlmConfig,
   // 使用者按「重新摘要」時要跳過這層快取。不跳的話同樣的條件會拿回一模一樣的
   // 字，按了等於沒事發生——那顆按鈕的意義就沒了。產生後照樣寫回快取。
-  options?: { skipCache?: boolean; onDelta?: LlmSummaryDeltaHandler } & ModelOverride
+  // signal：呼叫端（SSE 端點）的中止訊號。client 斷線時要一路傳到供應商的 fetch，
+  // 否則民眾關掉頁面後，這裡還會把剩下的候選一個個試完，白燒額度。
+  options?: {
+    skipCache?: boolean;
+    onDelta?: LlmSummaryDeltaHandler;
+    signal?: AbortSignal;
+  } & ModelOverride
 ): Promise<FreeTierSummaryResult> {
   const override = resolveModelOverride(options);
   const cached = options?.skipCache ? null : getCachedSummary(input, override || undefined);
@@ -220,6 +226,8 @@ export async function summarizeWithFreeTier(
 
   const errors: string[] = [];
   for (const candidate of candidates) {
+    // 已經斷線（或整體逾時）就不要再往下試——沒有人在等這篇字了
+    if (options?.signal?.aborted) break;
     if (!candidate.apiKey) continue;
     const candidateKey = `${candidate.provider}:${candidate.model}`;
     // 指定型號時不看冷卻：要測的就是它，被跳過會讓人以為測過了
@@ -229,7 +237,11 @@ export async function summarizeWithFreeTier(
       // 逐段回呼交給 client 自己決定要不要用（目前只有 Groq 走串流）。
       // 額度不足或金鑰錯誤都是在讀 body 之前就以非 2xx 回來，所以退讓到下一個
       // 候選時，前面那個不會已經吐出半篇文字到畫面上。
-      const rawSummary = await candidate.client.summarize(input, options?.onDelta);
+      const rawSummary = await candidate.client.summarize(
+        input,
+        options?.onDelta,
+        options?.signal
+      );
       // overview / overview_general / answer 是多段 Markdown，換行就是版面結構，
       // 只能收斂行內空白；guidance 維持原本的單行輸出。
       const isMarkdownMode = input.mode === "overview"
@@ -260,6 +272,8 @@ export async function summarizeWithFreeTier(
       const message = error?.message || String(error);
       errors.push(`${candidateKey}: ${message}`);
       console.warn(`[LLM][free-tier][${candidateKey}]`, message);
+      // 斷線造成的失敗不是這個候選的問題，也沒有必要退讓——直接收工
+      if (options?.signal?.aborted) break;
       if (isRateLimitError(error)) {
         providerCooldowns.set(candidateKey, Date.now() + RATE_LIMIT_COOLDOWN_MS);
       } else if (isBlockedModelError(error)) {

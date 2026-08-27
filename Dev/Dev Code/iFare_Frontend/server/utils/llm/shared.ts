@@ -897,7 +897,20 @@ export function isSummaryAnswerTurn(
   return isFollowUpQuestion(getLatestUserMessage(conversation));
 }
 
-/** 前端查回來的「換個範圍會有幾筆」。欄位不完整就整個丟掉，寧可不提也不能講錯數字 */
+/**
+ * 站內政策總量的量級上限。超過這個數字的 count 一定不是真的查出來的
+ *（全站政策約一千多筆），寧可整個丟掉也不要讓它進提示詞。
+ */
+const SCOPE_HINT_MAX_COUNT = 5000;
+
+/**
+ * 前端查回來的「換個範圍會有幾筆」。欄位不完整或數字不合理就整個丟掉，
+ * 寧可不提也不能講錯數字。
+ *
+ * verified 一律標成 false：這個數字是瀏覽器算完送上來的，伺服器沒有核對過
+ *（核對要先把縣市名轉成後端代碼、再打數趟 GetIFarePolicyList 去重，
+ * 伺服器這邊拿不到同一份可靠來源）。提示詞會據此把它講成概數而不是本站統計。
+ */
 export function sanitizeSummaryScopeHint(value: unknown): LlmSummaryScopeHint | null {
   const item = value as Partial<LlmSummaryScopeHint> | null | undefined;
   if (!item) return null;
@@ -906,8 +919,8 @@ export function sanitizeSummaryScopeHint(value: unknown): LlmSummaryScopeHint | 
   const target = sanitizeSummaryField(item.value, 40);
   const count = Number(item.count);
   if (!field || !label || !target) return null;
-  if (!Number.isInteger(count) || count <= 0) return null;
-  return { field, label, value: target, count };
+  if (!Number.isInteger(count) || count <= 0 || count > SCOPE_HINT_MAX_COUNT) return null;
+  return { field, label, value: target, count, verified: false };
 }
 
 /**
@@ -992,13 +1005,19 @@ export function buildAnswerPrompt(
       ? "- 下方有「本站其他範圍」這一段，代表使用者的話裡提到了目前條件以外的範圍。不論問題是什麼，都不得說本站沒有、查不到或未載明那個範圍——本站確實有，筆數就寫在那一段裡。"
       : "",
     scopeHint
-      ? "- 若問題本身就是在問那個範圍（例如「台北市也有嗎」）：第 1 段先一句話說明目前這幾筆的適用範圍，再講出本站有那個範圍的政策共幾筆、把該項條件改成那個值就看得到；### 段落改成簡短說明目前這幾筆各自的適用範圍，不要逐筆列「未載明」。"
+      ? "- 若問題本身就是在問那個範圍（例如「台北市也有嗎」）：第 1 段先一句話說明目前這幾筆的適用範圍，再講出本站有那個範圍的政策、大約幾筆、把該項條件改成那個值就看得到；### 段落改成簡短說明目前這幾筆各自的適用範圍，不要逐筆列「未載明」。"
       : "",
     scopeHint
-      ? "- 若問題問的是別的事（例如要準備什麼文件），就照原本的格式完整回答那個問題，只在最後補一句本站那個範圍另有幾筆、改條件就看得到；不要因為這一段就偏離使用者真正問的事。"
+      ? "- 若問題問的是別的事（例如要準備什麼文件），就照原本的格式完整回答那個問題，只在最後補一句本站那個範圍另有約幾筆、改條件就看得到；不要因為這一段就偏離使用者真正問的事。"
       : "",
     scopeHint
-      ? "- 講到那個範圍的筆數時不要加 [參考 N]。那個數字是本站查出來的統計，不是來自任何一筆候選政策。"
+      ? "- 講到那個範圍的筆數時不要加 [參考 N]。那個數字是搜尋系統回報的統計，不是來自任何一筆候選政策。"
+      : "",
+    // 這個數字由瀏覽器算完送上來、伺服器沒有核對過（見 sanitizeSummaryScopeHint）。
+    // 「本站有那個範圍的政策」可以講，但不能把一個未經核對的數字講成本站的正式統計——
+    // 民眾看到「共 68 筆」會當成查詢結果，切過去卻只有 3 筆時，錯的是我們。
+    scopeHint && scopeHint.verified === false
+      ? "- 那個筆數是搜尋當下的概數、未經完整核對：要提到時請寫成「約 N 筆」或「有多筆」，不得寫成「共 N 筆」「本站統計為 N 筆」這種確定的說法，也不要保證每一筆都適合對方。"
       : "",
     scopeHint
       ? "- 這種時候不要叫對方去洽詢承辦單位或主管機關。本站就有那個範圍的資料，直接告訴他改條件就看得到才是有用的答案。"
@@ -1019,7 +1038,9 @@ export function buildAnswerPrompt(
     contextText ? `使用者已選條件：${contextText}` : "使用者已選條件：未提供",
     `使用者這次的問題：${question || queryText}`,
     scopeHint
-      ? `本站其他範圍：把「${scopeHint.label}」改成「${scopeHint.value}」之後，本站符合的政策有 ${scopeHint.count} 筆`
+      ? `本站其他範圍：把「${scopeHint.label}」改成「${scopeHint.value}」之後，本站確實有符合的政策，搜尋系統回報${
+          scopeHint.verified === false ? "約" : ""
+        } ${scopeHint.count} 筆${scopeHint.verified === false ? "（概數，未經完整核對）" : ""}`
       : "",
     caseLines.length ? `站內候選政策：\n${caseLines.join("\n\n")}` : "站內候選政策：目前沒有可用資料",
     conversationLines.length ? `先前對話（依時間順序）：\n${conversationLines.join("\n")}` : "",

@@ -1,14 +1,22 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 const SITEMAP_LASTMOD = new Date().toISOString();
-const DEFAULT_SITE_URL = "http://10.200.0.39";
-const DEFAULT_FRONTEND_API_BASE = `${DEFAULT_SITE_URL}/ifare_api/api/services/app`;
+// 內網 API 主機。只用來組後端 API 位址與 dev proxy 目標，不會出現在對外的頁面上。
+const INTERNAL_API_ORIGIN = "http://10.200.0.39";
+const DEFAULT_FRONTEND_API_BASE = `${INTERNAL_API_ORIGIN}/ifare_api/api/services/app`;
 const DEFAULT_DEV_PUBLIC_FRONTEND_API_BASE = "/ifare_api/api/services/app";
 const DEFAULT_GEMINI_API_KEY = "";
 const DEFAULT_GROQ_API_KEY = "";
-const RESOLVED_SITE_URL =
+// 對外站台網址：預設留空，不再退回內網 IP。
+//
+// 這個值會被寫進 sitemap、canonical、og:url 與分享連結——預設成 http://10.200.0.39
+// 等於把內部網段位址印在每一張對外頁面上，而且民眾點了也連不到。
+// 正式環境請設 NUXT_PUBLIC_SITE_URL（或 NUXT_SITE_URL）為實際網域；
+// 未設定時 sitemap 模組會改用請求本身的主機名，不再硬帶一個錯的絕對網址。
+const RESOLVED_SITE_URL = (
   process.env.NUXT_PUBLIC_SITE_URL ||
   process.env.NUXT_SITE_URL ||
-  DEFAULT_SITE_URL;
+  ""
+).trim();
 
 const readEnv = (...keys: string[]) => {
   for (const key of keys) {
@@ -151,15 +159,14 @@ export default defineNuxtConfig({
       groqIntentModels:
         readEnv("NUXT_LLM_GROQ_INTENT_MODELS") ||
         "openai/gpt-oss-20b,openai/gpt-oss-120b",
-      // 請求層指定模型（provider／model）是開發比較模型用的，預設只在非正式環境開放。
+      // 請求層指定模型（provider／model）是開發比較模型用的，預設一律關閉。
       //
-      // 它接受任意型號而不限於候選清單，等於讓外部挑一個更貴的模型來消耗額度；
-      // 摘要那三個端點（summarize、summarize/stream、search-intent）目前又沒有
-      // 速率限制，兩者疊起來風險不小。芒寶有每分鐘 12 次的本地限流，影響較輕。
-      // 正式環境要臨時比對模型時，設 NUXT_LLM_ALLOW_MODEL_OVERRIDE=1 再開。
-      allowModelOverride:
-        readEnv("NUXT_LLM_ALLOW_MODEL_OVERRIDE")
-        || (process.env.NODE_ENV !== "production" ? "1" : ""),
+      // 它接受任意型號而不限於候選清單，等於讓外部挑一個更貴的模型來消耗額度。
+      // 原本的預設值是「NODE_ENV 不是 production 就開」——但 NODE_ENV 沒設、
+      // 以 nuxt dev 或非標準方式啟動的正式機都會落在那個分支，等於預設開著；
+      // 這種「猜環境」的判斷猜錯一次就是額度被打光，改成顯式開啟才生效的 fail-safe。
+      // 要比對模型時（含本機開發）設 NUXT_LLM_ALLOW_MODEL_OVERRIDE=1 即可。
+      allowModelOverride: readEnv("NUXT_LLM_ALLOW_MODEL_OVERRIDE"),
       // 芒寶（chatbot.post.ts）專用的 Gemini 清單與供應商順序。
       //
       // 2026-08-24 實測芒寶的 LLM 生成層（Layer 3，只有這一層會自由作答）：
@@ -252,9 +259,9 @@ export default defineNuxtConfig({
     id: "G-QCT2XVFX2L",
   },
 
-  site: {
-    url: RESOLVED_SITE_URL,
-  },
+  // 沒設定站台網址時整個 key 都不給，讓 sitemap 模組自己從請求推導；
+  // 給一個空字串會被當成「設定了一個空網址」而產出壞掉的 sitemap。
+  ...(RESOLVED_SITE_URL ? { site: { url: RESOLVED_SITE_URL } } : {}),
 
   sitemap: {
     xslColumns: [

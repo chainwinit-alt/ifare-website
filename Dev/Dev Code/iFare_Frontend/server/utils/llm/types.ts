@@ -39,8 +39,16 @@ export interface LlmSummaryScopeHint {
   label: string;
   /** 目標值，例如「台北市」 */
   value: string;
-  /** 換成這個值以後符合的政策筆數（查回來的，不是估的） */
+  /** 換成這個值以後符合的政策筆數 */
   count: number;
+  /**
+   * 這個筆數是不是伺服器自己核算出來的。
+   *
+   * 目前一律是 false：數字由瀏覽器算完送上來（前端的探測要先把縣市名轉成後端代碼、
+   * 再打數趟 GetIFarePolicyList 去重，伺服器這邊拿不到同一份可靠來源）。
+   * 未驗證的數字不能讓 AI 當成本站統計斬釘截鐵地引用，提示詞會據此改口（見 buildAnswerPrompt）。
+   */
+  verified?: boolean;
 }
 
 export interface LlmSummaryConversationMessage {
@@ -78,5 +86,13 @@ export interface LlmSummaryInput {
 export type LlmSummaryDeltaHandler = (delta: string, full: string) => void;
 
 export interface LlmClient {
-  summarize(input: LlmSummaryInput, onDelta?: LlmSummaryDeltaHandler): Promise<string>;
+  /**
+   * signal：呼叫端的中止訊號（SSE 的 client 斷線、整體逾時）。
+   * 傳下去之後，民眾關掉頁面時上游那趟 LLM 請求會跟著停，而不是自己寫完再丟掉。
+   */
+  summarize(
+    input: LlmSummaryInput,
+    onDelta?: LlmSummaryDeltaHandler,
+    signal?: AbortSignal
+  ): Promise<string>;
 }

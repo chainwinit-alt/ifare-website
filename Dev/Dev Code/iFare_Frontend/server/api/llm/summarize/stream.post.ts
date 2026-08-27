@@ -53,13 +53,29 @@ function toKilobytes(bytes: number) {
   return Math.round((bytes / 1024) * 100) / 100;
 }
 
-function createSseResponse(handler: (push: PushEvent) => Promise<void>) {
+/**
+ * 開一條 SSE。handler 拿到的第二個參數是「這位民眾還在不在」的訊號：
+ *
+ * ReadableStream 原本沒有 cancel()，民眾關掉分頁、按上一頁或中途重問時，
+ * 這一端完全不知道，上游那趟 LLM 請求照樣寫到底、額度照樣扣——摘要是本站最貴的
+ * 呼叫，這等於每一次中途離開都白付一次。現在 cancel 會 abort 這個訊號，
+ * 一路傳到 freeTier 與供應商的 fetch，請求跟著收掉。
+ *
+ * closed 旗標同時擋掉「串流關掉之後還在 enqueue／close」——那會丟 TypeError，
+ * 而那個錯誤只會被上面的 catch 記成一筆看不懂的日誌。
+ */
+function createSseResponse(
+  handler: (push: PushEvent, signal: AbortSignal) => Promise<void>
+) {
   const encoder = new TextEncoder();
+  const abortController = new AbortController();
+  let closed = false;
 
   return new Response(
     new ReadableStream({
       start(controller) {
         const push: PushEvent = (event, data) => {
+          if (closed) return;
           controller.enqueue(
             encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
           );
@@ -67,13 +83,20 @@ function createSseResponse(handler: (push: PushEvent) => Promise<void>) {
 
         (async () => {
           try {
-            await handler(push);
+            await handler(push, abortController.signal);
           } catch (error) {
             console.warn("[LLM][sse]", error);
           } finally {
-            controller.close();
+            if (!closed) {
+              closed = true;
+              controller.close();
+            }
           }
         })();
+      },
+      cancel() {
+        closed = true;
+        abortController.abort();
       },
     }),
     {
@@ -316,7 +339,12 @@ export default defineEventHandler(async (event) => {
         : generalFallbackEnabled
           ? "overview_general"
           : "guidance";
-  // 只有回答問題時用得到：使用者問到目前條件以外的範圍，前端查回了那個範圍的真實筆數。
+  // 只有回答問題時用得到：使用者問到目前條件以外的範圍，前端查回了那個範圍的筆數。
+  //
+  // 這個數字是 client 送上來的，伺服器沒有辦法用同一份來源核對（探測要先把縣市名
+  // 轉成後端代碼、再打數趟 GetIFarePolicyList 去重）。sanitizeSummaryScopeHint 因此
+  // 只做合理性把關（整數、正數、不超過全站量級）並標成未驗證，提示詞會把它講成概數，
+  // 不讓 AI 說成「本站統計共 N 筆」。
   const scopeHint = mode === "answer" && !focusPolicy
     ? sanitizeSummaryScopeHint(body.scopeHint)
     : null;
@@ -335,7 +363,7 @@ export default defineEventHandler(async (event) => {
   // 但有問句時第一項一定就是它，讀完問句往下看不會對不上。
   const guidanceFields = mode === "answer" ? [] : getSummaryGuidanceFields(input);
 
-  return createSseResponse(async (push) => {
+  return createSseResponse(async (push, signal) => {
     const startedAt = Date.now();
     const requestBytes = getUtf8Bytes(JSON.stringify(input));
     // 逐段把模型吐出來的字送給前端。摘要卡與 plugins/llm.ts 本來就會累積 chunk、
@@ -383,6 +411,8 @@ export default defineEventHandler(async (event) => {
           provider: overrideAllowed ? body.provider : undefined,
           model: overrideAllowed ? body.model : undefined,
           onDelta,
+          // client 斷線就把上游那趟 LLM 請求一起收掉（見 createSseResponse）
+          signal,
         }
       );
       const responseBytes = getUtf8Bytes(result.summary);
@@ -418,6 +448,9 @@ export default defineEventHandler(async (event) => {
         durationMs,
       });
     } catch (error: any) {
+      // 民眾已經離開（關掉分頁、按上一頁、中途重問）：沒有人在等這份回覆，
+      // 兜底文字也送不出去，這裡直接收工，順便不要把斷線記成一筆錯誤。
+      if (signal.aborted) return;
       console.warn("[LLM][stream]", error);
       const isConversation = conversation.length > 0;
       const summary = isConversation
@@ -438,6 +471,10 @@ export default defineEventHandler(async (event) => {
         mode: "guidance",
         cached: false,
         fallback: !isConversation,
+        // 【與前端 plugins/llm.ts 的介面約定】全部候選都失敗、又沒有可用的兜底文字時
+        //（對話回合不寫腳本兜底，summary 會是空字串），前端已經逐字長出來的半截草稿
+        // 必須整段丟掉，不能留在畫面上當答案。收到 discard: true 就丟。
+        discard: isConversation && !summary,
         requestBytes,
         requestKilobytes: toKilobytes(requestBytes),
         responseBytes,
