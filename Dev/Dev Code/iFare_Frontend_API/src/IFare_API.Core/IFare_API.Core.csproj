@@ -19,7 +19,18 @@
     <PackageReference Include="Abp.Castle.Log4Net" Version="7.3.0" />
     <PackageReference Include="Abp.ZeroCore.EntityFrameworkCore" Version="7.3.0" />
     <PackageReference Include="Castle.Windsor.MsDependencyInjection" Version="3.4.0" />
-    <PackageReference Include="jieba.NET" Version="0.42.2" />
+    <PackageReference Include="jieba.NET" Version="0.42.2" GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+  </ItemGroup>
+  <!--
+    jieba.NET 只在套件裡放 DLL，字典檔（Resources\dict.txt 等）不會自己進建置輸出。
+    JiebaSegmenter 是 static readonly 欄位，字典找不到時是「型別初始化直接失敗」而不是降級，
+    等於整個 TraditionalChineseFuzzyMatcher 不能用、搜尋全掛，所以一定要跟著輸出走。
+    JiebaNet 預設到執行檔旁邊的 Resources\ 找，Link 就照這個結構擺。
+    這裡整包複製而不是只挑 Cut() 需要的那三個檔：日後若改用 PosSegmenter 或 TfidfExtractor，
+    少檔案只會得到一個很難查的初始化例外。
+  -->
+  <ItemGroup>
+    <None Include="$(Pkgjieba_NET)\Resources\**\*.*" Link="Resources\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
