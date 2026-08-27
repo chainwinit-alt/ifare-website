@@ -33,6 +33,7 @@ namespace IFare_BDAPI.Fare.OfficeUnit
             return ObjectMapper.Map<FareOfficeUnitResultDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         [UnitOfWork(isTransactional: false)]
         public async Task<ErrorInfoBaseDto> InsertFareOfficeUnit(FareOfficeUnitInsertDataDto insertData)
@@ -44,6 +45,7 @@ namespace IFare_BDAPI.Fare.OfficeUnit
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         [UnitOfWork(isTransactional: false)]
         public async Task<ErrorInfoBaseDto> UpdateFareOfficeUnit(FareOfficeUnitEditorDataDto editorData)

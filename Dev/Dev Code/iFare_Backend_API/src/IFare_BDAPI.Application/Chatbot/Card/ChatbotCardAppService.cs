@@ -36,6 +36,7 @@ namespace IFare_BDAPI.Chatbot.Card
             return ObjectMapper.Map<ChatbotCardResultDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> InsertChatbotCard(ChatbotCardInsertDataDto insertData)
         {
@@ -46,6 +47,7 @@ namespace IFare_BDAPI.Chatbot.Card
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> UpdateChatbotCard(ChatbotCardEditorDataDto editorData)
         {
@@ -56,6 +58,7 @@ namespace IFare_BDAPI.Chatbot.Card
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> DeleteChatbotCard(ChatbotCardDeleteDataDto deleteData)
         {
