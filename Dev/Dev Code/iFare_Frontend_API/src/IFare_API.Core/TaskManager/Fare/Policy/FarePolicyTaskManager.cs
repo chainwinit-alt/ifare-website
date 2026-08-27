@@ -169,11 +169,11 @@ namespace IFare_API.TaskManager.Fare.Policy
             {
                 var normalizedQuery = TraditionalChineseFuzzyMatcher.Normalize(param.Query);
                 var queryTokens = TraditionalChineseFuzzyMatcher.TokenizeForBm25(param.Query);
-                // searchCorpus 的每一項（分詞、詞頻表、文件長度、摺疊後全文）只跟政策內容有關、
-                // 與查詢字串完全無關，因此改由行程內記憶化快取取得（見 GetOrBuildSearchCorpusEntry）。
-                // 這裡刻意維持與原本完全相同的匿名型別欄位（Item/Tokens/SearchText/TermFrequencies/
-                // DocumentLength），且各欄位值與原本逐筆重算的結果一模一樣，確保後續 grounding
-                // 與 BM25 計分的輸入位元級不變。
+                // searchCorpus 的每一項（分詞、詞頻表、文件長度、摺疊後全文，以及各計分欄位的
+                // 候選側前處理）只跟政策內容有關、與查詢字串完全無關，因此改由行程內記憶化快取
+                // 取得（見 GetOrBuildSearchCorpusEntry）。這裡的匿名型別欄位值與原本逐筆重算的
+                // 結果一模一樣，確保後續 grounding、BM25 與模糊計分的輸入位元級不變；
+                // FieldContexts 是新增的候選側快取，僅供 GetSearchScore 取用。
                 var searchCorpus = list
                     .Select(item =>
                     {
@@ -184,7 +184,8 @@ namespace IFare_API.TaskManager.Fare.Policy
                             Tokens = corpusEntry.Tokens,
                             SearchText = corpusEntry.FoldedSearchText,
                             TermFrequencies = corpusEntry.TermFrequencies,
-                            DocumentLength = corpusEntry.DocumentLength
+                            DocumentLength = corpusEntry.DocumentLength,
+                            FieldContexts = corpusEntry.FieldContexts
                         };
                     })
                     .ToList();
@@ -222,7 +223,7 @@ namespace IFare_API.TaskManager.Fare.Policy
                 var searchScores = searchCorpus
                     .Select(item =>
                     {
-                        var fuzzyScore = GetSearchScore(queryScoringContext, normalizedQuery, item.Item);
+                        var fuzzyScore = GetSearchScore(queryScoringContext, normalizedQuery, item.FieldContexts);
                         var bm25Score = TraditionalChineseFuzzyMatcher.ComputeBm25Score(
                             queryTokens,
                             item.TermFrequencies,
@@ -268,21 +269,26 @@ namespace IFare_API.TaskManager.Fare.Policy
 
         // queryScoringContext 是 normalizedQuery 的前處理結果（見 CreateQueryScoringContext），
         // normalizedQuery 本身仍留著只為維持原本「查詢為空就回 0」的短路判斷。
-        private static double GetSearchScore(TraditionalChineseFuzzyMatcher.QueryScoringContext queryScoringContext, string normalizedQuery, FarePolicyData item)
+        // fieldContexts 是這筆政策 8 個計分欄位的候選側前處理（見 BuildFieldSources／FieldXxx 索引），
+        // 每個元素都由與原本完全相同的欄位字串建出，因此每個欄位分數與原本逐筆重算的結果相同。
+        private static double GetSearchScore(
+            TraditionalChineseFuzzyMatcher.QueryScoringContext queryScoringContext,
+            string normalizedQuery,
+            TraditionalChineseFuzzyMatcher.CandidateScoringContext[] fieldContexts)
         {
             if (string.IsNullOrEmpty(normalizedQuery))
             {
                 return 0d;
             }
 
-            var titleScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, item.Title);
-            var qualificationScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, item.Qualification);
-            var keywordScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, string.Join(" ", item.CodeKeywordList.Select(p => p.CodeName)));
-            var policyScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, item.CodePolicy_LabelName);
-            var domicileScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, item.CodeDomicile_LabelName);
-            var recipientScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, string.Join(" ", item.CodeRecipientList.Select(p => p.CodeName)));
-            var identityScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, string.Join(" ", item.CodeIdentityList.Select(p => p.CodeName)));
-            var incomeScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, string.Join(" ", item.CodeIncomeList.Select(p => p.CodeName)));
+            var titleScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, fieldContexts[FieldTitle]);
+            var qualificationScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, fieldContexts[FieldQualification]);
+            var keywordScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, fieldContexts[FieldKeyword]);
+            var policyScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, fieldContexts[FieldPolicyLabel]);
+            var domicileScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, fieldContexts[FieldDomicileLabel]);
+            var recipientScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, fieldContexts[FieldRecipient]);
+            var identityScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, fieldContexts[FieldIdentity]);
+            var incomeScore = TraditionalChineseFuzzyMatcher.Score(queryScoringContext, fieldContexts[FieldIncome]);
 
             return (titleScore * 0.5d) +
                    (qualificationScore * 0.12d) +
@@ -393,59 +399,129 @@ namespace IFare_API.TaskManager.Fare.Policy
         }
 
         // ── 政策搜尋語料的行程內記憶化快取 ─────────────────────────────────────
-        // 為什麼可以快取：searchCorpus 每一項（分詞 Tokens、詞頻表 TermFrequencies、文件長度
-        // DocumentLength、摺疊後全文 FoldedSearchText）都只由「政策內容」決定，與使用者輸入的
-        // 查詢字串完全無關；同一筆政策不論被哪個查詢命中，這些純 CPU 的前處理結果都一樣，
-        // 因此可跨請求重用，把每次請求從零重算 BuildSearchDocument→Tokenize→TF 的成本省下來。
-        // 失效怎麼判：以政策 Id 為 key、以「這次組出來的語料原文（BuildSearchDocument 結果）」當版本戳。
+        // 為什麼可以快取：下面兩層的每一項都只由「政策內容」決定，與使用者輸入的查詢字串完全無關；
+        // 同一筆政策不論被哪個查詢命中，這些純 CPU 的前處理結果都一樣，因此可跨請求重用，
+        // 把每次請求從零重算 Normalize→Jieba 斷詞→詞頻表的成本省下來。
+        // 快取的內容分兩層：
+        //  (1) 文件層：BM25 用的分詞 Tokens、詞頻表 TermFrequencies、文件長度 DocumentLength、
+        //      grounding 判定用的摺疊後全文 FoldedSearchText。
+        //  (2) 欄位層（FieldContexts）：GetSearchScore 那 8 個計分欄位各自的候選側前處理
+        //      （Normalize + Jieba 斷詞 + 斷詞集合）。原本每次搜尋、每一筆政策都要重跑 8 次，
+        //      其中「資格條件」動輒上千字，是搜尋延遲與 DoS 風險的大宗。
+        // 失效怎麼判：以政策 Id 為 key、以「這次組出來的 8 個欄位原文」逐欄 Ordinal 比對當版本戳。
         // 舊做法用政策自身的 UpdateTime 當版本戳，抓不到「政策沒動、但底下關鍵字／身份別／補助對象
         // 等標籤的 LabelName 被改」的情況——那些字也在語料裡，改了卻不會 bump 政策的 UpdateTime，
         // 快取就會拿舊分詞去比對新內容（舊碼只能靠 10 分鐘 TTL 沖掉，這段期間搜尋結果是錯的）。
-        // 改用語料原文當版本戳可以完全避開這個問題：BuildSearchDocument 只是字串串接（便宜），
-        // 真正貴的是 Jieba 斷詞與詞頻表（快取的就是這一段）；原文相同 ⇒ 後續全部推導結果必然相同，
-        // 因此不再需要 TTL 這層保險。快取以 Id 為 key，天然上限＝政策數，不需額外淘汰機制。
+        // 改用欄位原文當版本戳可以完全避開這個問題：組欄位只是字串串接（便宜），真正貴的是 Jieba
+        // 斷詞（快取的就是這一段）；欄位原文全部相同 ⇒ 語料全文與後續推導結果必然相同，
+        // 因此不再需要 TTL 這層保險。
+        // 注意版本戳刻意比對「8 個欄位」而不是串接後的全文：全文相同不代表欄位切分相同
+        //（把標題末尾的字搬到資格條件開頭，全文一樣但兩欄的分數會變），欄位層快取需要更嚴的戳記。
+        // 記憶體：key 為政策 Id，不隨請求量成長，天然上限＝曾經被搜尋撈到過的政策數。
+        // 欄位層快取不會像「8 個欄位就是 8 倍」那樣膨脹——BuildSearchDocument 串的正是這 8 個欄位，
+        // 欄位層的文字總量本來就等於文件層那一份語料全文，只是換個切法存。
+        // 以目前 1,344 筆上架政策實測（見下方 MaxCachedPolicyCount 註解的推估）：
+        //   文件層（既有）約 7.1 KB/筆、欄位層（本次新增）約 8.2 KB/筆，合計約 20 MB。
+        // 唯一會慢慢長大的情況是政策被下架／刪除後，舊 Id 的快取項沒人再碰卻也不會被清掉。
+        // 因此加一道上限當保險（見 MaxCachedPolicyCount）。
         private static readonly ConcurrentDictionary<long, SearchCorpusCacheEntry> SearchCorpusCache =
             new ConcurrentDictionary<long, SearchCorpusCacheEntry>();
 
+        // 快取筆數上限。超過就整份清掉重建——快取是純記憶化，清掉只會讓下一次搜尋重算，
+        // 不影響任何分數或排序，所以用最簡單、最不會出錯的作法即可（LRU 要記存取時間、要鎖，
+        // 在這個「上限幾乎碰不到」的情境不值得）。
+        // 上限怎麼定：實測每筆政策約 15.3 KB（文件層 7.1 KB + 欄位層 8.2 KB），
+        // 4,000 × 15.3 KB ≒ 62 MB，是這台前台 API 可接受的天花板；而目前上架政策才 1,344 筆，
+        // 正常運作根本碰不到，這道只是防止「多年累積下架政策」把記憶體慢慢吃掉。
+        private const int MaxCachedPolicyCount = 4000;
+
+        // BuildFieldSources／FieldContexts 的欄位順序（＝原本 BuildSearchDocument 串接的順序）。
+        private const int FieldTitle = 0;
+        private const int FieldQualification = 1;
+        private const int FieldPolicyLabel = 2;
+        private const int FieldDomicileLabel = 3;
+        private const int FieldKeyword = 4;
+        private const int FieldRecipient = 5;
+        private const int FieldIdentity = 6;
+        private const int FieldIncome = 7;
+
         private static SearchCorpusCacheEntry GetOrBuildSearchCorpusEntry(FarePolicyData item)
         {
-            var searchText = BuildSearchDocument(item);
+            var fieldSources = BuildFieldSources(item);
 
-            // 命中且語料原文一字不差 → 直接重用。
+            // 命中且 8 個欄位原文一字不差 → 直接重用。
             if (SearchCorpusCache.TryGetValue(item.ID, out var cached) &&
-                string.Equals(cached.SourceDocument, searchText, StringComparison.Ordinal))
+                HasSameFieldSources(cached.SourceFields, fieldSources))
             {
                 return cached;
             }
 
-            // 未命中或內容已變：用與原本 searchCorpus 完全一致的算式重算後寫回快取。
+            // 未命中或內容已變：用與原本 searchCorpus／GetSearchScore 完全一致的輸入字串與算式
+            // 重算後寫回快取。
+            var searchText = BuildSearchDocument(fieldSources);
             var tokens = TraditionalChineseFuzzyMatcher.TokenizeForBm25(searchText);
+            var fieldContexts = new TraditionalChineseFuzzyMatcher.CandidateScoringContext[fieldSources.Length];
+            for (var i = 0; i < fieldSources.Length; i++)
+            {
+                fieldContexts[i] = TraditionalChineseFuzzyMatcher.CreateCandidateScoringContext(fieldSources[i]);
+            }
+
             var entry = new SearchCorpusCacheEntry
             {
-                SourceDocument = searchText,
+                SourceFields = fieldSources,
                 Tokens = tokens,
                 TermFrequencies = TraditionalChineseFuzzyMatcher.BuildTermFrequencyMap(tokens),
                 DocumentLength = tokens.Count,
-                FoldedSearchText = FoldSearchText(TraditionalChineseFuzzyMatcher.Normalize(searchText))
+                FoldedSearchText = FoldSearchText(TraditionalChineseFuzzyMatcher.Normalize(searchText)),
+                FieldContexts = fieldContexts
             };
+
+            // 只在「要新增一筆」時才檢查上限：穩定狀態幾乎全是命中，不會為了這道保險付出成本
+            //（ConcurrentDictionary.Count 會鎖住整張表，不適合每筆政策都問一次）。
+            if (!SearchCorpusCache.ContainsKey(item.ID) && SearchCorpusCache.Count >= MaxCachedPolicyCount)
+            {
+                SearchCorpusCache.Clear();
+            }
+
             SearchCorpusCache[item.ID] = entry;
             return entry;
         }
 
-        // 快取項：對應原本 searchCorpus 匿名型別中「只與政策內容有關」的欄位。
+        private static bool HasSameFieldSources(string[] cachedFields, string[] currentFields)
+        {
+            if (cachedFields == null || cachedFields.Length != currentFields.Length)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < currentFields.Length; i++)
+            {
+                if (!string.Equals(cachedFields[i], currentFields[i], StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // 快取項：對應原本 searchCorpus 匿名型別中「只與政策內容有關」的欄位，加上欄位層前處理。
         // 寫入後不再修改，所有欄位皆為唯讀取用，可安全跨執行緒共享。
         private sealed class SearchCorpusCacheEntry
         {
-            public string SourceDocument { get; set; }         // = 組出這份快取的語料原文（版本戳）
+            public string[] SourceFields { get; set; }         // = 組出這份快取的 8 個欄位原文（版本戳）
             public List<string> Tokens { get; set; }
             public Dictionary<string, int> TermFrequencies { get; set; }
             public int DocumentLength { get; set; }
             public string FoldedSearchText { get; set; }
+            public TraditionalChineseFuzzyMatcher.CandidateScoringContext[] FieldContexts { get; set; }
         }
 
-        private static string BuildSearchDocument(FarePolicyData item)
+        // GetSearchScore 計分用的 8 個欄位原文，順序同 FieldXxx 常數。
+        // 每個元素都與原本 GetSearchScore 內就地組出來的字串完全相同（含 string.Join 的分隔符）。
+        private static string[] BuildFieldSources(FarePolicyData item)
         {
-            return string.Join(" ", new[]
+            return new[]
             {
                 item.Title,
                 item.Qualification,
@@ -455,7 +531,12 @@ namespace IFare_API.TaskManager.Fare.Policy
                 string.Join(" ", item.CodeRecipientList.Select(p => p.CodeName)),
                 string.Join(" ", item.CodeIdentityList.Select(p => p.CodeName)),
                 string.Join(" ", item.CodeIncomeList.Select(p => p.CodeName))
-            }.Where(text => !string.IsNullOrWhiteSpace(text)));
+            };
+        }
+
+        private static string BuildSearchDocument(string[] fieldSources)
+        {
+            return string.Join(" ", fieldSources.Where(text => !string.IsNullOrWhiteSpace(text)));
         }
 
         // metrics 記錄的靜態設定與快取（見下方 WriteSearchMetricsLog / ResolveSearchMetricsDirectory）。
