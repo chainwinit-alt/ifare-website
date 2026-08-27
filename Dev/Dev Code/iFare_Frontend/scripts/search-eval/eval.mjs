@@ -19,32 +19,37 @@ const RAW_MODE = process.argv.includes("--raw");
 const TOP_K = 10;
 
 /**
- * 處境用語 → 站內政策用語（utils/ifareIntent.ts 的 SITUATION_VOCABULARY 最小複本）。
+ * 處境用語 → 站內政策用語，直接從 utils/ifareIntent.ts 抽出 SITUATION_VOCABULARY。
  *
- * 為什麼複製而不 import：那個檔在 Nuxt 應用內、依賴 Nuxt 的模組解析，
- * 獨立腳本 import 會把整包相依拉進來。這份只取「擴充搜尋詞」需要的對照，
- * 不含條件抽取那些邏輯。
+ * 原本是手抄複本、靠註解提醒「改那邊記得同步這裡」——實際發生的事是：那邊補了
+ * 二十幾條，這裡沒人記得同步，評估跑出來的分數跟站上行為整個脫節（新案例明明
+ * 站上查得到、eval 卻判失敗），排查半天才發現是量尺舊了。
  *
- * ⚠ 改了 utils/ifareIntent.ts 的 SITUATION_VOCABULARY 記得同步這裡，
- *   否則評估分數會與站上實際行為脫節（低估）。
+ * 不能直接 import：那個檔在 Nuxt 應用內、依賴 Nuxt 的模組解析，獨立腳本 import
+ * 會把整包相依拉進來。但那張表本身是純資料（regex 與字串的陣列，夾註解），
+ * 所以改成執行時把陣列區塊原文抽出來執行。ifareIntent.ts 若改了常數名或陣列
+ * 寫法，這裡會當場丟錯——大聲壞掉正是要的，安靜過期才是原本的問題。
  */
-const SITUATION_VOCABULARY = [
-  [/長照|長期照顧/u, "長照 長期照顧"],
-  [/早療|早期療育/u, "早療 早期療育"],
-  [/腦中風|中風|癱瘓|半身不遂|臥床|插鼻胃管|無法自理|不能自理|生活不能自理|沒辦法自己(?:吃飯|洗澡|穿衣|上廁所|走路)|需要人(?:照顧|看護)|行動不便/u, "失能 長期照顧 無法自理"],
-  [/失智|阿茲海默|老年痴呆|記憶力(?:變差|退化|越來越差|不好)|忘東忘西|認知退化/u, "失智 長期照顧"],
-  [/跌倒|摔倒|跌傷|滑倒|防跌|居家安全|浴室很滑|怕再跌|站不穩/u, "無障礙 修繕 輔具"],
-  [/失業|被裁員|遭資遣|丟了工作|沒有工作|待業|找不到工作/u, "失業 非自願離職"],
-  [/沒(?:有)?薪水|沒領(?:到)?薪水|領不到薪水|被欠薪|欠薪|積欠(?:薪資|工資)|薪水沒(?:發|著落)|發不出薪水|好幾個月沒(?:領到?錢|發薪)/u, "失業 急難 生活扶助"],
-  [/保溫箱|巴掌仙子|早產兒/u, "早產"],
-  [/慢半拍|發展比較慢|說話(?:比較)?慢|不太會說話|遲緩/u, "發展遲緩 早期療育"],
-  [/懷孕|坐月子|生小孩|生產|待產|新生兒/u, "生育"],
-  [/(?:繳|付)不(?:出|起)(?:房租|租金)|(?:房租|租金)[^\s，,。；;、]{0,3}?(?:繳|付)不(?:出|起)|租不起|沒地方住|(?:房租|租金)太(?:貴|高)/u, "租金 住宅"],
-  [/學費|學雜費|註冊費|補習費|書籍費|念不起(?:書|大學)|讀不起(?:書|大學)|上不起學/u, "就學 教育 助學"],
-  [/缺錢|沒錢|沒有錢|快沒錢|手頭(?:很|有點)?緊|經濟(?:困難|壓力|拮据|吃緊)|生活(?:過不下去|困難|陷入困境|有困難)|撐不下去|快活不下去|入不敷出|家裡沒(?:收入|錢)|沒(?:有)?收入|付不出(?:醫藥費|錢)?|繳不出/u, "急難 生活扶助"],
-  [/獨居|沒人照顧|一個人住/u, "獨居"],
-  [/往生|過世|辦後事|喪事/u, "喪葬"],
-];
+function loadSituationVocabulary() {
+  const source = readFileSync(new URL("../../utils/ifareIntent.ts", import.meta.url), "utf8");
+  const marker = "const SITUATION_VOCABULARY: Array<[RegExp, string]> = [";
+  const start = source.indexOf(marker);
+  if (start < 0) {
+    throw new Error("ifareIntent.ts 找不到 SITUATION_VOCABULARY 宣告——常數名或型別標註改了，請同步更新 eval.mjs 的抽取標記");
+  }
+  const bodyStart = start + marker.length;
+  const end = source.indexOf("\n];", bodyStart);
+  if (end < 0) {
+    throw new Error("ifareIntent.ts 的 SITUATION_VOCABULARY 找不到結尾 `];`");
+  }
+  const table = new Function(`return [${source.slice(bodyStart, end)}];`)();
+  if (!Array.isArray(table) || table.length === 0 || !(table[0][0] instanceof RegExp)) {
+    throw new Error("抽出的 SITUATION_VOCABULARY 形狀不對（應為 [RegExp, string] 陣列）");
+  }
+  return table;
+}
+
+const SITUATION_VOCABULARY = loadSituationVocabulary();
 
 /**
  * 站內認得的福利概念詞（result.vue 的 policySearchConceptPattern 複本）。

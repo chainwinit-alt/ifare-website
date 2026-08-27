@@ -138,5 +138,89 @@
     "expectPolicyIds": [],
     "expectKeywords": ["老人"],
     "expectZero": false
+  },
+  {
+    "query": "我要照顧我爸爸",
+    "note": "純處境：照顧＋親屬的講法，句子裡沒有半個政策詞。實測直查 0 筆，站內「長期照顧」有 172 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["長期照顧", "長照", "照顧", "失能"],
+    "expectZero": false
+  },
+  {
+    "query": "我要照顧我爺爺",
+    "note": "純處境：同上一題但親屬是祖父輩，驗證稱謂清單涵蓋隔代。實測直查 0 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["長期照顧", "長照", "照顧", "失能"],
+    "expectZero": false
+  },
+  {
+    "query": "小孩沒人帶",
+    "note": "純處境：托育需求最常見的講法。實測直查 0 筆，站內托育 68 筆、托嬰 38 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["托育", "托嬰", "保母", "兒童"],
+    "expectZero": false
+  },
+  {
+    "query": "家裡突然出事需要幫忙",
+    "note": "純處境：急難救助的典型入口，「出事」「變故」在語料裡不存在。實測直查 0 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["急難", "救助", "扶助"],
+    "expectZero": false
+  },
+  {
+    "query": "我一個人帶小孩",
+    "note": "純處境：單親家長的自我描述，沒有人會自稱「特殊境遇」。實測直查 0 筆，特殊境遇 118 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["特殊境遇", "單親", "婦女", "扶助"],
+    "expectZero": false
+  },
+  {
+    "query": "心情很低落想找人談",
+    "note": "純處境：心理支持需求。「憂鬱」「失眠」直查都是 0 筆，站內寫的是「心理健康」（144 筆）。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["心理", "諮商", "精神"],
+    "expectZero": false
+  },
+  {
+    "query": "社宅",
+    "note": "簡稱跨越：社會住宅的通行簡稱，語料只寫全稱。實測「社宅」直查 0 筆、「社會住宅」145 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["社會住宅", "住宅", "租"],
+    "expectZero": false
+  },
+  {
+    "query": "罕病",
+    "note": "簡稱跨越：罕見疾病的通行簡稱，兩字在語料裡不相連。實測「罕病」直查 0 筆、「罕見疾病」62 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["罕見"],
+    "expectZero": false
+  },
+  {
+    "query": "學貸",
+    "note": "簡稱跨越：就學貸款的通行簡稱。實測「學貸」「就學貸款」直查都是 0 筆，語料寫「就學」「助學」。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["就學", "助學", "教育", "學"],
+    "expectZero": false
+  },
+  {
+    "query": "日照中心",
+    "note": "簡稱跨越：日間照顧的通行簡稱。實測「日照中心」直查 0 筆、「日間照顧」170 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["日間", "照顧"],
+    "expectZero": false
+  },
+  {
+    "query": "打官司請不起律師",
+    "note": "純處境：法律糾紛的口語。實測「打官司」「官司」直查 0 筆，站內法律扶助 86 筆、法律協助 50 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["法律"],
+    "expectZero": false
+  },
+  {
+    "query": "被老公打",
+    "note": "純處境：受暴者不會用政策分類名求助。「家暴」直查只有 14 筆，補上保護令與特殊境遇才涵蓋庇護那一片。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["保護", "特殊境遇", "家庭暴力", "婦女"],
+    "expectZero": false
   }
 ]
