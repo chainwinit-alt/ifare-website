@@ -39,7 +39,12 @@ iFare 基金會網站採用「前後台 API 分離」的架構，由兩組獨立
 | Base Path | `/api/services/app/` | `/api/services/app/` |
 | Token Header | 不需要 | `Authorization: Bearer <token>` |
 | 回應格式 | ABP 標準 JSON | ABP 標準 JSON + `errCode/errMsg` |
-| 部署 Port | 44311（Local）/ ifare_api（Prod） | 44321（Local）/ ifare_backend_api（Prod） |
+| 部署 Port | 44311（Local）/ 路徑 `/ifare_api`（Prod） | 44311（Local）/ 路徑 `/ifare_bdapi`（Prod） |
+
+> **2026-08-27 更正**：
+> 1. 後台 API 的 Local 埠原寫 44321，但程式碼中不存在該值。兩支 API 的 `Kestrel:Endpoints:Http:Url` **都是 `https://localhost:44311/`**，因此本機無法同時 `dotnet run` 兩支，需擇一或以 `Kestrel__Endpoints__Http__Url` 環境變數覆寫。
+> 2. 正式環境路徑是 `/ifare_bdapi`（非 `ifare_backend_api`），見後台 `src/plugins/AjaxRef.ts`。
+> 3. 正式環境為 ANCM **in-process** 託管，API 不會開獨立 TCP 埠；對外一律走 IIS 的 80/443，以路徑區分。44311 只在 `dotnet run` 與 IIS Express 生效。
 
 ---
 
@@ -196,9 +201,9 @@ JWT 關閉。`appsettings.json` 中 `Authentication.JwtBearer.IsEnabled = "false
 
 ### 3.1 基本資訊
 
-- **Local Base URL**：`https://localhost:44321/api/services/app`
-- **正式 Base URL**：`https://www.i-fare.org.tw/ifare_backend_api/api/services/app`
-- **設定檔**：`iFare_Backend_API/src/IFare_API.Web.Host/appsettings.json`
+- **Local Base URL**：`https://localhost:44311/api/services/app`（與前台 API 同埠，不可並行啟動）
+- **正式 Base URL**：`https://www.i-fare.org.tw/ifare_bdapi/api/services/app`
+- **設定檔**：`iFare_Backend_API/src/IFare_BDAPI.Web.Host/appsettings.json`
 - **DB 連線**：
   - `IFare`：主資料庫（共用）
   - `IFare_BDAPIDb`：後台 ABP 系統表 + AbpUsers

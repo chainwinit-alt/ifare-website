@@ -309,7 +309,8 @@ IfareOfficeUnit ──── IfareOfficeUnitDomicile ──── IfareOfficeUni
 
 - **正式環境**：每日 02:00 自動備份至 `D:\Backup\IFare_*.bak`
 - **手動備份**：SSMS → 右鍵資料庫 → Tasks → Back Up...
-- **還原步驟**：詳見 `iFare_維護SOP.md`
+- **還原步驟**：SSMS -> 右鍵資料庫 -> Tasks -> Restore -> Database，選擇 `.bak` 後於 Options 勾選覆寫。
+  （原本指向的 `iFare_維護SOP.md` 只有章節目錄、從未撰寫內文，已於 2026-08-27 刪除。）
 
 ### 6.3 資料遷移注意事項
 

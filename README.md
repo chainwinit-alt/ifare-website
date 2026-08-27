@@ -26,8 +26,8 @@
 |---|---|
 | **框架** | Nuxt 3（Vue 3 + SSR） |
 | **樣式** | SCSS（模組化，含 RWD） |
-| **HTTP** | Axios |
-| **部署** | IIS（iis_node） |
+| **HTTP** | Nuxt `$fetch`（`plugins/WebAPI.ts`，逾時 90 秒；前台未使用 Axios） |
+| **部署** | IIS URL Rewrite 反向代理至 `127.0.0.1:3000` 的 Node 行程（Nitro preset：`node-server`） |
 | **SEO** | nuxt-simple-sitemap + Google Analytics |
 
 **頁面路由：**
