@@ -166,10 +166,26 @@ function normalizeConditionText(value: unknown) {
  */
 const NEGATION_PATTERN = /(?:不是|不住|不在|沒(?:有|領)?|未領|未具|不具備|不具|不算|並非|非|無|不符合|不屬於)$/u;
 
+/**
+ * 看起來像否定、其實是在問「本站／這個縣市有沒有這類補助」的寫法。
+ *
+ * 兩種都以「沒有」結尾，卻跟「我沒有低收入戶資格」意思完全相反，照舊判成否定的話
+ * 條件抽不出來、資格問題被答反——這正是 isNegated 當初要避免的那個錯，只是方向相反。
+ *
+ * 一、「有沒有」：「台北市有沒有低收入戶補助」「請問有沒有低收入戶的補助」。
+ *    視窗取 4 個字、「有沒有」只有 3 個字，緊貼條件詞時一定完整落在視窗裡，
+ *    不會被截成看起來像自陳否定的「沒有」。
+ * 二、「縣／市＋沒(有)」：「新北市沒有身心障礙補助嗎」——主語是縣市不是人，
+ *    問的是這個縣市有沒有這項補助。限定縣市字尾緊貼「沒」才放行，中間隔了標點或
+ *    別的字（「我在新北市，沒有低收入戶資格」）仍然算使用者自陳否定。
+ */
+const NEGATION_EXCEPTION_PATTERN = /有沒有$|[縣市]沒有?$/u;
+
 function isNegated(text: string, term: string) {
   const index = text.indexOf(term);
   if (index < 0) return false;
   const before = text.slice(Math.max(0, index - 4), index);
+  if (NEGATION_EXCEPTION_PATTERN.test(before)) return false;
   return NEGATION_PATTERN.test(before);
 }
 
@@ -398,6 +414,16 @@ const SITUATION_VOCABULARY: Array<[RegExp, string]> = [
   [/志工/u, "志願服務"],
 ];
 
+// 「小孩沒人照顧」會同時打中托育（小孩＋沒人照顧）與獨居（沒人照顧）兩條規則，
+// 但沒人照顧的是孩子、不是獨居長輩。互斥後處理放在展開這一層，不動 pattern 本身：
+// pattern 若改成「前一個字不是小孩」就會誤殺「妻子沒人照顧」「兒子需要人照顧」，
+// 那些是真的長照情境，漏掉比多給嚴重。
+const CHILD_NO_CARER_PATTERN =
+  /(?:小孩|孩子|寶寶|嬰兒|幼兒|小朋友|幼童|孩童)[^\s，,。；;、]{0,3}沒(?:人|地方)(?:帶|顧|照顧|托)|沒(?:人|地方)(?:帶|顧|照顧|托)(?:小孩|孩子|寶寶|嬰兒|幼兒|小朋友|幼童|孩童)/u;
+
+// 使用者自己明講的獨居。有這句就代表獨居是另一件真的事，兩組都要留。
+const LIVES_ALONE_PATTERN = /獨居|一個人住/u;
+
 /**
  * 把處境描述補上站內政策會用的詞，原文保留。
  *
@@ -420,7 +446,18 @@ export function expandSituationVocabulary(value: unknown, sourceText?: unknown) 
     }
   }
 
-  return additions.length ? `${text} ${additions.join(" ")}` : text;
+  // 講的是「小孩沒人照顧」而且沒明講自己獨居時，把獨居拿掉——托育那一組才是要的。
+  // 一定要先確認托育真的展開出來了才拿：兩張表的孩童詞列得不完全一樣，
+  // 少了這道確認就可能兩組都沒有，反而變成什麼都查不到。
+  const dropsLivesAlone =
+    (text.includes("托育") || additions.includes("托育")) &&
+    CHILD_NO_CARER_PATTERN.test(source) &&
+    !LIVES_ALONE_PATTERN.test(source);
+  const finalAdditions = dropsLivesAlone
+    ? additions.filter((term) => term !== "獨居")
+    : additions;
+
+  return finalAdditions.length ? `${text} ${finalAdditions.join(" ")}` : text;
 }
 
 /**
