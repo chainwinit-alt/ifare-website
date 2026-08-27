@@ -55,6 +55,23 @@ namespace IFare_BDAPI.Context
             }
         }
 
+        // ⚠️【已知問題，尚未修復｜2026-08-27 實測確認】
+        // 本方法內有 49 處 .HasMaxLength(-1)。-1 是 scaffold 從 sys.columns 讀 nvarchar(max)
+        // 得到的長度值，EF Core 6 不接受，會在這裡直接拋 ArgumentOutOfRangeException。
+        // OnModelCreating 一失敗整個 IFareContext 就不能用，而 SysUser 就在這個 context，
+        // 因此「後台 API 的任何請求都會回 500」，包含登入。
+        //
+        // 影響範圍：只有後台。前台 IFare_API 的同名檔案寫的是 HasMaxLength(10)，一切正常。
+        // 引入時間：4ba84ff（v1.0.2，2026-04）。正式站跑的是更早的 DLL，所以現在還沒出事，
+        // 但這也代表版控裡的後台原始碼與實際部署的二進位已經對不上。
+        //
+        // 修法：把那 49 處 .HasMaxLength(-1) 整段拿掉即可——EF 對沒有指定上限的字串
+        // 預設就是 nvarchar(max)，與資料庫現況一致。
+        //
+        // 未修的原因：不在本次（v.1.7.26）指派範圍，交由後續維護者處理。
+        // ⚠️ 後台部署順序必須是：先修這裡 → 跑得起來 → 先測登入 → 才上正式站。
+        //    v.1.7.26 改了密碼儲存方式（見 Common/PasswordHashManager.cs），
+        //    那批改動因為本問題從未實際執行過，只通過編譯。
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<ArticleLazy>(entity =>

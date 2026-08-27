@@ -13,6 +13,19 @@ namespace IFare_BDAPI.Common
     ///   2. 是雜湊 → 走雜湊驗證。
     ///   3. 不是雜湊 → 視為舊明文，改以字串比對；通過後回報 needRehash，由呼叫端即時改存雜湊。
     /// 這樣舊帳號第一次登入就會自動升級，不需要另外做資料轉檔。
+    ///
+    /// ⚠️【尚未實機驗證｜2026-08-27】
+    /// 這段相容層只通過編譯與單元層級測試，**從未對執行中的後台實際登入過一次**。
+    /// 原因是 Context/IFareContext.cs 有既有的 HasMaxLength(-1) 問題（見該檔註解），
+    /// 後台 API 目前起得來但任何請求都回 500，無從驗證。
+    ///
+    /// 上線前務必按這個順序做，否則風險是「全部後台帳號都登不進去」：
+    ///   1. 先修掉 IFareContext 的 HasMaxLength(-1)
+    ///   2. 用既有的明文帳號登入一次 → 應該成功
+    ///   3. 查 DB 確認該筆 Password 已變成 84 字元的雜湊
+    ///   4. 用同一組密碼再登入一次 → 應該成功（這次走雜湊驗證路徑）
+    ///   5. 用錯誤密碼登入 → 應該失敗
+    /// 已確認：SysUser.Password 是 nvarchar(max)，84 字元的雜湊放得下，不必改欄位。
     /// </summary>
     public class PasswordHashManager : IPasswordHashManager
     {
