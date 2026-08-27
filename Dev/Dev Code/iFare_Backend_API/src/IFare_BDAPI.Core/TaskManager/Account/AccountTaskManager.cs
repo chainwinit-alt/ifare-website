@@ -14,10 +14,12 @@ namespace IFare_BDAPI.TaskManager.Account
     {
         private readonly IRepository<SysUser> _repositorySysUser;
         private readonly ICommonToolsManager _commonTools;
-        public AccountTaskManager(IRepository<SysUser> repositorySysUser, ICommonToolsManager commonTools)
+        private readonly IPasswordHashManager _passwordHash;
+        public AccountTaskManager(IRepository<SysUser> repositorySysUser, ICommonToolsManager commonTools, IPasswordHashManager passwordHash)
         {
             _repositorySysUser = repositorySysUser;
             _commonTools = commonTools;
+            _passwordHash = passwordHash;
         }
 
         public AccountResult GetAccountList(AccountFilterParam param, long searchUserID)
@@ -26,8 +28,6 @@ namespace IFare_BDAPI.TaskManager.Account
             var list = new List<AccountData>();
 
             if (!paramChecker.IsCheckPass()) return new AccountResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_ParamFail), null);
-
-            var searchUser = _repositorySysUser.GetAll().Where(p => p.Id == searchUserID).FirstOrDefault();
 
             var query = _repositorySysUser.GetAll();
 
@@ -44,7 +44,7 @@ namespace IFare_BDAPI.TaskManager.Account
                             Email = p.Email,
                             Permission = p.Permissions,
                             State = p.State,
-                            Pwd = searchUser.Permissions == UserPermission.Admin ? p.Password : "",
+                            Pwd = "",   // 密碼改為雜湊儲存，一律不對外回傳（含管理者）
                             CreateDate = p.CreateTime,
                             CreateUserID = p.CreateUserId,
                             CreateUserName = p.CreateUser.UserName,
@@ -78,7 +78,7 @@ namespace IFare_BDAPI.TaskManager.Account
                     Email = insertData.Email,
                     Permissions = insertData.Permission,
                     State = insertData.State,
-                    Password = insertData.Pwd,
+                    Password = _passwordHash.HashPassword(insertData.Pwd),
                     CreateUserId = insertData.CreateUserID
                 });
 

@@ -11,10 +11,12 @@ namespace IFare_BDAPI.TaskManager.Personal
     {
         private readonly IRepository<SysUser> _repositorySysUser;
         private readonly ICommonToolsManager _commonTools;
-        public PersonalTaskManager(IRepository<SysUser> repositorySysUser, ICommonToolsManager commonTools)
+        private readonly IPasswordHashManager _passwordHash;
+        public PersonalTaskManager(IRepository<SysUser> repositorySysUser, ICommonToolsManager commonTools, IPasswordHashManager passwordHash)
         {
             _repositorySysUser = repositorySysUser;
             _commonTools = commonTools;
+            _passwordHash = passwordHash;
         }
 
         public PersonalResult GetPersonalInfo(long userID)
@@ -73,9 +75,14 @@ namespace IFare_BDAPI.TaskManager.Personal
                                         .Where(p => p.Id == req.UserID)
                                         .FirstOrDefault();
             if (self == null) return _commonTools.GetErrorInfo_API(ErrAPI.Code_Fail_Update);
-            if (req.Password_Old != self.Password) return _commonTools.GetErrorInfo_APIWithMsg(ErrAPI.Code_Fail_Update, "目前密碼不符");
+            // 舊資料可能仍是明文，交由相容層判斷該用雜湊還是明文比對
+            if (!_passwordHash.VerifyPassword(self.Password, req.Password_Old, out _))
+            {
+                return _commonTools.GetErrorInfo_APIWithMsg(ErrAPI.Code_Fail_Update, "目前密碼不符");
+            }
 
-            self.Password = req.Password_New;
+            // 新密碼一律存雜湊
+            self.Password = _passwordHash.HashPassword(req.Password_New);
             self.UpdateUserId = req.UpdateUserID;
 
             _repositorySysUser.Update(self);
