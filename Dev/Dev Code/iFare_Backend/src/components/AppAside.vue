@@ -97,7 +97,9 @@ if (userStore.permission == "編輯者") {
                 .map((p:any) => {
                   if (p.permission == "All" || p.permission == "Editor") {
                     if (p.subList != null) {
-                      p.subList = p.subList.filter((p2:any) => { return p.permission == "All" || p2.permission == "Editor" })
+                      // 2026-09-01：原本誤寫成父層的 p.permission，子項權限沒被真正檢查。
+                      // 現行選單資料下無可見差異，屬防範性修正（子項該看 p2）。
+                      p.subList = p.subList.filter((p2:any) => { return p2.permission == "All" || p2.permission == "Editor" })
                     }
                     return p
                   }

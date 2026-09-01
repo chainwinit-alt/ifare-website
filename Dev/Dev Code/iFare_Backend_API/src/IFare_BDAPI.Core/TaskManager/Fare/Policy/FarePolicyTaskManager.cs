@@ -72,15 +72,18 @@ namespace IFare_BDAPI.TaskManager.Fare.Policy
                 query = query.Join(queryKeywordsID, q => q.Id, qkID => qkID, (q, qkID) => q);
             }
             if (param.IsIDsFiltered) query = query.Where(p => param.IDs.Contains(p.Id));
-            if (param.IsReleaseStateFiltered && param.State_Release != DataState.All) 
+            if (param.IsReleaseStateFiltered && param.State_Release != DataState.All)
             {
+                // 2026-09-01 拍板：上下架判定以前台為準——下架時間留空＝永久上架。
+                // 舊判定要求 DiscontinuedTime 必須有值才算上架，導致「只填上架日」的政策
+                // 在後台顯示下架、前台民眾卻查得到。兩個分支互為補集。
                 if (param.State_Release == DataState.Release)
                 {
-                    query = query.Where(p => p.ReleaseTime != null && p.DiscontinuedTime != null && p.ReleaseTime <= DateTime.Now && p.DiscontinuedTime > DateTime.Now);
+                    query = query.Where(p => p.ReleaseTime != null && p.ReleaseTime <= DateTime.Now && (p.DiscontinuedTime == null || p.DiscontinuedTime > DateTime.Now));
                 }
                 if (param.State_Release == DataState.Discontinued)
                 {
-                    query = query.Where(p => p.ReleaseTime == null || p.DiscontinuedTime == null || p.ReleaseTime > DateTime.Now || p.DiscontinuedTime < DateTime.Now);
+                    query = query.Where(p => p.ReleaseTime == null || p.ReleaseTime > DateTime.Now || (p.DiscontinuedTime != null && p.DiscontinuedTime <= DateTime.Now));
                 }
             }
             
@@ -138,10 +141,10 @@ namespace IFare_BDAPI.TaskManager.Fare.Policy
                             UpdateDate = p.UpdateTime,
                             UpdateUserID = p.UpdateUserId,
                             UpdateUserName = p.UpdateUser.UserName,
-                            State_Release = p.ReleaseTime.HasValue && 
-                                            p.DiscontinuedTime.HasValue && 
-                                            p.ReleaseTime.Value <= DateTime.Now && 
-                                            p.DiscontinuedTime.Value > DateTime.Now ?
+                            // 與前台查詢口徑一致：下架時間留空＝永久上架（2026-09-01 拍板）
+                            State_Release = p.ReleaseTime.HasValue &&
+                                            p.ReleaseTime.Value <= DateTime.Now &&
+                                            (!p.DiscontinuedTime.HasValue || p.DiscontinuedTime.Value > DateTime.Now) ?
                                             DataState.Release : DataState.Discontinued
                         })
                         .OrderByDescending(p => p.CreateDate)
