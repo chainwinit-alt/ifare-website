@@ -35,7 +35,8 @@ namespace IFare_BDAPI.Common
         // PasswordHasher 的 user 參數在預設實作中用不到，但仍給一個非 null 物件以免將來版本改為必填。
         private static readonly object _hashUserPlaceholder = new object();
 
-        // Identity 雜湊還原後的位元組長度：v2 為 49、v3 為 84，取下限作為判斷門檻。
+        // Identity 雜湊還原後的位元組長度：v2 為 49、v3 為 61（Base64 字串長度分別為 68／84 字元），
+        // 取 49 作為判斷門檻。文件與上方檢查清單寫的「84 字元」指的是 v3 的 Base64 字串長度。
         private const int _minHashedByteLength = 49;
 
         public string HashPassword(string password)

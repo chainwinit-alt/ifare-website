@@ -4,15 +4,16 @@
 
 ---
 
-## 分支結構
+## 分支結構（2026-09-01 依現況更正）
 
 ```
-main        ← 正式穩定版（僅從 develop 合併，不直接 push）
-develop     ← 整合開發分支（日常開發基準）
-feature/*   ← 各功能開發（從 develop 切出）
-fix/*       ← Bug 修正（從 develop 切出）
-hotfix/*    ← 緊急線上修正（從 main 切出）
+master      ← 預設分支（正式基準，不直接 push）
+feat/*      ← 各功能開發（從 master 切出）
+fix/*       ← Bug 修正（從 master 切出）
+hotfix/*    ← 緊急線上修正（從 master 切出）
 ```
+
+> 早期規劃的 main／develop 雙層流程從未建立（repo 沒有 develop 分支），本文件已改為實際做法。
 
 ---
 
@@ -21,12 +22,12 @@ hotfix/*    ← 緊急線上修正（從 main 切出）
 ### 1. 開始新功能
 
 ```bash
-# 先確保本地 develop 是最新的
-git checkout develop
-git pull origin develop
+# 先確保本地 master 是最新的
+git checkout master
+git pull origin master
 
 # 建立新的功能分支
-git checkout -b feature/你的功能名稱
+git checkout -b feat/你的功能名稱
 ```
 
 ### 2. 開發中，定期提交
@@ -48,14 +49,14 @@ git push origin feature/你的功能名稱
 ### 3. 完成功能，發 Pull Request
 
 1. 前往 GitHub，點選「Compare & pull request」
-2. Base 設為 `develop`，Compare 設為你的 feature 分支
+2. Base 設為 `master`，Compare 設為你的功能分支
 3. 填寫 PR 說明（依照範本）
 4. 請其他成員 Code Review
-5. 通過後合併，刪除已合併的 feature 分支
+5. 通過後合併，刪除已合併的功能分支
 
 ### 4. 上線流程
 
-由負責人從 `develop` → `main` 發 PR，測試確認無誤後合併。
+合入 `master` 後，由負責人依 `docs/iFare_系統文件.docx` 第 5 章的部署步驟上線。
 
 ---
 
@@ -87,18 +88,18 @@ docs: 更新 README 環境設定說明
 當 Pull Request 發生衝突時：
 
 ```bash
-# 先更新 develop
-git checkout develop
-git pull origin develop
+# 先更新 master
+git checkout master
+git pull origin master
 
-# 切回你的分支，並合併 develop
-git checkout feature/你的功能名稱
-git merge develop
+# 切回你的分支，並合併 master
+git checkout feat/你的功能名稱
+git merge master
 
 # 手動解決衝突後
 git add .
-git commit -m "chore: 解決與 develop 的合併衝突"
-git push origin feature/你的功能名稱
+git commit -m "chore: 解決與 master 的合併衝突"
+git push origin feat/你的功能名稱
 ```
 
 ---
@@ -110,7 +111,7 @@ git push origin feature/你的功能名稱
 git branch -a
 
 # 切換分支
-git checkout develop
+git checkout master
 
 # 查看最近 commit 歷程
 git log --oneline -10
