@@ -24,7 +24,7 @@
       </section>
       <section class="section section-info">
         <div class="article-info">
-          <button class="btn-icon btn-ic-share" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
+          <button class="btn-icon btn-ic-share" aria-label="分享到 LINE" @click="ShareWebUrlToLine"><i class="ic-share"></i></button>
           <div ref="newsContentRef" class="raw-html"></div>
         </div>
         <!-- 2026-05-25 UIUX #21 — 讀完文章主動推廣 LINE 訂閱 -->
@@ -64,6 +64,8 @@ content: "",
 title: '',
 releaseTime: ''
 });
+
+useContentSocialTitle(() => newsItem.title);
 
 const isLoading = ref(true)
 const hasError = ref(false)

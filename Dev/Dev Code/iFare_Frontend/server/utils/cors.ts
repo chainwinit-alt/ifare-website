@@ -69,19 +69,23 @@ export function applyCors(event: H3Event): void {
   setHeader(event, 'Access-Control-Max-Age', '600');
 }
 
+/**
+ * requireDynamicApiToken — 授權檢查改為 fail-closed。
+ *
+ * 為何改成 fail-closed：舊版在「未設定 token 且 NODE_ENV !== 'production'」時直接 return 放行，
+ * 而這台機器的 NODE_ENV 不是 production，等於寫入端點完全沒有授權保護。
+ * 現在不再依賴 NODE_ENV 判斷：只要沒有設定 dynamicApiToken 就一律拒絕（503），
+ * 也就是「沒設 token = 全部擋掉」，避免因環境變數不同而意外放行寫入端點。
+ */
 export function requireDynamicApiToken(event: H3Event): void {
   const config = useRuntimeConfig(event);
   const expectedToken = String(config.dynamicApiToken || '').trim();
 
   if (!expectedToken) {
-    if (process.env.NODE_ENV === 'production') {
-      throw createError({
-        statusCode: 503,
-        statusMessage: 'Dynamic API token is not configured',
-      });
-    }
-
-    return;
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Dynamic API token is not configured',
+    });
   }
 
   const syncToken = String(getHeader(event, 'x-ifare-sync-token') || '').trim();

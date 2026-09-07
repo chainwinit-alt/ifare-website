@@ -74,7 +74,8 @@ namespace IFare_API
             IocManager.Register<TokenAuthConfiguration>();
             var tokenAuthConfig = IocManager.Resolve<TokenAuthConfiguration>();
 
-            tokenAuthConfig.SecurityKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_appConfiguration["Authentication:JwtBearer:SecurityKey"]));
+            // 金鑰改由 JwtSecurityKeyProvider 取得：環境變數 IFARE_API_JWT_KEY 優先，沒設才用設定檔現值。
+            tokenAuthConfig.SecurityKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(JwtSecurityKeyProvider.Resolve(_appConfiguration)));
             tokenAuthConfig.Issuer = _appConfiguration["Authentication:JwtBearer:Issuer"];
             tokenAuthConfig.Audience = _appConfiguration["Authentication:JwtBearer:Audience"];
             tokenAuthConfig.SigningCredentials = new SigningCredentials(tokenAuthConfig.SecurityKey, SecurityAlgorithms.HmacSha256);

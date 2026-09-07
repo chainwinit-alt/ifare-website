@@ -11,6 +11,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "check": "node scripts/check-syntax.mjs",
     "build_iis_node": "nuxt build --preset=iis_node"
   },
   "devDependencies": {
@@ -22,7 +23,6 @@
   },
   "dependencies": {
     "@google/genai": "1.0.0",
-    "axios": "^1.6.2",
     "isomorphic-dompurify": "2.25.0",
     "normalize.css": "^8.0.1",
     "nuxt-gtag": "^1.1.1",

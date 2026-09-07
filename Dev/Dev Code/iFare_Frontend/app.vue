@@ -23,27 +23,35 @@
 // 2026-05-25 UIUX #84 — 全站 schema.org 結構化資料(Organization)
 // Google 搜尋結果可顯示組織資訊、官方網站、social profile
 const config = useRuntimeConfig();
-const siteUrl = String(config.public.siteUrl || 'http://10.200.0.39').replace(/\/+$/, '');
+// #32 siteUrl 現在只吃 NUXT_PUBLIC_SITE_URL／NUXT_SITE_URL，沒設就是空字串。
+// 空值時不輸出 url／logo：結構化資料寧可少兩個欄位，也不要餵給搜尋引擎空字串或相對路徑。
+const siteUrl = String(config.public.siteUrl || '').replace(/\/+$/, '');
+useSiteSocialMeta(siteUrl);
+
+const organizationSchema: Record<string, unknown> = {
+  '@context': 'https://schema.org',
+  '@type': 'NGO',
+  name: '長穩社福慈善基金會',
+  alternateName: '長穩基金會',
+  description:
+    '長穩社福慈善基金會以推動環境保育、人才培育、社會關懷三大核心行動為使命,透過 i-fare 福利好幫手整合社會福利資訊。',
+  foundingDate: '2017-07-19',
+  founder: {
+    '@type': 'Person',
+    name: '陳進財',
+  },
+};
+
+if (siteUrl) {
+  organizationSchema.url = siteUrl;
+  organizationSchema.logo = `${siteUrl}/favicon.ico`;
+}
 
 useHead({
   script: [
     {
       type: 'application/ld+json',
-      innerHTML: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'NGO',
-        name: '長穩社福慈善基金會',
-        alternateName: '長穩基金會',
-        url: siteUrl,
-        logo: `${siteUrl}/favicon.ico`,
-        description:
-          '長穩社福慈善基金會以推動環境保育、人才培育、社會關懷三大核心行動為使命,透過 i-fare 福利好幫手整合社會福利資訊。',
-        foundingDate: '2017-07-19',
-        founder: {
-          '@type': 'Person',
-          name: '陳進財',
-        },
-      }),
+      innerHTML: JSON.stringify(organizationSchema),
     },
   ],
 });

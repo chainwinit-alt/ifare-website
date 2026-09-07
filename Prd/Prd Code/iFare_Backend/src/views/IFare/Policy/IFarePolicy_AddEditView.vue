@@ -38,13 +38,32 @@
             </el-select>
           </div>
           <div class="item-group">
-            <label class="item-title required">地區</label>
-            <el-select v-model="codeDomicileID" class="p-select" size="large">
-              <el-option 
+            <label class="item-title required">地區<span v-if="isAddMode">（可複選）</span></label>
+            <el-select
+              v-if="isAddMode"
+              v-model="codeDomicileIDs"
+              class="p-select"
+              size="large"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              filterable
+              clearable
+            >
+              <el-option
                 v-for="item in codeDomicileList"
                 :key="item.value"
                 :label="item.label"
-                :value="item.value"/>
+                :value="item.value"
+              />
+            </el-select>
+            <el-select v-else v-model="codeDomicileID" class="p-select" size="large" filterable>
+              <el-option
+                v-for="item in codeDomicileList"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
             </el-select>
           </div>
         </div>
@@ -286,6 +305,7 @@ const userStore = useUserStore();
 const $Message = app?.appContext.config.globalProperties.$message;
 
 const routeNameType = _$route?.name?.toString().toLocaleLowerCase() || "";
+const isAddMode = routeNameType.indexOf("add") >= 0;
 const ids = _$route?.query.id ? [parseInt(_$route?.query.id.toString())] : null
 const createdate = ref("")
 
@@ -317,6 +337,7 @@ const fareOfficeUnitList = reactive<Array<SelectOption>>([])
 // el-select v-model
 const codePolicyID = ref()
 const codeDomicileID = ref()
+const codeDomicileIDs = ref<number[]>([])
 const codeRecipientIDs = ref()
 const codeIncomeIDs = ref()
 const codeIdentityIDs = ref()
@@ -692,6 +713,9 @@ function SaveAction() {
 
   const _codePolicyID = codePolicyID.value
   const _codeDomicileID = codeDomicileID.value
+  const _codeDomicileIDs = isAddMode
+    ? [...new Set((codeDomicileIDs.value || []).map((value) => Number(value)).filter(Boolean))]
+    : (_codeDomicileID ? [Number(_codeDomicileID)] : [])
   const _codeRecipientIDs = codeRecipientIDs.value
   const _codeIncomeIDs = codeIncomeIDs.value
   const _codeIdentityIDs = codeIdentityIDs.value
@@ -711,7 +735,7 @@ function SaveAction() {
   if (!_codePolicyID) {
     return $Message({ message: `【政策類別】不可為空`, type: "warning" })
   }
-  if (!_codeDomicileID) {
+  if (_codeDomicileIDs.length <= 0) {
     return $Message({ message: `【地區】不可為空`, type: "warning" })
   }
   if (_codeRecipientIDs.length <= 0) {
@@ -743,26 +767,53 @@ function SaveAction() {
   }
 
   if (routeNameType.indexOf("add") >= 0) {
-    console.log("[Add] Save action");
-    $WebAPI.InsertFarePolicy(userStore.token, _title, _qualification, _welfareInfo, _evidence, _ifareOfficeUnitID, _officeInfo, _officeTel,
-      _codePolicyID, _codeDomicileID, _codeIdentityIDs, _codeIncomeIDs, _codeRecipientIDs, _codeKeywordIDs, _competentAuthority,
-      _releaseTime, _discontinued, _remark, _state,(res: any) => {
-        let _resData = res.data || "error";
-        if (_resData == "error") {
-          $Message({ message: `API res ${_resData}`, type: "error" })
-          return console.error(`API res ${_resData}`);
+    const insertOne = (domicileID: number) => new Promise<void>((resolve, reject) => {
+      $WebAPI.InsertFarePolicy(userStore.token, _title, _qualification, _welfareInfo, _evidence, _ifareOfficeUnitID, _officeInfo, _officeTel,
+        _codePolicyID, domicileID, _codeIdentityIDs, _codeIncomeIDs, _codeRecipientIDs, _codeKeywordIDs, _competentAuthority,
+        _releaseTime, _discontinued, _remark, _state, (res: any) => {
+          const responseData = res.data || "error";
+          if (responseData == "error") {
+            reject(new Error("API 無回應"));
+            return;
+          }
+
+          const result = responseData.result;
+          if (result.errCode != 0) {
+            reject(new Error(result.errMsg || "新增失敗"));
+            return;
+          }
+
+          resolve();
+        }
+      );
+    });
+
+    void (async () => {
+      let createdCount = 0;
+      try {
+        for (const domicileID of _codeDomicileIDs) {
+          await insertOne(domicileID);
+          createdCount += 1;
         }
 
-        let _res = _resData.result;
-        if (_res.errCode != 0) {
-          $Message({ message: _res.errMsg, type: "error" })
-          return console.error(_res.errMsg);
-        }
-
-        $Message({ message: '新增成功', type: "success" })
-        $commonLib.GuideToPage('IFare_Policy_DataList')
+        $Message({
+          message: _codeDomicileIDs.length > 1
+            ? `新增成功，已建立 ${_codeDomicileIDs.length} 筆地區政策`
+            : '新增成功',
+          type: "success",
+        });
+        $commonLib.GuideToPage('IFare_Policy_DataList');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '新增失敗';
+        $Message({
+          message: createdCount > 0
+            ? `已建立 ${createdCount} 筆，後續地區新增失敗：${message}`
+            : message,
+          type: "error",
+        });
+        console.error(error);
       }
-    );
+    })();
   }
 
   if (routeNameType.indexOf("edit") >= 0) {

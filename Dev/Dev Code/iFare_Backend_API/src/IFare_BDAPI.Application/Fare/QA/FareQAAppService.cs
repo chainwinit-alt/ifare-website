@@ -33,6 +33,7 @@ namespace IFare_BDAPI.Fare.QA
             return ObjectMapper.Map<FareQAResultDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> InsertFareQA(FareQAInsertDataDto insertData)
         {
@@ -43,6 +44,7 @@ namespace IFare_BDAPI.Fare.QA
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> UpdateFareQA(FareQAEditorDataDto editorData)
         {
@@ -53,6 +55,7 @@ namespace IFare_BDAPI.Fare.QA
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> DeleteFareQA(FareQADeleteDataDto deleteData)
         {

@@ -45,7 +45,7 @@
           </div>
         </div>
         <h2 class="raw-html">{{ title }}</h2>
-        <div class="raw-html" v-html="detail">
+        <div class="raw-html" v-html="sanitizeHtml(detail)">
         </div>
       </div>
     </div>
@@ -80,6 +80,8 @@ import { EditPen, ArrowLeft } from "@element-plus/icons-vue";
 import MainHeader from "@/components/MainHeader.vue";
 import type { TagObj } from "@/interface/Component";
 import { useUserStore } from "@/stores/user";
+// 富文本淨化，避免 v-html 造成 XSS
+import { sanitizeHtml } from "@/utils/sanitize";
 
 const app = getCurrentInstance();
 const _global = app?.appContext.config.globalProperties

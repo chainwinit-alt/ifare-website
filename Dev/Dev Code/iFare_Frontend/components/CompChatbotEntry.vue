@@ -3,8 +3,11 @@
     class="chatbot-entry"
     :class="{ 'is-open': isOpen && !isMascotOnly, 'is-mascot-only': isMascotOnly }"
   >
-    <!-- 吉祥物本體保留；手機版目前只透過下方 media query 暫時隱藏。 -->
-    <div class="chatbot-entry-mascot">
+    <!--
+      手機版直接不掛載，不是只用 CSS 藏起來——理由見下方 shouldRenderMascot。
+      下方的 media query 保留著，JS 沒跑起來時仍然擋得住。
+    -->
+    <div v-if="shouldRenderMascot" class="chatbot-entry-mascot">
       <CompChatbotMascot :is-open="isOpen && !isMascotOnly" />
     </div>
     <!-- 小幫手入口不顯示 hover 文字提示，僅保留 aria-label。 -->
@@ -83,6 +86,39 @@ const tooltipText = '芒寶-網頁導覽員';
 const showTooltip = ref(false);
 const isOpen = defineModel<boolean>('open', { default: false });
 const isMascotOnly = computed(() => props.mascotOnly);
+
+/**
+ * 手機版要不要把吉祥物掛進 DOM。
+ *
+ * 原本只靠下方 media query 的 display:none，但 <img src> 只要進了 DOM 就會下載，
+ * CSS 擋不住。實測 390x844：13 張圖全部抓完共 2,542 KB，然後整組藏起來——
+ * 使用者一眼都看不到，卻付了手機首頁 43% 的流量。而且這個元件掛在
+ * layouts/default.vue，每一頁都中。
+ *
+ * 斷點與下方 media query 的 768px 對齊。伺服器算繪與 hydration 之前一律不掛載：
+ * 桌機會在 hydration 後補上，吉祥物是右下角的裝飾，晚一瞬間出現沒有影響；
+ * 反過來讓手機先抓 2.5 MB 才有影響。
+ */
+const MASCOT_MIN_WIDTH_PX = 769;
+const isWideViewport = ref(false);
+let mascotMediaQuery: MediaQueryList | null = null;
+
+function syncMascotViewport(event: MediaQueryList | MediaQueryListEvent) {
+  isWideViewport.value = event.matches;
+}
+
+const shouldRenderMascot = computed(() => isWideViewport.value);
+
+onMounted(() => {
+  mascotMediaQuery = window.matchMedia(`(min-width: ${MASCOT_MIN_WIDTH_PX}px)`);
+  syncMascotViewport(mascotMediaQuery);
+  mascotMediaQuery.addEventListener('change', syncMascotViewport);
+});
+
+onBeforeUnmount(() => {
+  mascotMediaQuery?.removeEventListener('change', syncMascotViewport);
+  mascotMediaQuery = null;
+});
 
 const emit = defineEmits<{
   (e: 'open'): void;

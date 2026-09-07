@@ -80,6 +80,10 @@ namespace IFare_API.Web.Host.Startup
             services.AddSignalR();
 
             // Configure CORS for angular2 UI
+            // 待人工確認：目前只有來源清單（App:CorsOrigins）受限，Header／Method 全開且允許帶
+            // 認證資訊。收斂 Method（例如只留 GET/POST/OPTIONS）或拿掉 AllowCredentials 需要先
+            // 盤點前台實際用到的動詞與是否依賴 cookie／antiforgery，改錯會直接讓前台整站叫不動，
+            // 因此這裡先不動；正式環境請確認 App:CorsOrigins 只保留必要來源（勿留 localhost）。
             services.AddCors(
                 options => options.AddPolicy(
                     _defaultCorsPolicyName,

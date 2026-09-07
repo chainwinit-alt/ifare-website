@@ -33,6 +33,7 @@ namespace IFare_BDAPI.Fare.Policy
             return ObjectMapper.Map<FarePolicyResultDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         [UnitOfWork(isTransactional: false)]
         public async Task<ErrorInfoBaseDto> InsertFarePolicy(FarePolicyInsertDataDto insertData)
@@ -44,6 +45,7 @@ namespace IFare_BDAPI.Fare.Policy
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         [UnitOfWork(isTransactional: false)]
         public async Task<ErrorInfoBaseDto> UpdateFarePolicy(FarePolicyEditorDataDto editorData)
@@ -55,6 +57,7 @@ namespace IFare_BDAPI.Fare.Policy
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> DeleteFarePolicy(FarePolicyDeleteDataDto deleteData)
         {

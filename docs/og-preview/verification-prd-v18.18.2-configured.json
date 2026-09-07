@@ -1,0 +1,61 @@
+{
+  "variant": "Prd",
+  "nodeVersion": "v18.18.2",
+  "nodePath": "D:\\Users\\jason.hsieh\\AppData\\Local\\Temp\\ifare-og-node-v18.18.2\\node.exe",
+  "originMode": "configured",
+  "isolatedOutput": "D:\\Users\\jason.hsieh\\AppData\\Local\\Temp\\ifare-og-prd-J0TYWV\\.output",
+  "api": "Local fixture; no production API or database accessed",
+  "apiRequestCount": 34,
+  "imageSha256": "2947415efc1bb5747ffbbdb4b4c1ce29da9866604b426d2b576ef3bd7f07a12b",
+  "tests": [
+    {
+      "route": "/",
+      "device": "crawler",
+      "status": 200,
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/",
+      "device": "mobile",
+      "status": 200,
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/about",
+      "device": "crawler",
+      "status": 200,
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/about",
+      "device": "mobile",
+      "status": 200,
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare",
+      "device": "crawler",
+      "status": 200,
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare",
+      "device": "mobile",
+      "status": 200,
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/info?id=5170",
+      "device": "crawler",
+      "status": 200,
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/info?id=5170",
+      "device": "mobile",
+      "status": 200,
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    }
+  ],
+  "status": "PASS"
+}

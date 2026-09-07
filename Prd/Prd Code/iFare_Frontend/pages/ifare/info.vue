@@ -176,6 +176,8 @@ const _welfareItem = reactive<infoItem>({
   codeRecipientIDs: [],
 });
 
+useContentSocialTitle(() => _welfareItem.title);
+
 // Office Unit
 interface OfficeUnitItem {
   id: number;

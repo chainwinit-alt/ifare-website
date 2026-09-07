@@ -1,0 +1,226 @@
+[
+  {
+    "query": "老任津貼",
+    "note": "錯字：老人打成老任。使用者實際會這樣打。expectKeywords 對照的是「老人津貼」該撈到的政策。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["老人", "津貼"],
+    "expectZero": false
+  },
+  {
+    "query": "假芽補助",
+    "note": "錯字：假牙打成假芽。同音錯字是最常見的一類，站內確實有假牙補助政策。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["假牙"],
+    "expectZero": false
+  },
+  {
+    "query": "中低收入護",
+    "note": "錯字：戶打成護。收案是因為「中低收入戶」是站內出現頻率最高的資格詞，錯一個字就全滅。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["中低收入", "低收入"],
+    "expectZero": false
+  },
+  {
+    "query": "我媽媽80歲想裝假牙",
+    "note": "口語整句：帶稱謂、年齡、數字的完整問句。核心詞「假牙」明確，是整句處理的最低標。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["假牙"],
+    "expectZero": false
+  },
+  {
+    "query": "我爸爸中風需要人照顧",
+    "note": "口語整句：病名（中風）不是政策用詞，要能連到長照／喘息／臨時照顧這一類。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["長照", "照顧", "喘息"],
+    "expectZero": false
+  },
+  {
+    "query": "我懷孕了有什麼補助",
+    "note": "口語整句：使用者說「懷孕」，站內政策寫「孕婦／生育／產檢」，考的是同義詞跨越。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["生育", "孕", "產檢"],
+    "expectZero": false
+  },
+  {
+    "query": "家裡有身心障礙者需要輔具",
+    "note": "口語整句：這句已經用了站內詞彙（身心障礙、輔具），只是包在句子裡。如果連這句都 0 筆，代表卡的是整句而不是詞彙。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["輔具", "身心障礙"],
+    "expectZero": false
+  },
+  {
+    "query": "我缺錢可以怎麼辦",
+    "note": "純處境：完全沒有政策詞彙，只講處境。這是最難也最該做對的一類，使用者不知道要查什麼才會這樣問。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["急難", "生活扶助"],
+    "expectZero": false
+  },
+  {
+    "query": "房租繳不出來",
+    "note": "純處境：站內講「租金補貼／租屋補助」，使用者講「房租繳不出來」。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["租金", "租屋", "住宅"],
+    "expectZero": false
+  },
+  {
+    "query": "我最近失業沒有收入",
+    "note": "純處境：句中有「失業」這個站內詞，但被口語句子包住，可用來區分「詞彙問題」與「整句問題」。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["失業", "就業", "生活扶助"],
+    "expectZero": false
+  },
+  {
+    "query": "家裡發生火災什麼都沒了",
+    "note": "純處境：使用者講「火災」，政策寫「災害救助」。突發事件是急難類的典型入口。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["災害", "救助"],
+    "expectZero": false
+  },
+  {
+    "query": "我生病沒錢看醫生",
+    "note": "純處境：對應傷病醫療費用補助、健保自付額減免這一類。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["醫療", "傷病", "健保"],
+    "expectZero": false
+  },
+  {
+    "query": "我兩個月沒工作",
+    "note": "受助對象對照組（成人本人）：應導向失業／就業／生活扶助。跟下一題是一組，兩題若撈回同一份清單，代表沒有讀出受助對象。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["失業", "就業", "生活扶助"],
+    "expectZero": false
+  },
+  {
+    "query": "我小孩要註冊沒錢",
+    "note": "受助對象對照組（子女就學）：應導向就學／助學，而不是成人失業補助。跟上一題必須給出不同的結果。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["就學", "助學", "學生"],
+    "expectZero": false
+  },
+  {
+    "query": "寵物醫療補助",
+    "note": "站內沒有的主題：靠「醫療」「補助」兩個高頻字曾撈回幾百筆弱相關，現由後端主題落地檢查擋下，必須是 0 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": [],
+    "expectZero": true
+  },
+  {
+    "query": "電動車充電樁",
+    "note": "站內沒有的主題：完全無關的名詞，必須 0 筆讓前端查無資料引導接手。",
+    "expectPolicyIds": [],
+    "expectKeywords": [],
+    "expectZero": true
+  },
+  {
+    "query": "健身房會員補助",
+    "note": "站內沒有的主題（較難）：帶了「補助」這個泛用詞，是放寬檢索後最容易誤放行的形狀。",
+    "expectPolicyIds": [],
+    "expectKeywords": [],
+    "expectZero": true
+  },
+  {
+    "query": "假牙",
+    "note": "關鍵詞控制組：單一站內詞。放寬處境查詢時，這類基本查詢不能被弄壞。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["假牙"],
+    "expectZero": false
+  },
+  {
+    "query": "長照 喘息服務",
+    "note": "關鍵詞控制組：多詞查詢，驗證空白切段仍正常。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["喘息", "照顧"],
+    "expectZero": false
+  },
+  {
+    "query": "新北市 老人津貼",
+    "note": "關鍵詞控制組：縣市 + 主題，驗證戶籍地條件沒被改動影響。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["老人"],
+    "expectZero": false
+  },
+  {
+    "query": "我要照顧我爸爸",
+    "note": "純處境：照顧＋親屬的講法，句子裡沒有半個政策詞。實測直查 0 筆，站內「長期照顧」有 172 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["長期照顧", "長照", "照顧", "失能"],
+    "expectZero": false
+  },
+  {
+    "query": "我要照顧我爺爺",
+    "note": "純處境：同上一題但親屬是祖父輩，驗證稱謂清單涵蓋隔代。實測直查 0 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["長期照顧", "長照", "照顧", "失能"],
+    "expectZero": false
+  },
+  {
+    "query": "小孩沒人帶",
+    "note": "純處境：托育需求最常見的講法。實測直查 0 筆，站內托育 68 筆、托嬰 38 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["托育", "托嬰", "保母", "兒童"],
+    "expectZero": false
+  },
+  {
+    "query": "家裡突然出事需要幫忙",
+    "note": "純處境：急難救助的典型入口，「出事」「變故」在語料裡不存在。實測直查 0 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["急難", "救助", "扶助"],
+    "expectZero": false
+  },
+  {
+    "query": "我一個人帶小孩",
+    "note": "純處境：單親家長的自我描述，沒有人會自稱「特殊境遇」。實測直查 0 筆，特殊境遇 118 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["特殊境遇", "單親", "婦女", "扶助"],
+    "expectZero": false
+  },
+  {
+    "query": "心情很低落想找人談",
+    "note": "純處境：心理支持需求。「憂鬱」「失眠」直查都是 0 筆，站內寫的是「心理健康」（144 筆）。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["心理", "諮商", "精神"],
+    "expectZero": false
+  },
+  {
+    "query": "社宅",
+    "note": "簡稱跨越：社會住宅的通行簡稱，語料只寫全稱。實測「社宅」直查 0 筆、「社會住宅」145 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["社會住宅", "住宅", "租"],
+    "expectZero": false
+  },
+  {
+    "query": "罕病",
+    "note": "簡稱跨越：罕見疾病的通行簡稱，兩字在語料裡不相連。實測「罕病」直查 0 筆、「罕見疾病」62 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["罕見"],
+    "expectZero": false
+  },
+  {
+    "query": "學貸",
+    "note": "簡稱跨越：就學貸款的通行簡稱。實測「學貸」「就學貸款」直查都是 0 筆，語料寫「就學」「助學」。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["就學", "助學", "教育", "學"],
+    "expectZero": false
+  },
+  {
+    "query": "日照中心",
+    "note": "簡稱跨越：日間照顧的通行簡稱。實測「日照中心」直查 0 筆、「日間照顧」170 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["日間", "照顧"],
+    "expectZero": false
+  },
+  {
+    "query": "打官司請不起律師",
+    "note": "純處境：法律糾紛的口語。實測「打官司」「官司」直查 0 筆，站內法律扶助 86 筆、法律協助 50 筆。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["法律"],
+    "expectZero": false
+  },
+  {
+    "query": "被老公打",
+    "note": "純處境：受暴者不會用政策分類名求助。「家暴」直查只有 14 筆，補上保護令與特殊境遇才涵蓋庇護那一片。",
+    "expectPolicyIds": [],
+    "expectKeywords": ["保護", "特殊境遇", "家庭暴力", "婦女"],
+    "expectZero": false
+  }
+]

@@ -14,6 +14,8 @@
     role="combobox"
     :aria-expanded="isShow"
     aria-haspopup="listbox"
+    :aria-controls="listboxId || undefined"
+    :aria-activedescendant="activeDescendantId"
     :aria-label="props.selectTitle || props.placeholder"
     @click="toggleSelectDialog"
     @keydown.enter.prevent="onEnterSelect"
@@ -38,11 +40,13 @@
           v-if="variant === 'list'"
           class="list-unstyled select-list"
           role="listbox"
+          :id="listboxId || undefined"
           :aria-multiselectable="props.multiple || undefined"
         >
           <li
             v-for="(item, idx) in selectList"
             :key="item.val"
+            :id="listboxId ? `${listboxId}-option-${idx}` : undefined"
             class="select-item"
             :class="{ active: isItemSelected(item.val), focused: idx === focusedIndex }"
             role="option"
@@ -54,10 +58,11 @@
           </li>
         </ul>
 
-        <div v-else class="btn-tag-list" role="listbox">
+        <div v-else class="btn-tag-list" role="listbox" :id="listboxId || undefined">
           <span
             v-for="(item, idx) in selectList"
             :key="item.val"
+            :id="listboxId ? `${listboxId}-option-${idx}` : undefined"
             class="btn btn-tag"
             :class="{ active: isItemSelected(item.val), focused: idx === focusedIndex }"
             role="option"
@@ -82,6 +87,9 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onBeforeUnmount } from "vue";
 
+// 2026-08-25 A11y #35：模組層級計數器，為每個 combobox 實例產生穩定且唯一的 listbox id
+let comboboxUidSeed = 0;
+
 type SelectItem = {
   name: string;
   val: string;
@@ -93,6 +101,8 @@ const selectedValues = ref<string[]>([]);
 const isShow = ref(false);
 const focusedIndex = ref(-1);
 const rootEl = ref<HTMLElement | null>(null);
+// 2026-08-25 A11y #35：對應 listbox 的唯一 id，於 client 端 mount 後才產生（避免 SSR/CSR hydration 不一致）
+const listboxId = ref("");
 
 const props = defineProps<{
   placeholder?: string;
@@ -121,6 +131,16 @@ const displayName = computed(() => {
     .filter(Boolean)
     .join("、");
 });
+
+// 2026-08-25 A11y #35：面板開啟且 focusedIndex 有效時，指向目前高亮選項的 id；否則為空字串（等同無 active descendant）
+const activeDescendantId = computed(() =>
+  isShow.value &&
+  focusedIndex.value >= 0 &&
+  focusedIndex.value < selectList.value.length &&
+  listboxId.value
+    ? `${listboxId.value}-option-${focusedIndex.value}`
+    : "",
+);
 
 function isItemSelected(value: string) {
   return props.multiple
@@ -281,6 +301,10 @@ function onDocumentClick(e: MouseEvent) {
     closeDialog();
   }
 }
-onMounted(() => document.addEventListener("click", onDocumentClick));
+onMounted(() => {
+  // 2026-08-25 A11y #35：於 client 端產生唯一 id（避免 SSR/CSR hydration 不一致）
+  listboxId.value = `comp-select-${comboboxUidSeed++}`;
+  document.addEventListener("click", onDocumentClick);
+});
 onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
 </script>

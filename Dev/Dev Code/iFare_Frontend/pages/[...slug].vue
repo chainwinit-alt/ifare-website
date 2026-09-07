@@ -87,11 +87,16 @@ const { data: parentLocation } = await useAsyncData(
 );
 
 const parentLocationText = computed(() => page.value?.showOnParent === false ? '歸屬於' : '顯示於');
+useContentSocialTitle(() => page.value?.title);
 
 useHead(() => ({
   title: page.value?.title || '頁面',
   meta: page.value?.metaDescription
-    ? [{ name: 'description', content: page.value.metaDescription }]
+    ? [
+        { name: 'description', content: page.value.metaDescription },
+        { property: 'og:description', content: page.value.metaDescription },
+        { name: 'twitter:description', content: page.value.metaDescription },
+      ]
     : [],
 }));
 </script>

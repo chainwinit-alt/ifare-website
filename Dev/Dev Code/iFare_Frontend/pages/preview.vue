@@ -42,8 +42,19 @@ const pageData = ref<DynamicPage>({
 });
 const hasPage = ref(false);
 
-// 允許的訊息來源（後台 dev server）
-const ALLOWED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+// 允許的訊息來源（後台）
+// 優先讀 runtimeConfig.public.previewAllowedOrigins（逗號分隔字串 → 陣列）；
+// 未設定或設定為空時，fallback 回原本的 localhost 兩個值 → dev 預設行為完全不變。
+// 注意：需在 nuxt.config 的 runtimeConfig.public 補上 previewAllowedOrigins
+//       （對應環境變數 NUXT_PUBLIC_PREVIEW_ALLOWED_ORIGINS）才能於正式環境放行後台網域；
+//       該 config 改動不在本次範圍、由後續處理。
+const FALLBACK_ALLOWED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const previewAllowedOriginsConfig = (useRuntimeConfig().public as Record<string, unknown>).previewAllowedOrigins;
+const parsedAllowedOrigins = String(previewAllowedOriginsConfig ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
+const ALLOWED_ORIGINS = parsedAllowedOrigins.length > 0 ? parsedAllowedOrigins : FALLBACK_ALLOWED_ORIGINS;
 const DEFAULT_PARENT_ORIGIN = ALLOWED_ORIGINS[0];
 
 interface PreviewMessage {

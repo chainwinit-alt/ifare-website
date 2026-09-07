@@ -1,22 +1,22 @@
 <template>
   <!--
-    2026-05-25 UIUX #21 — LINE 訂閱主動推廣 callout
-    放在 news/article 詳情頁底部,讀完繼續引導加入官方 LINE
+    2026-05-25 UIUX #21 — Facebook 粉絲團主動推廣 callout
+    放在 news/article 詳情頁底部，讀完繼續引導前往 i-Fare FB 粉絲團
   -->
-  <aside class="line-subscribe" aria-label="加入 LINE 好友">
-    <div class="line-subscribe__icon" aria-hidden="true">L</div>
+  <aside class="line-subscribe" aria-label="前往 i-Fare FB 粉絲團">
+    <div class="line-subscribe__icon" aria-hidden="true">f</div>
     <div class="line-subscribe__copy">
       <strong class="line-subscribe__title">想第一手收到新福利資訊?</strong>
-      <p class="line-subscribe__desc">加入 i-Fare 官方 LINE,新政策、活動與重要提醒第一時間通知你。</p>
+      <p class="line-subscribe__desc">加入 i-Fare FB 粉絲團，新政策、活動與重要提醒第一時間通知你。</p>
     </div>
     <a
       class="line-subscribe__btn"
-      href="https://lin.ee/eHw9VpL"
+      href="https://www.facebook.com/ccfIfare"
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="加入 i-Fare 官方 LINE 好友"
+      aria-label="前往 i-Fare FB 粉絲團"
     >
-      加入好友
+      前往粉絲團
     </a>
   </aside>
 </template>
@@ -29,8 +29,8 @@
   width: min(100%, 720px);
   margin: 32px auto 16px;
   padding: 16px 20px;
-  background: linear-gradient(135deg, rgba(0, 185, 0, 0.08), rgba(0, 185, 0, 0.04));
-  border: 1px solid rgba(0, 185, 0, 0.3);
+  background: linear-gradient(135deg, rgba(24, 119, 242, 0.1), rgba(24, 119, 242, 0.04));
+  border: 1px solid rgba(24, 119, 242, 0.3);
   border-radius: 14px;
 }
 
@@ -42,7 +42,7 @@
   height: 44px;
   flex-shrink: 0;
   border-radius: 12px;
-  background: #00b900;
+  background: #1877f2;
   color: #ffffff;
   font-size: 22px;
   font-weight: 800;
@@ -73,7 +73,7 @@
   display: inline-flex;
   align-items: center;
   padding: 10px 20px;
-  background: #00b900;
+  background: #1877f2;
   color: #ffffff;
   border-radius: 999px;
   font-size: 14px;
@@ -83,9 +83,9 @@
 }
 
 .line-subscribe__btn:hover {
-  background: #009100;
+  background: #0f5fc3;
   transform: translateY(-1px);
-  box-shadow: 0 8px 18px -8px rgba(0, 185, 0, 0.5);
+  box-shadow: 0 8px 18px -8px rgba(24, 119, 242, 0.5);
 }
 
 @media (max-width: 540px) {

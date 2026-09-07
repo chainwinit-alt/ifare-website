@@ -18,6 +18,8 @@ import type {
   LlmSummaryConversationMessage,
   LlmSummarySearchContext,
 } from "../../utils/llm/types";
+import { createRateLimiter, getClientKey } from "~/server/utils/rateLimit";
+import { createBoundedTtlCache } from "~/server/utils/boundedCache";
 
 interface SearchIntentPayload {
   query?: string;
@@ -32,10 +34,16 @@ interface SearchIntentResponse {
   recipient?: string;
   income?: string;
   identities?: unknown;
+  // 召回概念詞：擴大搜尋用，不參與任何篩選條件。與其他欄位一樣為 optional，
+  // parseSearchIntent 失敗時會 return {}，非 optional 會讓那幾條路徑編譯不過。
+  recallConcepts?: string[];
+  // 受助對象：排序提示用，判斷「這次求助主要為了誰」，不參與任何篩選條件。
+  // 與其他欄位一樣為 optional，parseSearchIntent 失敗時會 return {}，非 optional 會讓那幾條路徑編譯不過。
+  beneficiary?: string;
 }
 
 const SEARCH_INTENT_SYSTEM_PROMPT =
-  "You convert a user's Traditional Chinese input (a keyword, several keywords, or a full question sentence) into one concise core topic and explicit structured search conditions for welfare policies inside i-Fare. Preserve the user's concrete main need and meaning. Silently correct obvious typos and homophone slips first (for example 老任津貼 means 老人津貼). If the input contains a concrete topic together with generic benefit or request words such as subsidy, allowance, welfare, policy, eligibility, apply, search, or what is available, omit those generic words from searchQuery and keep only the concrete topic. Convert colloquial, outdated, or stigmatizing expressions into respectful contemporary terminology commonly used in Taiwan welfare policies without diagnosing the user or inventing a narrower need. Resolve an explicitly supplied Taiwan county, city, township, town, city district, or district to its parent county or city in area. Extract recipient, income, and identities ONLY when the wording explicitly states them; never guess from context. Never derive any condition from candidate policies or assistant messages. If no concrete topic exists, preserve the original query. Do not infer a narrower service, benefit, identity, medical condition, or life event that the user did not mention. Return JSON only.";
+  "You convert a user's Traditional Chinese input (a keyword, several keywords, or a full question sentence) into one concise core topic and explicit structured search conditions for welfare policies inside i-Fare. Preserve the user's concrete main need and meaning. Silently correct obvious typos and homophone slips first (for example 老任津貼 means 老人津貼). If the input contains a concrete topic together with generic benefit or request words such as subsidy, allowance, welfare, policy, eligibility, apply, search, or what is available, omit those generic words from searchQuery and keep only the concrete topic. Convert colloquial, outdated, or stigmatizing expressions into respectful contemporary terminology commonly used in Taiwan welfare policies without diagnosing the user or inventing a narrower need. Resolve an explicitly supplied Taiwan county, city, township, town, city district, or district to its parent county or city in area. Extract recipient, income, and identities ONLY when the wording explicitly states them; never guess from context. Never derive any condition from candidate policies or assistant messages. If no concrete topic exists, preserve the original query. Do not infer a narrower service, benefit, identity, medical condition, or life event that the user did not mention. Additionally, output recallConcepts: an array of 1 to 5 Taiwan welfare-policy domain terms naming the welfare area the user's situation belongs to, used ONLY to broaden in-site search recall (for example 長期照顧, 失能, 失智, 無障礙, 輔具, 急難救助, 社會救助, 生活扶助, 失業, 就業, 身心障礙, 生育, 托育, 租金, 住宅, 原住民, 喪葬, 獨居). recallConcepts are for search expansion only and are never filter conditions; never place area, age, economic status, or identity into recallConcepts. If you cannot tell which welfare domain the situation belongs to, return an empty array; never pad it or invent expressions the site does not use. Additionally, output beneficiary: a single hint naming who this help request is mainly for — self (the applicant themselves), child (the applicant's child), elder (the applicant's parent or older relative), or family (another family member). beneficiary is only a ranking hint and never a filter condition; never use it to infer identity or age. If you cannot tell, return unknown. Return JSON only.";
 
 // 站上篩選器的標準選項標籤；LLM 與本地抽取的結果都會收斂到這些值
 const RECIPIENT_LABELS = ["嬰幼兒", "兒童＆青少年", "成人", "老人"] as const;
@@ -72,6 +80,30 @@ function normalizeResolvedIdentities(value: unknown): string[] {
       .map((item) => matchOptionLabel(item, IDENTITY_LABELS))
       .filter(Boolean)
   )];
+}
+
+// 使用者只寫實際歲數（「媽媽 80 歲」「6 個月大」）時，字面正則抽不出年齡區間，
+// 但歲數確實是使用者自己講的，這種情況才放行 LLM 的年齡判斷
+const EXPLICIT_AGE_PATTERN = /\d{1,3}\s*(?:歲|個月大)/u;
+
+function hasExplicitAgeWording(query: string, conversation: LlmSummaryConversationMessage[]) {
+  return [query, ...conversation.filter(item => item.role === "user").map(item => item.content)]
+    .some(text => EXPLICIT_AGE_PATTERN.test(text));
+}
+
+/**
+ * 字面白名單：LLM 抽到的條件，必須在使用者自己打過的字裡找得到依據才採用。
+ *
+ * 提示詞已經寫明「只有字面明確提到才填」，模型還是會從對話脈絡與已選條件推測——
+ * 實測追問「資格為低收」，回來的是「中低收入戶」，還自己補了一個沒人提過的「老人」。
+ * 這些欄位會被 applyResolvedSearchFilters 直接套進篩選器、當場改掉搜尋結果，
+ * 寧可少抓也不能錯抓，所以一律以 extractExplicitSearchConditions（純正則、只認字面）為準。
+ * 該抽取器已涵蓋常見同義詞（長輩→老人、身障→身心障礙、外籍配偶→新住民），
+ * 正常的同義對應不會被這道防線擋掉；擋掉的是模型自己補的條件。
+ */
+function keepLiteralCondition(resolved: string, literal: string, allowResolved = false) {
+  if (literal) return literal;
+  return allowResolved ? resolved : "";
 }
 
 const TAIWAN_AREAS = [
@@ -114,10 +146,23 @@ function resolveFallbackArea(
 }
 
 const SEARCH_INTENT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const searchIntentCache = new Map<
-  string,
-  { expiresAt: number; response: Record<string, string> }
->();
+// 【快取上限｜問題 B】原本是裸 Map：無筆數上限、無過期清掃，key 又是整包 body，
+// 不同 query 連打會讓它只增不減、撐爆記憶體。改用有上限的 TTL 快取——max 設 500、
+// 過期時間沿用 SEARCH_INTENT_CACHE_TTL_MS，過期清掃與 LRU 淘汰都交給工具處理。
+// 快取內容維持原本存的回應物件型別（Record<string, string>）。
+const searchIntentCache = createBoundedTtlCache<Record<string, string>>({
+  max: 500,
+  ttlMs: SEARCH_INTENT_CACHE_TTL_MS,
+});
+
+// 每個 IP 每分鐘的請求上限：這支端點每次請求都可能觸發外部 LLM 呼叫，
+// 沒有限流的話腳本連打就能燒光額度，所以設定每 IP 每分鐘上限。
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const searchIntentRateLimiter = createRateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX,
+});
 
 function parseSearchIntent(text: string): SearchIntentResponse {
   const normalized = String(text || "")
@@ -136,6 +181,62 @@ function parseSearchIntent(text: string): SearchIntentResponse {
       return {};
     }
   }
+}
+
+/**
+ * 縣市名與純年齡詞不可以當召回詞。
+ *
+ * 提示詞已經寫明「不得把地區、年齡、經濟、身分放進 recallConcepts」，但模型照樣會塞——
+ * 而這些詞進了召回路等於災難：每一筆政策的標題都以【新北市】開頭，拿「新北市」去召回
+ * 會把該縣市的政策整批撈進來，真正的主題詞（長照、托育）被稀釋到看不見；
+ * 年齡詞（「80歲」「三歲」）同理，命中的是一堆不相干政策裡的數字。
+ * 地區與年齡本來就各有自己的結構化欄位（area／recipient），不需要靠召回詞再撈一次。
+ */
+const AREA_RECALL_PATTERN = new RegExp(
+  `^(?:${TAIWAN_AREAS.map(area => area.replace(/市$|縣$/u, "")).join("|")})[市縣]?$`,
+  "u"
+);
+// 純年齡詞：「65歲」「六十五歲以上」「未滿18歲」「3-5歲」都算，
+// 但「老人」「嬰幼兒」這種族群詞不在此列（它們本來就是站內用語）。
+const AGE_ONLY_RECALL_PATTERN =
+  /^(?:未滿|滿|年滿|超過|以上|以下|約)?[\d０-９一二三四五六七八九十百零兩～~\-—至到]+(?:歲|足歲)(?:以上|以下|之間|前|後)?$/u;
+
+function isFilterOnlyRecallConcept(value: string) {
+  const normalized = normalizeAreaText(value);
+  if (!normalized) return true;
+  if (AREA_RECALL_PATTERN.test(normalized)) return true;
+  // 臺→台 已由 normalizeAreaText 處理，年齡詞只要去掉空白即可
+  return AGE_ONLY_RECALL_PATTERN.test(normalized);
+}
+
+/**
+ * recallConcepts 是「擴大搜尋召回」用的站內福利概念詞，不參與任何篩選條件，
+ * 因此不必過字面白名單（keepLiteralCondition），也不會被套成篩選器；只做基本清洗。
+ * 模型偶爾會回非陣列、夾雜空白、或多到爆的清單，這裡一律收斂成
+ * 「最多 5 個、每個至多 10 字、去重、去空」的字串陣列；不是陣列就當空陣列。
+ * 縣市名與純年齡詞另外剔除，理由見 isFilterOnlyRecallConcept。
+ */
+function sanitizeRecallConcepts(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const cleaned = value
+    .map((item) => String(item ?? "").trim().slice(0, 10))
+    .filter(Boolean)
+    .filter((item) => !isFilterOnlyRecallConcept(item));
+  return [...new Set(cleaned)].slice(0, 5);
+}
+
+/**
+ * beneficiary 是「這次求助主要是為了誰」的排序提示（self／child／elder／family），
+ * 和 recallConcepts 一樣只是搜尋輔助線索，完全不參與任何篩選條件、也不會進 conditionsText，
+ * 因此不必過字面白名單（keepLiteralCondition），也不會被套成篩選器；只做基本收斂。
+ * 模型可能回大小寫不一、夾空白、或清單外的值，這裡一律收斂成上述四個字面值之一；
+ * 不在清單內（含判斷不出）一律回 "unknown"，確保永遠是契約定義的五個值之一。
+ */
+function sanitizeBeneficiary(value: unknown): string {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return (["self", "child", "elder", "family"] as const).includes(normalized as any)
+    ? normalized
+    : "unknown";
 }
 
 function normalizeResolvedQuery(value: unknown) {
@@ -226,7 +327,12 @@ function buildIntentPrompt(
     `identities：只有字面明確提到特殊身分時才填，值只能從「${IDENTITY_LABELS.join("、")}」挑選，可複數，否則回空陣列。`,
     "已拆進 recipient、income、identities 的條件詞，searchQuery 不必重複；但若整個輸入只有那個條件詞（例如只輸入「低收入戶」），searchQuery 仍保留它。",
     "intent 請用一句簡短繁體中文描述判斷到的需求。",
-    '只輸出 JSON：{"searchQuery":"核心搜尋詞","intent":"需求描述","area":"標準縣市或空字串","recipient":"年齡族群或空字串","income":"經濟條件或空字串","identities":["特殊身分"]}',
+    "recallConcepts：除了上述欄位，另輸出 1 到 5 個描述使用者處境所屬福利領域的台灣福利政策常用詞，用途只是擴大站內搜尋召回。請用政策實際會出現的詞，例如：長期照顧、失能、失智、無障礙、輔具、急難救助、社會救助、生活扶助、失業、就業、身心障礙、生育、托育、租金、住宅、原住民、喪葬、獨居。",
+    "recallConcepts 只用於擴大搜尋、不是篩選條件；不得把地區、年齡、經濟、身分放進 recallConcepts；判斷不出處境所屬領域時回空陣列，不要硬湊、不要編造站內不存在的說法。",
+    'recallConcepts 範例：「我缺錢可以怎麼辦」可回 ["低收入","急難救助","社會救助","生活扶助"]；「我媽媽走路不方便要人照顧」可回 ["長期照顧","失能","照顧服務"]。',
+    "beneficiary：另外判斷「這次求助主要是為了誰」，值必須是 self（申請人本人）、child（申請人的子女）、elder（申請人的父母或長輩）、family（其他家人）其中之一；判斷不出回 unknown。",
+    "beneficiary 只是排序提示、不是篩選條件；不要據此推斷身分或年齡。例如「我兩個月沒工作怎麼辦」回 self；「我小孩要註冊沒錢」回 child；「我媽媽失智」回 elder。",
+    '只輸出 JSON：{"searchQuery":"核心搜尋詞","intent":"需求描述","area":"標準縣市或空字串","recipient":"年齡族群或空字串","income":"經濟條件或空字串","identities":["特殊身分"],"recallConcepts":["站內福利概念詞"],"beneficiary":"self｜child｜elder｜family｜unknown"}',
     `原始搜尋文字：${JSON.stringify(query)}`,
     selectedConditions.length
       ? `目前已選條件：\n${selectedConditions.join("\n")}`
@@ -237,56 +343,111 @@ function buildIntentPrompt(
   ].join("\n");
 }
 
+// 意圖判讀擋在搜尋結果前面：使用者等的是政策清單，不是這一步。以前這兩支呼叫
+// 完全沒有上限，供應商吊住不回就整個搜尋卡住（畫面只能一直轉圈）。比照
+// chatbot.post.ts 的作法補上中止；失敗會退讓到下一個候選，最後還有本地正則兜底。
+const INTENT_REQUEST_TIMEOUT_MS = 10_000;
+
+/**
+ * SDK 呼叫的逾時保險。
+ * abortSignal 已經傳給 SDK，這一層只是確保呼叫端一定脫得了身
+ *（萬一某個版本沒有處理 abortSignal，光靠它就會一直等下去）。
+ */
+function withIntentTimeout<T>(task: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const guard = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} intent request timed out after ${ms}ms.`)),
+      ms
+    );
+  });
+  return Promise.race([task, guard]).finally(() => {
+    if (timer) clearTimeout(timer);
+  }) as Promise<T>;
+}
+
 async function requestGroqIntent(apiKey: string, model: string, prompt: string) {
   const isGptOss = /^openai\/gpt-oss-/iu.test(model);
   const isQwen = /^qwen\//iu.test(model);
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      ...(isGptOss
-        ? { reasoning_effort: "low" }
-        : isQwen
-          ? { reasoning_effort: "none" }
-          : {}),
-      temperature: 0.1,
-      max_completion_tokens: isGptOss ? 320 : 180,
-      messages: [
-        { role: "system", content: SEARCH_INTENT_SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), INTENT_REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        ...(isGptOss
+          ? { reasoning_effort: "low" }
+          : isQwen
+            ? { reasoning_effort: "none" }
+            : {}),
+        temperature: 0.1,
+        max_completion_tokens: isGptOss ? 320 : 180,
+        messages: [
+          { role: "system", content: SEARCH_INTENT_SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
 
-  const data: any = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(
-      `Groq intent request failed with status ${response.status}. ${
-        data?.error?.message || ""
-      }`.trim()
-    );
+    const data: any = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        `Groq intent request failed with status ${response.status}. ${
+          data?.error?.message || ""
+        }`.trim()
+      );
+    }
+    return String(data?.choices?.[0]?.message?.content || "");
+  } finally {
+    clearTimeout(timeout);
   }
-  return String(data?.choices?.[0]?.message?.content || "");
 }
 
 async function requestGeminiIntent(apiKey: string, model: string, prompt: string) {
-  const ai = new GoogleGenAI({ apiKey, apiVersion: "v1beta" });
-  const response = await ai.models.generateContent({
-    model,
-    contents: prompt,
-    config: {
-      systemInstruction: SEARCH_INTENT_SYSTEM_PROMPT,
-      responseMimeType: "application/json",
-    },
-  });
-  return response.text || "";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), INTENT_REQUEST_TIMEOUT_MS);
+  try {
+    const ai = new GoogleGenAI({ apiKey, apiVersion: "v1beta" });
+    const response = await withIntentTimeout(
+      ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          systemInstruction: SEARCH_INTENT_SYSTEM_PROMPT,
+          responseMimeType: "application/json",
+          // SDK 支援的中止訊號。注意 Google 官方說明：中止只發生在用戶端，
+          // 服務端仍可能跑完並計費——但至少不會把使用者的搜尋一直吊著。
+          abortSignal: controller.signal,
+        },
+      }),
+      INTENT_REQUEST_TIMEOUT_MS,
+      "Gemini"
+    );
+    return response.text || "";
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export default defineEventHandler(async (event) => {
+  // 【限流｜問題 A】放在處理器最前面（讀 body／快取之前）：超限直接回 429、
+  // 並帶 Retry-After，完全不觸發下游的 LLM 呼叫，用來擋腳本連打燒額度。
+  const rl = searchIntentRateLimiter(getClientKey(event));
+  if (!rl.allowed) {
+    setResponseHeader(event, "Retry-After", String(rl.retryAfter));
+    throw createError({
+      statusCode: 429,
+      statusMessage: "Too many requests",
+      data: { retryAfter: rl.retryAfter },
+    });
+  }
+
   const body = (await readBody<SearchIntentPayload>(event)) || {};
   // 先修常見錯字（老任津貼→老人津貼），LLM 與本地抽取都吃修正後的字串
   const query = fixCommonTypos(normalizeSummaryQuery(body.query)).trim();
@@ -301,6 +462,9 @@ export default defineEventHandler(async (event) => {
       recipient: "",
       income: "",
       identities: [] as string[],
+      recallConcepts: [] as string[],
+      // 空查詢早退：沒有 LLM 輸出可判斷受助對象，一律回 "unknown"（維持回應契約）
+      beneficiary: "unknown",
       source: "skipped",
       model: "",
       errorMessage: "",
@@ -313,9 +477,9 @@ export default defineEventHandler(async (event) => {
   );
 
   const cacheKey = JSON.stringify({ query, conversation, context: body.context || {} });
+  // 過期與 LRU 淘汰都由 createBoundedTtlCache 內部處理，命中即直接回傳存好的回應
   const cached = searchIntentCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.response;
-  if (cached) searchIntentCache.delete(cacheKey);
+  if (cached) return cached;
 
   const config = useRuntimeConfig();
   const llmConfig = (config as any).llm || {};
@@ -351,11 +515,21 @@ export default defineEventHandler(async (event) => {
           : await requestGeminiIntent(candidate.apiKey, candidate.model, prompt);
       const parsed = parseSearchIntent(text);
       const parsedSearchQuery = normalizeResolvedQuery(parsed.searchQuery);
-      // LLM 優先、本地抽取補漏：條件欄位任一來源有值就採用
-      const recipient = matchOptionLabel(parsed.recipient, RECIPIENT_LABELS) || localConditions.recipient;
-      const income = matchOptionLabel(parsed.income, INCOME_LABELS) || localConditions.income;
+      // 條件欄位一律過字面白名單：字面有依據就以字面為準（實測「低收」被 LLM 讀成中低收入戶），
+      // 字面完全沒依據就不採用，免得模型推測出來的條件被自動套成篩選器
+      const recipient = keepLiteralCondition(
+        matchOptionLabel(parsed.recipient, RECIPIENT_LABELS),
+        localConditions.recipient,
+        hasExplicitAgeWording(query, conversation)
+      );
+      const income = keepLiteralCondition(
+        matchOptionLabel(parsed.income, INCOME_LABELS),
+        localConditions.income
+      );
       const identities = [...new Set([
-        ...normalizeResolvedIdentities(parsed.identities),
+        // 身分不接受任何推論：模型會從病名或家庭狀況推出「重大傷病」「特殊境遇」，
+        // 那是使用者沒說過的標籤，必須有字面背書才留下
+        ...normalizeResolvedIdentities(parsed.identities).filter(item => localConditions.identities.includes(item)),
         ...localConditions.identities,
       ])];
       const conditionsText = [recipient, income, identities.join(" ")].filter(Boolean).join(" ");
@@ -363,6 +537,12 @@ export default defineEventHandler(async (event) => {
       const area = normalizeResolvedArea(parsed.area)
         || localConditions.area
         || resolveFallbackArea(conversation, body.context);
+      // recallConcepts 只是搜尋召回用的概念詞，與上面的篩選條件（recipient／income／identities／area）
+      // 完全無關：不過字面白名單、不會被套進任何篩選器，僅做基本清洗後隨回應一起帶給前端擴大搜尋。
+      const recallConcepts = sanitizeRecallConcepts(parsed.recallConcepts);
+      // beneficiary 同樣只是「這次求助主要為了誰」的排序提示，和 recallConcepts 一樣完全不參與篩選條件：
+      // 不過字面白名單、不會被套進任何篩選器、也刻意不併入上面的 conditionsText；只做收斂後帶給前端當排序線索。
+      const beneficiary = sanitizeBeneficiary(parsed.beneficiary);
 
       const result = {
         originalQuery: query,
@@ -372,14 +552,14 @@ export default defineEventHandler(async (event) => {
         recipient,
         income,
         identities,
+        recallConcepts,
+        beneficiary,
         source: candidate.provider,
         model: candidate.model,
         errorMessage: "",
       };
-      searchIntentCache.set(cacheKey, {
-        expiresAt: Date.now() + SEARCH_INTENT_CACHE_TTL_MS,
-        response: result,
-      });
+      // 過期時間由快取工具依 ttlMs 自動計算，這裡只存回應本身
+      searchIntentCache.set(cacheKey, result);
       return result;
     } catch (error: any) {
       const message = error?.message || String(error);
@@ -398,8 +578,14 @@ export default defineEventHandler(async (event) => {
     recipient: localConditions.recipient,
     income: localConditions.income,
     identities: localConditions.identities,
+    // fallback 沒有 LLM 輸出可解析，召回概念詞一律回空陣列（維持回應契約）
+    recallConcepts: [] as string[],
+    // fallback 同樣沒有 LLM 輸出可判斷受助對象，一律回 "unknown"（維持回應契約）
+    beneficiary: "unknown",
     source: "fallback",
     model: "script",
-    errorMessage: errors.join(" | ") || "No free-tier LLM provider is configured.",
+    // 【去敏｜問題 C】errors 內含供應商名、型號、配額訊息，逐筆已在上方 catch 的
+    // console.warn 記到伺服器端；回給前端的 errorMessage 只給通用字串，不外洩內部細節
+    errorMessage: "AI 服務暫時無法使用",
   };
 });

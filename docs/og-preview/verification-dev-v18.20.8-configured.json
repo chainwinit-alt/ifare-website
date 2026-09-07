@@ -1,0 +1,61 @@
+{
+  "variant": "Dev",
+  "nodeVersion": "v18.20.8",
+  "nodePath": "D:\\Users\\jason.hsieh\\AppData\\Local\\Temp\\node18-complete-20260902\\node-v18.20.8-win-x64\\node.exe",
+  "originMode": "configured",
+  "isolatedOutput": "D:\\Users\\jason.hsieh\\AppData\\Local\\Temp\\ifare-og-dev-uhJqGG\\.output",
+  "api": "Local fixture; no production API or database accessed",
+  "apiRequestCount": 4,
+  "imageSha256": "2947415efc1bb5747ffbbdb4b4c1ce29da9866604b426d2b576ef3bd7f07a12b",
+  "tests": [
+    {
+      "route": "/",
+      "device": "crawler",
+      "status": 200,
+      "image": "http://10.200.0.39:3002/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/",
+      "device": "mobile",
+      "status": 200,
+      "image": "http://10.200.0.39:3002/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/about",
+      "device": "crawler",
+      "status": 200,
+      "image": "http://10.200.0.39:3002/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/about",
+      "device": "mobile",
+      "status": 200,
+      "image": "http://10.200.0.39:3002/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare",
+      "device": "crawler",
+      "status": 200,
+      "image": "http://10.200.0.39:3002/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare",
+      "device": "mobile",
+      "status": 200,
+      "image": "http://10.200.0.39:3002/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/info?id=5170",
+      "device": "crawler",
+      "status": 200,
+      "image": "http://10.200.0.39:3002/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/info?id=5170",
+      "device": "mobile",
+      "status": 200,
+      "image": "http://10.200.0.39:3002/og-logo-safe-20260903.png"
+    }
+  ],
+  "status": "PASS"
+}

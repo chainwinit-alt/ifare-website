@@ -133,25 +133,27 @@ namespace IFare_API.TaskManager.Articles.Lazy
             const int TTLCOUNT = 3;
             var takeNum = TTLCOUNT;
 
+            // 剩餘名額＝總額扣掉「累計」筆數；舊寫法 takeNum -= _relationList.Count() 會把
+            // 前面幾層已補的筆數重複扣掉，讓後面的層數被 takeNum > 0 提早擋掉、名額補不滿。
             // All same.
             if (_query_All.Count() > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_query_All, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = TTLCOUNT - _relationList.Count();
             }
 
             // All Contains same.
             if (_query_Keyword.Count() > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_query_Keyword, takeNum, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = TTLCOUNT - _relationList.Count();
             }
 
             // All random.
-            if (_query.Count() > 0 && takeNum > 0) 
+            if (_query.Count() > 0 && takeNum > 0)
             {
                 _relationList.AddRange(getArticlesWelfareDataList(_query, takeNum, isRandom: true, currentList: _relationList));
-                takeNum = takeNum - _relationList.Count();
+                takeNum = TTLCOUNT - _relationList.Count();
             }
             
             return new ArticlesLazyResult(_commonTools.GetErrorInfo_API(ErrAPI.Code_Success), _relationList);

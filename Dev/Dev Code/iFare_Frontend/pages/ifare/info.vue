@@ -1,6 +1,22 @@
 <template>
   <div class="app-body-child" :name="$route.name">
-    <div class="section-list">
+    <div class="part-loading" v-if="isLoading" role="status" aria-live="polite">
+      <div class="loading-hint">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span>政策資料載入中...</span>
+      </div>
+      <span class="skeleton-line skeleton-line-title"></span>
+      <span class="skeleton-line"></span>
+      <span class="skeleton-line"></span>
+      <span class="skeleton-line skeleton-line-info"></span>
+    </div>
+
+    <div class="part-empty part-error" v-else-if="hasError" role="alert">
+      <p>{{ errorMessage }}</p>
+      <button class="btn-retry transition-general" type="button" @click="retryLoad">重新載入</button>
+    </div>
+
+    <div class="section-list" v-else-if="hasPolicy">
       <section class="section-top">
         <h1 class="info-title">{{ _welfareItem.title }}</h1>
         <div class="date-group">
@@ -62,10 +78,11 @@
                 >
                   <i class="ic-phone" aria-hidden="true"></i>
                 </a>
+                <!-- 洽辦單位是「中央」佔位項（UNRESTRICTED_CODE_ID）時沒有可看的詳情頁，藏起跳轉鈕 -->
                 <button
                   class="btn-icon btn-go"
                   type="button"
-                  v-if="_welfareItem.officeUnitID != 1"
+                  v-if="_welfareItem.officeUnitID != UNRESTRICTED_CODE_ID"
                   @click="JumpTo(_welfareItem.officeUnitID)"
                   aria-label="查看洽辦單位詳情"
                 >
@@ -76,7 +93,14 @@
           </div>
         </div>
       </section>
-      <section class="section-relation">
+      <!--
+        看完明細還是有想問的（要帶什麼文件、金額多少、去哪辦），以前只能回上一頁重查。
+        這裡直接就著這一筆問，答案只從這一頁的政策資料來。
+      -->
+      <IfarePolicyAskBox :policy="askPolicy" />
+
+      <!-- 相關福利載不到時整區收起，不要留一個空標題讓使用者以為這筆政策沒有相關福利 -->
+      <section class="section-relation" v-if="iFarePolicyList.length > 0">
         <div class="relation-links">
           <h2 class="relation-title">相關福利</h2>
           <ul class="list-unstyled relation-list">
@@ -84,7 +108,9 @@
               <NuxtLink
                   :to="{
                     path: '/ifare/info',
-                    query: { id: _welfare.id, reload: _welfare.id },
+                    // 不帶 reload：它會讓 route.global.ts 用 replace 吃掉上一筆歷史紀錄。
+                    // 換 id 的重抓由本頁 watcher 負責，不需要這個參數。
+                    query: { id: _welfare.id },
                   }"
                 >
                 <h3 class="link-title">{{ _welfare.title }}</h3>
@@ -108,6 +134,10 @@
         </div>
       </section>
     </div>
+
+    <div class="part-empty" v-else>
+      <p>查無這筆政策，可能已經下架，或是網址中的編號有誤。</p>
+    </div>
   </div>
 </template>
 
@@ -121,14 +151,137 @@ definePageMeta({
 // 福利政策資格預覽截斷長度（字元數）
 const QUALIFICATION_PREVIEW_LENGTH = 50;
 
-const { $WebApiGet } = useNuxtApp();
+// 載入失敗的預設說法 — 分不出原因時就用這句，總比讓使用者對著空白頁猜好
+const DETAIL_ERROR_MESSAGE = "政策資料載入失敗，請稍後再試。";
+
+// id 1 是後端「不限／中央」的佔位項（洽辦單位為中央、限制代碼為不限），不是可點的實體資料。
+// 此約定由後端維護：本檔用它決定洽辦單位能不能跳詳情、以及某筆限制算不算「有特定條件」。
+// 後端若日後改變佔位項的 id，下面幾處判斷要一起調整。
+const UNRESTRICTED_CODE_ID = 1;
+
+const { $WebApiGet, $WebApiGetDetailed } = useNuxtApp();
 const { getApiResultValue } = useApiResult();
+const { getApiErrorMessage } = useApiErrorMessage();
 const { formatDisplayDate } = useDateFormatter();
 const route = useRoute();
 const $router = useRouter();
 
+// 這頁原本只憑 _welfareItem 有沒有內容決定畫面，於是「還在載入」「連線失敗」
+// 「查無政策」三種情況全都長成同一片空白，使用者無從判斷該重試還是換一筆看。
+const isLoading = ref(true);
+const hasError = ref(false);
+const errorMessage = ref(DETAIL_ERROR_MESSAGE);
+// 後端確實回了一筆政策才算數。不直接看 _welfareItem.id，是為了避免資料缺 id 時被誤判成查無
+const hasPolicy = ref(false);
+const currentPolicyId = computed(() => Number(route.query.id || 0));
+
+/**
+ * 轉傳預覽與搜尋結果用的中繼資料，必須在伺服器算繪時就備好。
+ *
+ * LINE 與 Facebook 的爬蟲不執行 JavaScript——實測用它們的 User-Agent 抓這一頁，
+ * 拿回來的是骨架，政策標題出現 0 次。所以標籤光寫在元件裡沒有用：底下那個
+ * watch(immediate) 是裸露的 async 副作用，Nuxt 在 SSR 階段不會等它。
+ * useAsyncData 會被 await，資料才進得了伺服器吐出去的 HTML。
+ *
+ * 這裡刻意只取三個欄位、與底下的 loadPolicyDetail 分開跑：
+ * 那支函式同時管載入狀態、錯誤分類、相關福利與競態控制，
+ * 為了 meta 去動它風險太高。明細 API 實測 12–16ms，多打一次可以接受，
+ * 而且 useAsyncData 的結果會隨 payload 帶到前端，hydration 時不會再打一次。
+ */
+// key 用固定字串：這個 Nuxt 版本的 useAsyncData 不接受函式 key（會丟
+// "key must be a string"）。換 id 時靠下方的 watch 重取，效果一樣。
+const { data: policyMeta } = await useAsyncData(
+  "ifare-policy-meta",
+  async () => {
+    const infoID = currentPolicyId.value;
+    if (!infoID) return null;
+
+    const { data } = await $WebApiGetDetailed("/FarePolicy/GetIFarePolicyDetail", {
+      farePolicyID: infoID,
+    });
+    const detail = getApiResultValue<any>(data);
+    if (!detail) return null;
+
+    return {
+      title: String(detail.title || "").trim(),
+      qualification: String(detail.qualification || "").trim(),
+      area: String(detail.codeDomicile_LabelName || "").trim(),
+    };
+  },
+  { watch: [currentPolicyId] }
+);
+
+const SITE_NAME = "i-Fare 福利好幫手";
+const SITE_DESCRIPTION = "長穩社福慈善基金會 i-Fare，整合全臺社會福利政策，用一句話描述您的處境就能找到適合的補助。";
+const runtimeConfigForMeta = useRuntimeConfig();
+const metaSiteUrl = String(runtimeConfigForMeta.public.siteUrl || "").replace(/\/+$/u, "");
+
+/** 說明文字取申請資格前 100 字。該欄位是純文字，不像 welfareInfo 需要解碼與去標籤 */
+const metaDescription = computed(() => {
+  const raw = String(policyMeta.value?.qualification || "").replace(/\s+/gu, " ").trim();
+  if (!raw) return SITE_DESCRIPTION;
+  return raw.length > 100 ? `${raw.slice(0, 100)}…` : raw;
+});
+
+/**
+ * 分頁標題（給搜尋引擎）：政策全名（已含縣市）在前，用途在後，站名收尾。
+ * 這是照台灣人的搜尋習慣排的——「縣市 + 對象 + 補助」，而搜尋結果頁夠寬，顯示得下。
+ */
+const metaTitle = computed(() => {
+  const title = String(policyMeta.value?.title || "").trim();
+  return title ? `${title}｜申請資格與補助內容 - ${SITE_NAME}` : `福利政策查詢 - ${SITE_NAME}`;
+});
+
+/**
+ * 轉傳卡片標題（給 LINE／Facebook）：只留政策全名。
+ *
+ * 跟上面刻意分開。轉傳卡片大約只顯示 30–40 字，把「申請資格與補助內容 - i-Fare 福利好幫手」
+ * 也塞進去的話，實際渲染出來會斷成兩行還被截掉，反而讓政策名稱看不完整。
+ * 站名交給 og:site_name 那一行去顯示就好。
+ */
+const shareTitle = computed(() => {
+  const title = String(policyMeta.value?.title || "").trim();
+  return title || `福利政策查詢 - ${SITE_NAME}`;
+});
+
+const metaUrl = computed(() =>
+  currentPolicyId.value && metaSiteUrl
+    ? `${metaSiteUrl}/ifare/info?id=${currentPolicyId.value}`
+    : metaSiteUrl
+);
+
+// 未設定對外站址時，不輸出 og:url 與 canonical；分享圖片由 app.vue 統一提供。
+const shareUrlMeta = computed(() =>
+  metaUrl.value ? [{ property: "og:url", content: metaUrl.value }] : []
+);
+
+useHead(() => ({
+  title: metaTitle.value,
+  meta: [
+    { name: "description", content: metaDescription.value },
+    { property: "og:type", content: "article" },
+    { property: "og:site_name", content: SITE_NAME },
+    { property: "og:title", content: shareTitle.value },
+    { property: "og:description", content: metaDescription.value },
+    ...shareUrlMeta.value,
+    { property: "og:locale", content: "zh_TW" },
+    { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:title", content: shareTitle.value },
+    { name: "twitter:description", content: metaDescription.value },
+  ],
+  link: metaUrl.value ? [{ rel: "canonical", href: metaUrl.value }] : [],
+}));
+
+function toDetailErrorMessage(error: any) {
+  const message = getApiErrorMessage(error, DETAIL_ERROR_MESSAGE);
+  // getApiErrorMessage 分不出類別時會原封不動回傳底層訊息（例如 "Failed to fetch"），
+  // 那是給開發者看的，不該端到使用者面前
+  return message === error?.message ? DETAIL_ERROR_MESSAGE : message;
+}
+
 function JumpTo(id: any) {
-  if (id == 1) return false;
+  // 中央／不限佔位項沒有對應的洽辦單位頁，直接擋掉跳轉
+  if (id == UNRESTRICTED_CODE_ID) return false;
   $router.push({ path: "/ifare/contact", query: { id: id } });
 }
 
@@ -174,6 +327,28 @@ const _welfareItem = reactive<infoItem>({
   codeIdentityIDs: [],
   codeIncomeIDs: [],
   codeRecipientIDs: [],
+});
+
+// #33 「不限」佔位項（UNRESTRICTED_CODE_ID）不是限制，要先排除掉再判斷有沒有設條件。
+// 只看陣列長度的話，只掛著佔位項的政策會被當成「有限制」，判斷方式與同檔 hasSpecificCode
+// 及列表頁不一致，只是這裡拿到的是 id 陣列。
+function hasRestrictionIds(ids: number[]) {
+  return ids.some((id) => Number(id) !== UNRESTRICTED_CODE_ID);
+}
+
+// 問答元件要的政策形狀。has* 三項明細 API 沒有直接給，用限制代碼推——
+// 有列到「不限」以外的代碼就代表這筆設了該項限制，跟列表頁的判斷一致。
+const askPolicy = computed(() => {
+  if (!hasPolicy.value || !_welfareItem.id) return null;
+  return {
+    id: _welfareItem.id,
+    title: _welfareItem.title,
+    area: _welfareItem.area,
+    qualification: _welfareItem.qualification,
+    hasRecipient: hasRestrictionIds(_welfareItem.codeRecipientIDs),
+    hasIncome: hasRestrictionIds(_welfareItem.codeIncomeIDs),
+    hasIndentity: hasRestrictionIds(_welfareItem.codeIdentityIDs),
+  };
 });
 
 // Office Unit
@@ -324,43 +499,71 @@ function normalizeWelfareHtml(value: string) {
 
 let detailRequestToken = 0;
 async function loadPolicyDetail(infoID: number) {
-  if (!infoID) {
-    resetWelfareItem();
-    return;
-  }
-
   const requestToken = ++detailRequestToken;
+  isLoading.value = true;
+  hasError.value = false;
+  errorMessage.value = DETAIL_ERROR_MESSAGE;
+  hasPolicy.value = false;
   resetWelfareItem();
 
-  const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyDetail", {
-    farePolicyID: infoID,
-  });
-  const _data = getApiResultValue<any>(res);
-  if (!_data || requestToken !== detailRequestToken) return;
+  try {
+    // 網址沒帶 id 不是連線問題，讓它落到「查無政策」，才不會給一個按了也沒用的重試鈕
+    if (!infoID) return;
 
-  _welfareItem.id = _data.id;
-  _welfareItem.title = _data.title;
-  _welfareItem.area = _data.codeDomicile_LabelName ?? "";
-  _welfareItem.qualification = _data.qualification;
-  _welfareItem.evidence = _data.evidence;
-  _welfareItem.remark = _data.remark ?? "";
-  _welfareItem.welfareInfo = normalizeWelfareHtml(_data.welfareInfo);
-  _welfareItem.welfareTel = _data.officeUnitTel
-    ? _data.officeUnitTel.indexOf("分機") >= 0
-      ? `${_data.officeUnitTel.replace("分機", ",")}%23`
-      : _data.officeUnitTel
-    : "";
-  _welfareItem.welfareTelStr = _data.officeUnitTel ?? "";
-  _welfareItem.releaseTime = _data.releaseTime;
-  _welfareItem.discontinuedTime = _data.discontinuedTime;
-  _welfareItem.updateTime = _data.updateTime;
-  _welfareItem.officeUnitInfo = _data.officeUnitInfo ?? "";
-  _welfareItem.officeUnitID = _data.iFareOfficeUnitID ?? 0;
-  _welfareItem.codeDomicileID = _data.codeDomicile_ID ?? 0;
-  _welfareItem.codePolicyID = _data.codePolicy_ID ?? 0;
-  _welfareItem.codeIdentityIDs = Array.isArray(_data.codeIdentityList) ? _data.codeIdentityList.map((p: any) => Number(p.id)) : [];
-  _welfareItem.codeIncomeIDs = Array.isArray(_data.codeIncomeList) ? _data.codeIncomeList.map((p: any) => Number(p.id)) : [];
-  _welfareItem.codeRecipientIDs = Array.isArray(_data.codeRecipientList) ? _data.codeRecipientList.map((p: any) => Number(p.id)) : [];
+    // 用 Detailed 版本才拿得到 error：$WebApiGet 會把連線錯誤吞成 null，
+    // 於是「後端連不上」和「這筆政策不存在」回到頁面時完全同形，只能一起留白
+    const { data, error } = await $WebApiGetDetailed("/FarePolicy/GetIFarePolicyDetail", {
+      farePolicyID: infoID,
+    });
+
+    // 在相關福利之間連點時舊請求可能後到，不能讓它蓋掉新請求的結果
+    if (requestToken !== detailRequestToken) return;
+
+    if (error) {
+      hasError.value = true;
+      errorMessage.value = toDetailErrorMessage(error);
+      return;
+    }
+
+    const _data = getApiResultValue<any>(data);
+    // 連得上但沒有這筆資料 — 屬於查無政策，跟連線失敗要講不一樣的話
+    if (!_data) return;
+
+    hasPolicy.value = true;
+    _welfareItem.id = _data.id;
+    _welfareItem.title = _data.title;
+    _welfareItem.area = _data.codeDomicile_LabelName ?? "";
+    _welfareItem.qualification = _data.qualification;
+    _welfareItem.evidence = _data.evidence;
+    _welfareItem.remark = _data.remark ?? "";
+    _welfareItem.welfareInfo = normalizeWelfareHtml(_data.welfareInfo);
+    _welfareItem.welfareTel = _data.officeUnitTel
+      ? _data.officeUnitTel.indexOf("分機") >= 0
+        ? `${_data.officeUnitTel.replace("分機", ",")}%23`
+        : _data.officeUnitTel
+      : "";
+    _welfareItem.welfareTelStr = _data.officeUnitTel ?? "";
+    _welfareItem.releaseTime = _data.releaseTime;
+    _welfareItem.discontinuedTime = _data.discontinuedTime;
+    _welfareItem.updateTime = _data.updateTime;
+    _welfareItem.officeUnitInfo = _data.officeUnitInfo ?? "";
+    _welfareItem.officeUnitID = _data.iFareOfficeUnitID ?? 0;
+    _welfareItem.codeDomicileID = _data.codeDomicile_ID ?? 0;
+    _welfareItem.codePolicyID = _data.codePolicy_ID ?? 0;
+    _welfareItem.codeIdentityIDs = Array.isArray(_data.codeIdentityList) ? _data.codeIdentityList.map((p: any) => Number(p.id)) : [];
+    _welfareItem.codeIncomeIDs = Array.isArray(_data.codeIncomeList) ? _data.codeIncomeList.map((p: any) => Number(p.id)) : [];
+    _welfareItem.codeRecipientIDs = Array.isArray(_data.codeRecipientList) ? _data.codeRecipientList.map((p: any) => Number(p.id)) : [];
+  } catch (e) {
+    // 解析回應時炸掉也算載入失敗 — 至少講清楚並讓使用者能重試，別卡在轉不完的載入中
+    console.warn("[ifare/info] load detail failed:", e);
+    if (requestToken !== detailRequestToken) return;
+    hasError.value = true;
+    hasPolicy.value = false;
+    errorMessage.value = DETAIL_ERROR_MESSAGE;
+  } finally {
+    // 只有最新的那次請求有資格收掉載入狀態，否則舊請求會提前把畫面放行
+    if (requestToken === detailRequestToken) isLoading.value = false;
+  }
 }
 
 function getPolicyId(item: any) {
@@ -382,7 +585,8 @@ function getCodeList(value: any) {
 }
 
 function hasSpecificCode(value: any) {
-  return getCodeList(value).findIndex((p: any) => Number(p?.id) === 1) < 0;
+  // 清單裡若含「不限」佔位項（UNRESTRICTED_CODE_ID）就代表這項沒設限制；找不到它才算有特定條件
+  return getCodeList(value).findIndex((p: any) => Number(p?.id) === UNRESTRICTED_CODE_ID) < 0;
 }
 
 interface iFarePolicyItem {
@@ -408,37 +612,57 @@ async function loadRelationList(infoID: number) {
   iFarePolicyList.splice(0, iFarePolicyList.length);
   if (!infoID) return;
 
-  const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyRelation", {
-    farePolicyID: infoID,
-  });
-  const _data = getApiResultValue<any>(res);
-  if (!Array.isArray(_data) || requestToken !== relationRequestToken) return;
+  // 相關福利只是加值資訊，載不到就安靜收起這一區即可，不該讓整頁政策內容跟著陪葬
+  try {
+    const res: any = await $WebApiGet("/FarePolicy/GetIFarePolicyRelation", {
+      farePolicyID: infoID,
+    });
+    const _data = getApiResultValue<any>(res);
+    if (!Array.isArray(_data) || requestToken !== relationRequestToken) return;
 
-  const nextItems = _data
-    .map((item: any) => ({
-      id: getPolicyId(item),
-      title: item.title,
-      qualification: `${(item.qualification ?? "").slice(0, QUALIFICATION_PREVIEW_LENGTH)}...`,
-      area: item.codeDomicile_LabelName ?? "",
-      hasIndentity: hasSpecificCode(item.codeIdentityList),
-      hasIncome: hasSpecificCode(item.codeIncomeList),
-      hasRecipient: hasSpecificCode(item.codeRecipientList),
-      codeDomicileID: item.codeDomicile_ID ?? 0,
-      codePolicyID: item.codePolicy_ID ?? 0,
-      codeIdentityIDs: getCodeList(item.codeIdentityList).map((p: any) => Number(p.id)),
-      codeIncomeIDs: getCodeList(item.codeIncomeList).map((p: any) => Number(p.id)),
-      codeRecipientIDs: getCodeList(item.codeRecipientList).map((p: any) => Number(p.id)),
-    }))
-    .filter((item: iFarePolicyItem) => item.id > 0 && item.title);
+    const nextItems = _data
+      .map((item: any) => ({
+        id: getPolicyId(item),
+        title: item.title,
+        qualification: `${(item.qualification ?? "").slice(0, QUALIFICATION_PREVIEW_LENGTH)}...`,
+        area: item.codeDomicile_LabelName ?? "",
+        hasIndentity: hasSpecificCode(item.codeIdentityList),
+        hasIncome: hasSpecificCode(item.codeIncomeList),
+        hasRecipient: hasSpecificCode(item.codeRecipientList),
+        codeDomicileID: item.codeDomicile_ID ?? 0,
+        codePolicyID: item.codePolicy_ID ?? 0,
+        codeIdentityIDs: getCodeList(item.codeIdentityList).map((p: any) => Number(p.id)),
+        codeIncomeIDs: getCodeList(item.codeIncomeList).map((p: any) => Number(p.id)),
+        codeRecipientIDs: getCodeList(item.codeRecipientList).map((p: any) => Number(p.id)),
+      }))
+      .filter((item: iFarePolicyItem) => item.id > 0 && item.title);
 
-  iFarePolicyList.push(...nextItems);
+    iFarePolicyList.push(...nextItems);
+  } catch (e) {
+    console.warn("[ifare/info] load relation failed:", e);
+  }
 }
 
-loadOfficeList();
+function retryLoad() {
+  // 相關福利多半跟主資料一起斷線，重試時一併補回來，使用者才不用再按第二次
+  const infoID = currentPolicyId.value;
+  loadPolicyDetail(infoID);
+  loadRelationList(infoID);
+}
+
+// #19 洽辦單位清單只是 officeUnitInfo 缺值時的備援文字，沒有 SEO 需求；
+// 留在頂層等於伺服器白打一次（SSR 不會等它，結果直接丟掉），瀏覽器再打第二次。
+onMounted(() => {
+  loadOfficeList();
+});
 
 watch(
-  () => [Number(route.query.id || 0), String(route.query.reload ?? "")] as const,
+  () => [currentPolicyId.value, String(route.query.reload ?? "")] as const,
   async ([infoID]) => {
+    // #19 這是裸露的 async 副作用，SSR 階段不會被 await——伺服器那一輪的結果進不了
+    // 吐出去的 HTML，只是白打一次後端。轉傳／SEO 需要的欄位由上方的 useAsyncData 負責，
+    // 那支才是會被 await 的正解，這裡只在瀏覽器跑就好。
+    if (!import.meta.client) return;
     await Promise.all([loadPolicyDetail(infoID), loadRelationList(infoID)]);
   },
   { immediate: true }

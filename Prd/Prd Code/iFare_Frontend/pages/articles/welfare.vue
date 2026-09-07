@@ -105,6 +105,8 @@ const welfareItem = reactive<welfareItem>({
 });
 
 const welfareRelation = reactive<Array<welfareItem>>([]);
+useContentSocialTitle(() => welfareItem.title);
+
 const isLoading = ref(true);
 const hasError = ref(false);
 const errorMessage = ref("載入福利專欄時發生錯誤");

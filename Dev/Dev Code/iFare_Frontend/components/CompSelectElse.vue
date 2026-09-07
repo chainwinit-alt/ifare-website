@@ -6,6 +6,7 @@
       role="combobox"
       :aria-expanded="isShow"
       aria-haspopup="dialog"
+      :aria-controls="dialogId || undefined"
       :aria-label="props.selectTitle || props.placeholder"
       @click="ToggleSelectDialog"
       @keydown.enter.prevent="ToggleSelectDialog"
@@ -22,33 +23,54 @@
             </button>
       </div>
       <div class="select-content-bg" v-show="isShow">
-        <div class="select-content" @click.stop.prevent="PreventClick($event)">
+        <div
+          class="select-content"
+          role="dialog"
+          :id="dialogId || undefined"
+          :aria-labelledby="dialogId ? `${dialogId}-title` : undefined"
+          @click.stop.prevent="PreventClick($event)"
+        >
           <div class="part-top">
-            <h5 class="select-title">{{ props.selectTitle }}</h5>
+            <h5 class="select-title" :id="dialogId ? `${dialogId}-title` : undefined">{{ props.selectTitle }}</h5>
           </div>
           <div class="part-filter-list">
             <div class="filter-group">
-              <label class="filter-title">經濟條件</label>
-              <div class="btn-tag-list">
+              <label class="filter-title" :id="dialogId ? `${dialogId}-income` : undefined">經濟條件</label>
+              <!--
+                純 span 只綁 @click 的話，鍵盤與讀屏使用者在這裡一項都選不到。
+                補 role/tabindex/aria-pressed 與 enter、space（寫法比照 pages/ifare.vue）。
+                鍵盤事件要 .stop：外層 combobox 也綁了 enter/space，冒泡上去會把對話框關掉。
+              -->
+              <div class="btn-tag-list" role="group" :aria-labelledby="dialogId ? `${dialogId}-income` : undefined">
                 <span
                   class="btn btn-tag"
                   :class="{ active: selectItems.findIndex((p:any) => p.name == _item.name) >= 0 }"
+                  role="button"
+                  tabindex="0"
+                  :aria-pressed="selectItems.findIndex((p:any) => p.name == _item.name) >= 0"
                   v-for="_item in selectListIncome"
                   :key="_item.val"
                   @click="ClickSelectItem(_item.name, _item.val, 'Income')"
+                  @keydown.enter.prevent.stop="ClickSelectItem(_item.name, _item.val, 'Income')"
+                  @keydown.space.prevent.stop="ClickSelectItem(_item.name, _item.val, 'Income')"
                   >{{ _item.name }}</span
                 >
               </div>
             </div>
             <div class="filter-group">
-              <label class="filter-title" name="identity">特殊身分</label>
-              <div class="btn-tag-list">
+              <label class="filter-title" name="identity" :id="dialogId ? `${dialogId}-identity` : undefined">特殊身分</label>
+              <div class="btn-tag-list" role="group" :aria-labelledby="dialogId ? `${dialogId}-identity` : undefined">
                 <span
                   class="btn btn-tag"
                   :class="{ active: selectItems.findIndex((p:any) => p.name == _item.name) >= 0 }"
+                  role="button"
+                  tabindex="0"
+                  :aria-pressed="selectItems.findIndex((p:any) => p.name == _item.name) >= 0"
                   v-for="_item in selectListIdentity"
                   :key="_item.val"
                   @click="ClickSelectItem(_item.name, _item.val, 'Identity')"
+                  @keydown.enter.prevent.stop="ClickSelectItem(_item.name, _item.val, 'Identity')"
+                  @keydown.space.prevent.stop="ClickSelectItem(_item.name, _item.val, 'Identity')"
                   >{{ _item.name }}</span
                 >
               </div>
@@ -69,6 +91,9 @@
   <script setup lang="ts">
   import { computed, watch } from "vue";
 
+  // 2026-08-25 A11y #35：模組層級計數器，為進階篩選對話框產生穩定且唯一的 id
+  let comboboxUidSeed = 0;
+
   interface switchItem {
     type: string,
     name: string,
@@ -80,6 +105,8 @@
   const isShow = ref(false);
   const isOpts = ref(false)
   const selectItems = reactive<Array<switchItem>>([])
+  // 2026-08-25 A11y #35：進階篩選對話框的唯一 id，於 client 端 mount 後才產生（避免 SSR/CSR hydration 不一致）
+  const dialogId = ref("")
 
   function ToggleSelectDialog() {
     isShow.value = !isShow.value;
@@ -186,6 +213,11 @@
   set() {
       emits("update:select-items", selectItems);
     },
+  });
+
+  onMounted(() => {
+    // 2026-08-25 A11y #35：於 client 端產生唯一 id（避免 SSR/CSR hydration 不一致）
+    dialogId.value = `comp-select-else-${comboboxUidSeed++}`;
   });
   </script>
 

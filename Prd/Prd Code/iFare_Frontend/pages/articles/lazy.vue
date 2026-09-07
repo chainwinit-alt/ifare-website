@@ -109,6 +109,8 @@ const lazyItem = reactive<lazyItem>({
 
 const lazyRelation = reactive<Array<lazyItem>>([]);
 const lazyImages = shallowRef<Array<string>>([]);
+useContentSocialTitle(() => lazyItem.title);
+
 const isLoading = ref(true);
 const hasError = ref(false);
 const errorMessage = ref("載入懶人包時發生錯誤");

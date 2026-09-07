@@ -1,14 +1,22 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 const SITEMAP_LASTMOD = new Date().toISOString();
-const DEFAULT_SITE_URL = "http://10.200.0.39";
-const DEFAULT_FRONTEND_API_BASE = `${DEFAULT_SITE_URL}/ifare_api/api/services/app`;
+// 內網 API 主機。只用來組後端 API 位址與 dev proxy 目標，不會出現在對外的頁面上。
+const INTERNAL_API_ORIGIN = "http://10.200.0.39";
+const DEFAULT_FRONTEND_API_BASE = `${INTERNAL_API_ORIGIN}/ifare_api/api/services/app`;
 const DEFAULT_DEV_PUBLIC_FRONTEND_API_BASE = "/ifare_api/api/services/app";
 const DEFAULT_GEMINI_API_KEY = "";
 const DEFAULT_GROQ_API_KEY = "";
-const RESOLVED_SITE_URL =
+// 對外站台網址：預設留空，不再退回內網 IP。
+//
+// 這個值會被寫進 sitemap、canonical、og:url 與分享連結——預設成 http://10.200.0.39
+// 等於把內部網段位址印在每一張對外頁面上，而且民眾點了也連不到。
+// 正式環境請設 NUXT_PUBLIC_SITE_URL（或 NUXT_SITE_URL）為實際網域；
+// 未設定時 sitemap 模組會改用請求本身的主機名，不再硬帶一個錯的絕對網址。
+const RESOLVED_SITE_URL = (
   process.env.NUXT_PUBLIC_SITE_URL ||
   process.env.NUXT_SITE_URL ||
-  DEFAULT_SITE_URL;
+  ""
+).trim();
 
 const readEnv = (...keys: string[]) => {
   for (const key of keys) {
@@ -90,9 +98,13 @@ export default defineNuxtConfig({
       ) || DEFAULT_GEMINI_API_KEY,
       geminiModel:
         readEnv("NUXT_GEMINI_MODEL", "GEMINI_MODEL") || "gemini-3.5-flash-lite",
+      // 2026-08-21：移除 gemini-2.5-flash-lite，Google 已對新用戶下架，API 直接回 404
+      //（no longer available to new users，要求改用 models/gemini-3.5-flash-lite）。
+      // 它是候選鏈最後一棒，前面全掛時只會多打一次註定失敗的請求才掉到本地腳本。
+      // 與 server/utils/llm/freeTier.ts 的 DEFAULT_GEMINI_MODELS 對齊。
       geminiModels:
         readEnv("NUXT_LLM_GEMINI_MODELS") ||
-        "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash-lite",
+        "gemini-3.5-flash-lite,gemini-3.1-flash-lite",
       groqApiKey:
         readEnv("NUXT_LLM_GROQ_API_KEY", "GROQ_API_KEY") || DEFAULT_GROQ_API_KEY,
       // 2026-08-12：qwen/qwen3.6-27b 是 Groq 的 Preview 模型，官方警告
@@ -104,9 +116,74 @@ export default defineNuxtConfig({
       groqModels:
         readEnv("NUXT_LLM_GROQ_MODELS") ||
         "openai/gpt-oss-20b,openai/gpt-oss-120b",
+      // AI 摘要獨立一份候選清單，跟聊天機器人（chatbot.post.ts 也吃 groqModels）分開。
+      //
+      // 2026-08-20 曾實測 7 個模型跑 4 種情境，結論是「120b 全面優於 20b，20b 留第二順位」。
+      // 那次只測了搜尋總覽（overview），而總覽測不出下面這些問題——問答才會出現。
+      //
+      // 2026-08-24 改測「追問問答」，涵蓋全部 1337 筆政策所屬的 12 個類別，
+      // 每個回答都比對過網站原始資料並人工複核。三種會害到民眾的錯誤：
+      //   編造     憑空生出網站沒有的內容（例如來源只寫流程，卻列出一整份應備文件清單）
+      //   斷定資格 把「須經評估或審核才能確定」的事說成已確定
+      //   擋錯人   漏讀條件，把符合資格的民眾說成不符合
+      // 結果：gpt-oss-20b 三種全中（編造三輪三中、斷定 3 次、擋錯人 1 次），
+      //       gpt-oss-120b 僅單一政策測試中斷定過一次，跨 11 個類別未再犯，
+      //       兩個 gemini 模型完全沒有出現過。
+      //
+      // 因此摘要改成 Gemini 優先（見下方 summaryProviderOrder），Groq 只留 120b 當最後備援：
+      // Gemini 兩個都掛掉時，120b 多數題目仍答得正確，比完全沒有摘要好。
+      // 20b 已整個移出——它接手的那一次，正是最可能給出錯誤資訊的一次。
+      groqSummaryModels:
+        readEnv("NUXT_LLM_GROQ_SUMMARY_MODELS") ||
+        "openai/gpt-oss-120b",
+      // 摘要專用的 Gemini 清單。不共用 geminiModels，因為那份還餵給意圖判讀
+      //（search-intent）與協作搜尋（collaborator-search），那兩條這次沒測過，不動它們。
+      //
+      // 3.1 排第一是因為它在七道功能題與 11 個類別的資格題全數正確，是本次唯一零缺點的；
+      // 3.5 排第二當備援——它同樣沒出過錯，只是有一題答得過於簡略。
+      // 注意 3.1 是較舊的版本，Google 有下架舊模型的前例（見上方 geminiModels 的說明），
+      // 哪天它回 404 就把兩者對調。
+      geminiSummaryModels:
+        readEnv("NUXT_LLM_GEMINI_SUMMARY_MODELS") ||
+        "gemini-3.1-flash-lite,gemini-3.5-flash-lite",
+      // 摘要的供應商順序。空值或非 gemini 開頭 = 維持原本的 Groq 優先。
+      // 代價：Gemini 目前不走串流，民眾等到第一個字的時間從約 0.8 秒變成 1.3～1.5 秒。
+      summaryProviderOrder:
+        readEnv("NUXT_LLM_SUMMARY_PROVIDER_ORDER") || "gemini,groq",
+      // 站內查無相符政策時，是否附一段「清楚標示非站內資料」的一般知識總覽
+      //（overview_general 模式，紅線收得更緊：不得寫具體金額／名額／日期、不用 [參考 N]）。
+      // 2026-08-25 拍板：維持開。開＝查無資料時頁面不會空掉、仍有引導價值；
+      // 要完全杜絕站外內容的疑慮，設 NUXT_LLM_SUMMARY_GENERAL_FALLBACK=0 即可關閉。
+      summaryGeneralFallback:
+        readEnv("NUXT_LLM_SUMMARY_GENERAL_FALLBACK") || "true",
       groqIntentModels:
         readEnv("NUXT_LLM_GROQ_INTENT_MODELS") ||
         "openai/gpt-oss-20b,openai/gpt-oss-120b",
+      // 請求層指定模型（provider／model）是開發比較模型用的，預設一律關閉。
+      //
+      // 它接受任意型號而不限於候選清單，等於讓外部挑一個更貴的模型來消耗額度。
+      // 原本的預設值是「NODE_ENV 不是 production 就開」——但 NODE_ENV 沒設、
+      // 以 nuxt dev 或非標準方式啟動的正式機都會落在那個分支，等於預設開著；
+      // 這種「猜環境」的判斷猜錯一次就是額度被打光，改成顯式開啟才生效的 fail-safe。
+      // 要比對模型時（含本機開發）設 NUXT_LLM_ALLOW_MODEL_OVERRIDE=1 即可。
+      allowModelOverride: readEnv("NUXT_LLM_ALLOW_MODEL_OVERRIDE"),
+      // 芒寶（chatbot.post.ts）專用的 Gemini 清單與供應商順序。
+      //
+      // 2026-08-24 實測芒寶的 LLM 生成層（Layer 3，只有這一層會自由作答）：
+      //   gpt-oss-120b 出現三次編造——把民眾導向不存在的「福利專欄的低收入戶懶人包」、
+      //     保證政策內頁「會列出需要的文件與申請步驟」（多數政策其實只寫流程）、
+      //     保證搜得到一個測試用的虛構補助；另把長照問題導向就業服務站。
+      //   gpt-oss-20b 表現正常，只回「站內沒有這項細節，建議洽承辦單位確認」。
+      //   兩個 gemini 型號都沒有出現上述情形。
+      // 因此改為 Gemini 優先，Groq 留作備援並維持 20b 在 120b 前面。
+      //
+      // 已知共通弱點（換模型解決不了，要改提示詞）：問到站內沒有的虛構政策時，
+      // 四個模型都不會說「查無此政策」，而是請民眾去搜尋，等於讓人白找一趟。
+      geminiChatbotModels:
+        readEnv("NUXT_LLM_GEMINI_CHATBOT_MODELS") ||
+        "gemini-3.1-flash-lite,gemini-3.5-flash-lite",
+      chatbotProviderOrder:
+        readEnv("NUXT_LLM_CHATBOT_PROVIDER_ORDER") || "gemini,groq",
       summaryCacheTtlMs: Number(readEnv("NUXT_LLM_SUMMARY_CACHE_TTL_MS")) || 86400000,
       ollamaBaseUrl: readEnv("NUXT_OLLAMA_BASE_URL") || "http://localhost:11434",
       ollamaModel: readEnv("NUXT_OLLAMA_MODEL") || "llama3.1",
@@ -116,6 +193,11 @@ export default defineNuxtConfig({
       llmProvider: (readEnv("NUXT_LLM_PROVIDER", "LLM_PROVIDER") || "groq").toLowerCase(),
       frontendApiBase: RESOLVED_PUBLIC_FRONTEND_API_BASE,
       enableIfareAiSummary: ENABLE_IFARE_AI_SUMMARY,
+      // /preview 頁只接受這些來源送來的預覽訊息（逗號分隔）。
+      // 未設定時 pages/preview.vue 會退回內建的 localhost:5173，dev 行為不變；
+      // 正式環境要讓後台預覽功能可用，必須設成後台實際的網域，
+      // 否則 /preview 會一直停在「等待後台連線中」。
+      previewAllowedOrigins: readEnv("NUXT_PUBLIC_PREVIEW_ALLOWED_ORIGINS") || "",
     },
   },
 
@@ -158,6 +240,10 @@ export default defineNuxtConfig({
 
   app: {
     head: {
+      // 沒有 lang 的話，NVDA／JAWS 會退回系統預設語音引擎（多半是英文）去念中文——
+      // 使用者聽到的不是口音怪，是逐字亂念或整段跳過。本站的長者與視障使用者比例
+      // 遠高於一般網站，這一行沒寫等於整站對報讀軟體不可用。WCAG 3.1.1（A）。
+      htmlAttrs: { lang: "zh-Hant-TW" },
       charset: "utf-8",
       viewport: "width=device-width, initial-scale=1",
       meta: [{ name: "format-detection", content: "telephone=no" }],
@@ -173,9 +259,9 @@ export default defineNuxtConfig({
     id: "G-QCT2XVFX2L",
   },
 
-  site: {
-    url: RESOLVED_SITE_URL,
-  },
+  // 沒設定站台網址時整個 key 都不給，讓 sitemap 模組自己從請求推導；
+  // 給一個空字串會被當成「設定了一個空網址」而產出壞掉的 sitemap。
+  ...(RESOLVED_SITE_URL ? { site: { url: RESOLVED_SITE_URL } } : {}),
 
   sitemap: {
     xslColumns: [

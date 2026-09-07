@@ -118,7 +118,7 @@
           <div class="info-content info-pre-line">{{ detail_qual }}</div>
         </div>
         <div class="info-item info-welfare">
-          <div class="info-content raw-html" v-html="detail_welfare"></div>
+          <div class="info-content raw-html" v-html="sanitizeHtml(detail_welfare)"></div>
         </div>
         <div class="info-item info-evidence">
           <div class="info-content info-pre-line">{{ detail_evidence }}</div>
@@ -169,6 +169,8 @@ import { EditPen, ArrowLeft } from "@element-plus/icons-vue";
 import MainHeader from "@/components/MainHeader.vue";
 import type { TagObj } from "@/interface/Component";
 import { useUserStore } from "@/stores/user";
+// 富文本淨化，避免 v-html 造成 XSS
+import { sanitizeHtml } from "@/utils/sanitize";
 
 const app = getCurrentInstance();
 const _global = app?.appContext.config.globalProperties

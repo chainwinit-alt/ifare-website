@@ -32,6 +32,7 @@ namespace IFare_BDAPI.Code.Keyword
             return ObjectMapper.Map<CodeResultDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> InsertCodeKeyword(CodeInsertDataDto insertData)
         {
@@ -42,6 +43,7 @@ namespace IFare_BDAPI.Code.Keyword
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> UpdateCodeKeyword(CodeEditorDataDto editorData)
         {

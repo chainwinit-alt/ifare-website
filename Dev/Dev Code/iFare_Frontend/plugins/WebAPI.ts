@@ -87,6 +87,11 @@ export default defineNuxtPlugin(() => {
 
     return {
         provide: {
+            // 這兩個相容版故意只回 data（全站多處呼叫點依賴此回傳形狀，不可更動）。
+            // 錯誤並不會被靜默丟棄：requestWithDetail 於回傳前已呼叫 logError()，
+            // 以 console.warn 記下含端點、分類、狀態碼與訊息的結構化 log，
+            // 失敗一定會在 console 留下線索（故此處不再重複記錄，以免同一筆錯誤被印兩次）。
+            // 需分辨「失敗 / 查無資料」的呼叫端，請改用下方的 WebApiGetDetailed / WebApiPostDetailed。
             WebApiGet: async (path: string, query?: object) => {
                 const { data } = await requestWithDetail('GET', path, query)
                 return data

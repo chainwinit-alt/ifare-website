@@ -78,7 +78,10 @@ export class AjaxRef {
     }
 
     getBaseUrl(): string {
-        return this.isDevMode ? "https://localhost:44311" : "http://10.200.0.39/ifare_bdapi"
+        // 2026-09-01：正式環境改用相對路徑。後台 SPA（/ifare_backend）與後台 API（/ifare_bdapi）
+        // 掛在同一個 IIS 站台，相對路徑天然同源——不吃寫死的內網 IP、不用 CORS、協定跟著站台走，
+        // 換網域或 IP 都不需要重建。（舊值 http://10.200.0.39/ifare_bdapi 使後台只能在該內網使用。）
+        return this.isDevMode ? "https://localhost:44311" : "/ifare_bdapi"
     }
 
     getUrl(): string {

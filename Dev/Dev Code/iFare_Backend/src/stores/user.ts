@@ -24,7 +24,10 @@ export const useUserStore = defineStore('user', {
             tokenExpiredTime: null
         }
     },
-    persist: true,
+    // 改存 sessionStorage：重整仍保留登入，關閉分頁 / 瀏覽器即失效，token 不會長期留在 localStorage
+    persist: {
+        storage: sessionStorage
+    },
     getters: {
         isLogin: state => state.token != "" && state.token != null
     },

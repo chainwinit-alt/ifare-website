@@ -163,14 +163,16 @@ function SaveAction() {
   if (!_permission) {
     return $Message({ message: `【權限】不可為空`, type: "warning" })
   }
-  if (!_pwd) {
-    return $Message({ message: `【預設密碼】不可為空`, type: "warning" })
-  }
-  if (_pwd.length < 6 || !/\d/.test(_pwd) || !/[a-z]/.test(_pwd) || !/[A-Z]/.test(_pwd)) {
+  if (routeNameType.indexOf("add") >= 0) {
+    if (!_pwd) {
+      return $Message({ message: `【預設密碼】不可為空`, type: "warning" })
+    }
+    if (_pwd.length < 6 || !/\d/.test(_pwd) || !/[a-z]/.test(_pwd) || !/[A-Z]/.test(_pwd)) {
       return $Message({ message: `密碼須超過6字以上，包含英文大小寫、數字`, type: "warning" })
-  }
-  if (_pwd != _pwdConfirm) {
-    return $Message({ message: `【預設密碼】與【確認密碼】不符`, type: "warning" })
+    }
+    if (_pwd != _pwdConfirm) {
+      return $Message({ message: `【預設密碼】與【確認密碼】不符`, type: "warning" })
+    }
   }
 
   if (routeNameType.indexOf("add") >= 0) {
@@ -198,6 +200,9 @@ function SaveAction() {
     console.log("[Edit] Save action");
     const _id = ids? ids[0] : 0
     if (_id == 0) return false
+    if (_id == userStore.userID && !_isEnabled) {
+      return $Message({ message: `不可停用目前登入中的帳號`, type: "warning" })
+    }
     $WebAPI.UpdateAccount(userStore.token, _id, _userName, _account, _email, _permission, _isEnabled,(res: any) => {
         let _resData = res.data || "error";
         if (_resData == "error") {

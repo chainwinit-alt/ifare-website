@@ -32,6 +32,7 @@ namespace IFare_BDAPI.Code.Income
             return ObjectMapper.Map<CodeResultDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> InsertCodeIncome(CodeInsertDataDto insertData)
         {
@@ -42,6 +43,7 @@ namespace IFare_BDAPI.Code.Income
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> UpdateCodeIncome(CodeEditorDataDto editorData)
         {

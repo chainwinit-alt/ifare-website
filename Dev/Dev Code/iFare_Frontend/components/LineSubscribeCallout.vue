@@ -7,7 +7,7 @@
     <div class="line-subscribe__icon" aria-hidden="true">f</div>
     <div class="line-subscribe__copy">
       <strong class="line-subscribe__title">想第一手收到新福利資訊?</strong>
-      <p class="line-subscribe__desc">加入 i-Fare FB粉絲團 ,新政策、活動與重要提醒第一時間通知你。</p>
+      <p class="line-subscribe__desc">加入 i-Fare FB 粉絲團，新政策、活動與重要提醒第一時間通知你。</p>
     </div>
     <a
       class="line-subscribe__btn"

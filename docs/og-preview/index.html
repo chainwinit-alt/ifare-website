@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>長穩基金會分享縮圖預覽</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 32px 24px; color: #231815; background: #fff; font-family: system-ui, sans-serif; }
+      main { max-width: 1160px; margin: auto; }
+      h1 { margin: 0 0 12px; font-size: 24px; }
+      p { line-height: 1.7; color: #555; }
+      .previews { display: grid; grid-template-columns: 1.6fr 1fr; gap: 32px; margin-top: 28px; align-items: start; }
+      h2 { font-size: 16px; margin: 0 0 12px; }
+      img { display: block; width: 100%; height: auto; border: 1px solid #eee; }
+      @media (max-width: 700px) { .previews { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>長穩基金會分享縮圖</h1>
+      <p>DEV、PRD 使用相同的原始 Logo。下方為本機裁切模擬，實際 Facebook 預覽仍須部署後確認。</p>
+      <div class="previews">
+        <section>
+          <h2>橫式原圖：1200 × 630</h2>
+          <img src="og-logo-safe-20260903.png" width="1200" height="630" alt="長穩社福慈善基金會橫式分享圖片" />
+        </section>
+        <section>
+          <h2>手機方形裁切：630 × 630</h2>
+          <img src="og-logo-mobile-square-preview.png" width="630" height="630" alt="手機方形裁切後，Logo 與基金會全名完整顯示" />
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

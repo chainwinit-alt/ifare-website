@@ -163,6 +163,8 @@ const _contactItem = reactive<contactItem>({
   officeList: undefined,
 });
 
+useContentSocialTitle(() => _contactItem.title);
+
 const isLoading = ref(true);
 const hasError = ref(false);
 

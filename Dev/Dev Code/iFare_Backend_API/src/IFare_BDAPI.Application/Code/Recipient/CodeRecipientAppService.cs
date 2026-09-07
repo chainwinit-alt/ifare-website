@@ -32,6 +32,7 @@ namespace IFare_BDAPI.Code.Recipient
             return ObjectMapper.Map<CodeResultDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> InsertCodeRecipient(CodeInsertDataDto insertData)
         {
@@ -42,6 +43,7 @@ namespace IFare_BDAPI.Code.Recipient
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> UpdateCodeRecipient(CodeEditorDataDto editorData)
         {

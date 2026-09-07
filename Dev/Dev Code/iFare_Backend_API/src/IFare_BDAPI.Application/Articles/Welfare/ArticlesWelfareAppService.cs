@@ -60,6 +60,7 @@ namespace IFare_BDAPI.Articles.Welfare
         /// </summary>
         /// <param name="insertData">新增文章資料 DTO</param>
         /// <returns>操作結果（包含成功/失敗訊息）</returns>
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         [UnitOfWork(isTransactional: false)] // 停用 ABP 預設的交易機制（由 TaskManager 自行管理）
         public async Task<ErrorInfoBaseDto> InsertArticlesWelfare(ArticlesWelfareInsertDataDto insertData)
@@ -79,6 +80,7 @@ namespace IFare_BDAPI.Articles.Welfare
         /// </summary>
         /// <param name="editorData">修改文章資料 DTO（包含文章 ID 及修改內容）</param>
         /// <returns>操作結果（包含成功/失敗訊息）</returns>
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         [UnitOfWork(isTransactional: false)]
         public async Task<ErrorInfoBaseDto> UpdateArticlesWelfare(ArticlesWelfareEditorDataDto editorData)
@@ -98,6 +100,7 @@ namespace IFare_BDAPI.Articles.Welfare
         /// </summary>
         /// <param name="deleteData">刪除文章資料 DTO（包含文章 ID）</param>
         /// <returns>操作結果（包含成功/失敗訊息）</returns>
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> DeleteArticlesWelfare(ArticlesWelfareDeleteDataDto deleteData)
         {

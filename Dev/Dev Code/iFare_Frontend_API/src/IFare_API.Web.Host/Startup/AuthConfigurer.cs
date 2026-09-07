@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Abp.Runtime.Security;
+using IFare_API.Authentication.JwtBearer;
 
 namespace IFare_API.Web.Host.Startup
 {
@@ -37,7 +38,8 @@ namespace IFare_API.Web.Host.Startup
                     {
                         // The signing key must match!
                         ValidateIssuerSigningKey = true,
-                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(configuration["Authentication:JwtBearer:SecurityKey"])),
+                        // 金鑰改由 JwtSecurityKeyProvider 取得：環境變數 IFARE_API_JWT_KEY 優先，沒設才用設定檔現值。
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(JwtSecurityKeyProvider.Resolve(configuration))),
 
                         // Validate the JWT Issuer (iss) claim
                         ValidateIssuer = true,

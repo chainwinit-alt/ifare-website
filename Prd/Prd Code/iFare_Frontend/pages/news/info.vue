@@ -65,6 +65,8 @@ title: '',
 releaseTime: ''
 });
 
+useContentSocialTitle(() => newsItem.title);
+
 const isLoading = ref(true)
 const hasError = ref(false)
 const errorMessage = ref('載入最新消息時發生錯誤')

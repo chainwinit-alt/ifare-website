@@ -24,6 +24,7 @@
 // Google 搜尋結果可顯示組織資訊、官方網站、social profile
 const config = useRuntimeConfig();
 const siteUrl = String(config.public.siteUrl || 'https://www.i-fare.org.tw').replace(/\/+$/, '');
+useSiteSocialMeta(siteUrl);
 
 useHead({
   script: [

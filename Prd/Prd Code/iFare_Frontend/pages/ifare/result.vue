@@ -192,7 +192,9 @@
                 <h4 class="result-title">{{ _item.title }}</h4>
                 <div class="result-item-bottom">
                   <div class="result-filter">
-                    <label class="result-filter-area">{{ _item.area }}</label>
+                    <label class="result-filter-area" :title="_item.areaTitle">
+                      <span class="result-filter-area-text">{{ _item.area }}</span>
+                    </label>
                     <label class="result-filter-qualify">
                       <span :class="{ remark: _item.hasRecipient }">{{ _item.hasRecipient ? '有' : '無' }}</span>年齡限制、
                       <span :class="{ remark: _item.hasIncome }">{{ _item.hasIncome ? '有' : '無' }}</span>經濟限制、
@@ -614,6 +616,7 @@ interface iFarePolicyItem {
   title: string;
   qualification: string;
   area: string;
+  areaTitle: string;
   hasIndentity: boolean;
   hasIncome: boolean;
   hasRecipient: boolean;
@@ -623,6 +626,98 @@ interface pageNum {
   num: number;
   isActive: boolean;
   isHide: boolean;
+}
+
+function normalizePolicySignatureText(value: unknown) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function getPolicyCodeListSignature(value: unknown) {
+  if (!Array.isArray(value)) return "";
+
+  return value
+    .map((item: any) => String(item?.id ?? item?.ID ?? item?.codeName ?? ""))
+    .filter(Boolean)
+    .sort()
+    .join(",");
+}
+
+const unrestrictedPolicyCodeNames = new Set([
+  "全選",
+  "全部",
+  "不限",
+  "不限制",
+  "無限制",
+  "無經濟限制",
+  "無特殊身分",
+  "無",
+]);
+
+function hasPolicyRestriction(value: unknown) {
+  if (!Array.isArray(value) || value.length === 0) return false;
+
+  return value.some((item: any) => {
+    const id = Number(item?.id ?? item?.ID);
+    const name = String(
+      item?.codeName ?? item?.CodeName ?? item?.labelName ?? item?.name ?? ""
+    ).trim();
+
+    if (id === 1 || unrestrictedPolicyCodeNames.has(name)) return false;
+    return (Number.isFinite(id) && id > 0) || Boolean(name);
+  });
+}
+
+function getPolicyContentSignature(item: any) {
+  return JSON.stringify([
+    normalizePolicySignatureText(item?.title),
+    normalizePolicySignatureText(item?.qualification),
+    String(item?.codePolicy_ID ?? ""),
+    getPolicyCodeListSignature(item?.codeKeywordList),
+    getPolicyCodeListSignature(item?.codeIdentityList),
+    getPolicyCodeListSignature(item?.codeIncomeList),
+    getPolicyCodeListSignature(item?.codeRecipientList),
+    String(item?.releaseTime ?? ""),
+    String(item?.discontinuedTime ?? ""),
+  ]);
+}
+
+function getUniquePolicySearchResults(rawItems: Array<any>) {
+  if (!isAllAreaValue(codeSelect_area.value)) {
+    const uniqueItems = new Map<string, any>();
+    rawItems.forEach((item: any) => uniqueItems.set(String(item.id), item));
+    return [...uniqueItems.values()];
+  }
+
+  const policyGroups = new Map<string, { item: any; areas: Set<string> }>();
+  rawItems.forEach((item: any) => {
+    const signature = getPolicyContentSignature(item);
+    const area = normalizePolicySignatureText(item?.codeDomicile_LabelName);
+    const existing = policyGroups.get(signature);
+
+    if (existing) {
+      if (area) existing.areas.add(area);
+      return;
+    }
+
+    policyGroups.set(signature, {
+      item,
+      areas: new Set(area ? [area] : []),
+    });
+  });
+
+  return [...policyGroups.values()].map(({ item, areas }) => {
+    const areaList = [...areas];
+    const fullAreaLabel = areaList.join("、") || item.codeDomicile_LabelName;
+    const displayAreaLabel = areaList.length > 1
+      ? `${areaList[0]}等`
+      : fullAreaLabel;
+
+    return {
+      ...item,
+      codeDomicile_LabelName: displayAreaLabel,
+      codeDomicile_FullLabelName: fullAreaLabel,
+    };
+  });
 }
 
 const iFarePolicyList = reactive<Array<iFarePolicyItem>>([]);
@@ -642,17 +737,22 @@ function SetDataInit(_q: any) {
   const listNews = $WebApiGet("/FarePolicy/GetIFarePolicyList", _q);
   listNews.then((res: any) => {
     if (!res?.result?.result) return;
-    const _data = res.result.result;
+    const _data = getUniquePolicySearchResults(res.result.result);
     let _newsList: Array<iFarePolicyItem> = _data.map(
       (item: any, i: number) => {
+        const recipientList = Array.isArray(item.codeRecipientList)
+          ? item.codeRecipientList
+          : [];
+
         return {
           id: item.id,
           title: item.title,
           qualification: item.qualification ?? "",
           area: item.codeDomicile_LabelName,
-          hasIndentity: item.codeIdentityList.findIndex((p:any) => p.id == 1) < 0,
-          hasIncome: item.codeIncomeList.findIndex((p:any) => p.id == 1) < 0,
-          hasRecipient: item.codeRecipientList.findIndex((p:any) => p.id == 1) < 0
+          areaTitle: item.codeDomicile_FullLabelName ?? item.codeDomicile_LabelName,
+          hasIndentity: hasPolicyRestriction(item.codeIdentityList),
+          hasIncome: hasPolicyRestriction(item.codeIncomeList),
+          hasRecipient: recipientList.findIndex((entry: any) => entry.id == 1) < 0
         };
       }
     );

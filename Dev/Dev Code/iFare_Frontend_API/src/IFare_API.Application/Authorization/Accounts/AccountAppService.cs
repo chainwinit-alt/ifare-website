@@ -13,13 +13,14 @@ namespace IFare_API.Authorization.Accounts
         // from: http://regexlib.com/REDetails.aspx?regexp_id=1923
         public const string PasswordRegex = "(?=^.{8,}$)(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\\s)[0-9a-zA-Z!@#$%^&*()]*$";
 
-        private readonly UserRegistrationManager _userRegistrationManager;
+        // 註冊功能已停用（見下方 Register），連帶不再需要 UserRegistrationManager。
+        //private readonly UserRegistrationManager _userRegistrationManager;
 
-        public AccountAppService(
-            UserRegistrationManager userRegistrationManager)
-        {
-            _userRegistrationManager = userRegistrationManager;
-        }
+        //public AccountAppService(
+        //    UserRegistrationManager userRegistrationManager)
+        //{
+        //    _userRegistrationManager = userRegistrationManager;
+        //}
 
         public async Task<IsTenantAvailableOutput> IsTenantAvailable(IsTenantAvailableInput input)
         {
@@ -37,23 +38,26 @@ namespace IFare_API.Authorization.Accounts
             return new IsTenantAvailableOutput(TenantAvailabilityState.Available, tenant.Id);
         }
 
-        public async Task<RegisterOutput> Register(RegisterInput input)
-        {
-            var user = await _userRegistrationManager.RegisterAsync(
-                input.Name,
-                input.Surname,
-                input.EmailAddress,
-                input.UserName,
-                input.Password,
-                true // Assumed email address is always confirmed. Change this if you want to implement email confirmation.
-            );
+        // 前台不提供註冊功能，整段停用（與 IAccountAppService.Register 成對）。
+        // 原本沒有 [AbpAuthorize]，ABP 動態 API 會開成匿名可呼叫的
+        // /api/services/app/Account/Register，任何人都能自行建立帳號。
+        //public async Task<RegisterOutput> Register(RegisterInput input)
+        //{
+        //    var user = await _userRegistrationManager.RegisterAsync(
+        //        input.Name,
+        //        input.Surname,
+        //        input.EmailAddress,
+        //        input.UserName,
+        //        input.Password,
+        //        true // Assumed email address is always confirmed. Change this if you want to implement email confirmation.
+        //    );
 
-            var isEmailConfirmationRequiredForLogin = await SettingManager.GetSettingValueAsync<bool>(AbpZeroSettingNames.UserManagement.IsEmailConfirmationRequiredForLogin);
+        //    var isEmailConfirmationRequiredForLogin = await SettingManager.GetSettingValueAsync<bool>(AbpZeroSettingNames.UserManagement.IsEmailConfirmationRequiredForLogin);
 
-            return new RegisterOutput
-            {
-                CanLogin = user.IsActive && (user.IsEmailConfirmed || !isEmailConfirmationRequiredForLogin)
-            };
-        }
+        //    return new RegisterOutput
+        //    {
+        //        CanLogin = user.IsActive && (user.IsEmailConfirmed || !isEmailConfirmationRequiredForLogin)
+        //    };
+        //}
     }
 }

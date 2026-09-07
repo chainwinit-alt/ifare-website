@@ -1,0 +1,332 @@
+{
+  "scope": "all-pages",
+  "variant": "Prd",
+  "nodeVersion": "v18.18.2",
+  "nodePath": "D:\\Users\\jason.hsieh\\AppData\\Local\\Temp\\ifare-og-node-v18.18.2\\node.exe",
+  "originMode": "configured",
+  "isolatedOutput": "D:\\Users\\jason.hsieh\\AppData\\Local\\Temp\\ifare-og-prd-9fRUaO\\.output",
+  "api": "Local fixture; no production API or database accessed",
+  "apiRequestCount": 128,
+  "imageSha256": "2947415efc1bb5747ffbbdb4b4c1ce29da9866604b426d2b576ef3bd7f07a12b",
+  "tests": [
+    {
+      "route": "/",
+      "device": "crawler",
+      "status": 200,
+      "title": "長穩社福慈善基金會",
+      "description": "認識長穩社福慈善基金會，掌握最新消息、福利專欄與公益夥伴資訊，透過 i-Fare 查找福利政策。",
+      "url": "https://www.i-fare.org.tw/",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/",
+      "device": "mobile",
+      "status": 200,
+      "title": "長穩社福慈善基金會",
+      "description": "認識長穩社福慈善基金會，掌握最新消息、福利專欄與公益夥伴資訊，透過 i-Fare 查找福利政策。",
+      "url": "https://www.i-fare.org.tw/",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/about",
+      "device": "crawler",
+      "status": 200,
+      "title": "關於長穩｜長穩社福慈善基金會",
+      "description": "認識長穩社福慈善基金會的成立背景、使命與宗旨，以及環境保育、人才培育、社會關懷三大核心行動。",
+      "url": "https://www.i-fare.org.tw/about",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/about",
+      "device": "mobile",
+      "status": 200,
+      "title": "關於長穩｜長穩社福慈善基金會",
+      "description": "認識長穩社福慈善基金會的成立背景、使命與宗旨，以及環境保育、人才培育、社會關懷三大核心行動。",
+      "url": "https://www.i-fare.org.tw/about",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/news",
+      "device": "crawler",
+      "status": 200,
+      "title": "最新消息｜長穩社福慈善基金會",
+      "description": "掌握長穩社福慈善基金會的最新消息、活動公告與服務動態。",
+      "url": "https://www.i-fare.org.tw/news",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/news",
+      "device": "mobile",
+      "status": 200,
+      "title": "最新消息｜長穩社福慈善基金會",
+      "description": "掌握長穩社福慈善基金會的最新消息、活動公告與服務動態。",
+      "url": "https://www.i-fare.org.tw/news",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/news/info?id=30",
+      "device": "crawler",
+      "status": 200,
+      "title": "OG fixture news",
+      "description": "閱讀長穩社福慈善基金會的消息與活動內容，了解公告詳情及相關資訊。",
+      "url": "https://www.i-fare.org.tw/news/info?id=30",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/news/info?id=30",
+      "device": "mobile",
+      "status": 200,
+      "title": "OG fixture news",
+      "description": "閱讀長穩社福慈善基金會的消息與活動內容，了解公告詳情及相關資訊。",
+      "url": "https://www.i-fare.org.tw/news/info?id=30",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/articles",
+      "device": "crawler",
+      "status": 200,
+      "title": "福利專欄｜長穩社福慈善基金會",
+      "description": "閱讀福利專欄與懶人包，了解福利政策、補助資訊及相關服務。",
+      "url": "https://www.i-fare.org.tw/articles",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/articles",
+      "device": "mobile",
+      "status": 200,
+      "title": "福利專欄｜長穩社福慈善基金會",
+      "description": "閱讀福利專欄與懶人包，了解福利政策、補助資訊及相關服務。",
+      "url": "https://www.i-fare.org.tw/articles",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/articles/welfare?id=1",
+      "device": "crawler",
+      "status": 200,
+      "title": "OG fixture welfare",
+      "description": "閱讀本站福利專欄，了解文章介紹的福利資訊、政策說明及相關資源。",
+      "url": "https://www.i-fare.org.tw/articles/welfare?id=1",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/articles/welfare?id=1",
+      "device": "mobile",
+      "status": 200,
+      "title": "OG fixture welfare",
+      "description": "閱讀本站福利專欄，了解文章介紹的福利資訊、政策說明及相關資源。",
+      "url": "https://www.i-fare.org.tw/articles/welfare?id=1",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/articles/lazy?id=1",
+      "device": "crawler",
+      "status": 200,
+      "title": "OG fixture guide",
+      "description": "查看本站整理的福利懶人包與相關說明，掌握福利資訊重點。",
+      "url": "https://www.i-fare.org.tw/articles/lazy?id=1",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/articles/lazy?id=1",
+      "device": "mobile",
+      "status": 200,
+      "title": "OG fixture guide",
+      "description": "查看本站整理的福利懶人包與相關說明，掌握福利資訊重點。",
+      "url": "https://www.i-fare.org.tw/articles/lazy?id=1",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/collaborator",
+      "device": "crawler",
+      "status": 200,
+      "title": "公益夥伴｜長穩社福慈善基金會",
+      "description": "認識長穩基金會的公益夥伴，查詢相關機構與服務資訊。",
+      "url": "https://www.i-fare.org.tw/collaborator",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/collaborator",
+      "device": "mobile",
+      "status": 200,
+      "title": "公益夥伴｜長穩社福慈善基金會",
+      "description": "認識長穩基金會的公益夥伴，查詢相關機構與服務資訊。",
+      "url": "https://www.i-fare.org.tw/collaborator",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare",
+      "device": "crawler",
+      "status": 200,
+      "title": "i-Fare 福利好幫手｜長穩社福慈善基金會",
+      "description": "依受助者情況、年齡、戶籍地與關鍵字查找福利政策，了解申請資格與洽辦資訊。",
+      "url": "https://www.i-fare.org.tw/ifare",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare",
+      "device": "mobile",
+      "status": 200,
+      "title": "i-Fare 福利好幫手｜長穩社福慈善基金會",
+      "description": "依受助者情況、年齡、戶籍地與關鍵字查找福利政策，了解申請資格與洽辦資訊。",
+      "url": "https://www.i-fare.org.tw/ifare",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/result?query=%E9%95%B7%E7%85%A7&codeDomicileID=17",
+      "device": "crawler",
+      "status": 200,
+      "title": "i-Fare 政策搜尋結果｜長穩社福慈善基金會",
+      "description": "檢視福利政策搜尋結果，查看政策的適用地區、資格條件與詳細內容。",
+      "url": "https://www.i-fare.org.tw/ifare/result?query=%E9%95%B7%E7%85%A7&codeDomicileID=17",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/result?query=%E9%95%B7%E7%85%A7&codeDomicileID=17",
+      "device": "mobile",
+      "status": 200,
+      "title": "i-Fare 政策搜尋結果｜長穩社福慈善基金會",
+      "description": "檢視福利政策搜尋結果，查看政策的適用地區、資格條件與詳細內容。",
+      "url": "https://www.i-fare.org.tw/ifare/result?query=%E9%95%B7%E7%85%A7&codeDomicileID=17",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/info?id=5170",
+      "device": "crawler",
+      "status": 200,
+      "title": "OG fixture policy",
+      "description": "查看福利政策的適用對象、申請資格與洽辦資訊，實際規定請以主管機關公告為準。",
+      "url": "https://www.i-fare.org.tw/ifare/info?id=5170",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/info?id=5170",
+      "device": "mobile",
+      "status": 200,
+      "title": "OG fixture policy",
+      "description": "查看福利政策的適用對象、申請資格與洽辦資訊，實際規定請以主管機關公告為準。",
+      "url": "https://www.i-fare.org.tw/ifare/info?id=5170",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/contact?id=2",
+      "device": "crawler",
+      "status": 200,
+      "title": "i-Fare 洽辦單位｜長穩社福慈善基金會",
+      "description": "查看福利政策洽辦單位的聯絡電話、地址與相關服務資訊。",
+      "url": "https://www.i-fare.org.tw/ifare/contact?id=2",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/contact?id=2",
+      "device": "mobile",
+      "status": 200,
+      "title": "i-Fare 洽辦單位｜長穩社福慈善基金會",
+      "description": "查看福利政策洽辦單位的聯絡電話、地址與相關服務資訊。",
+      "url": "https://www.i-fare.org.tw/ifare/contact?id=2",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/future",
+      "device": "crawler",
+      "status": 404,
+      "expected": "Existing disabled page; not published"
+    },
+    {
+      "route": "/future",
+      "device": "mobile",
+      "status": 404,
+      "expected": "Existing disabled page; not published"
+    },
+    {
+      "route": "/preview",
+      "device": "crawler",
+      "status": 200,
+      "title": "頁面預覽｜長穩社福慈善基金會",
+      "description": "長穩社福慈善基金會網站內容預覽。",
+      "url": "https://www.i-fare.org.tw/preview",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/preview",
+      "device": "mobile",
+      "status": 200,
+      "title": "頁面預覽｜長穩社福慈善基金會",
+      "description": "長穩社福慈善基金會網站內容預覽。",
+      "url": "https://www.i-fare.org.tw/preview",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/compare",
+      "device": "crawler",
+      "status": 200,
+      "title": "i-Fare 福利好幫手｜長穩社福慈善基金會",
+      "description": "依受助者情況、年齡、戶籍地與關鍵字查找福利政策，了解申請資格與洽辦資訊。",
+      "url": "https://www.i-fare.org.tw/ifare",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/compare",
+      "device": "mobile",
+      "status": 200,
+      "title": "i-Fare 福利好幫手｜長穩社福慈善基金會",
+      "description": "依受助者情況、年齡、戶籍地與關鍵字查找福利政策，了解申請資格與洽辦資訊。",
+      "url": "https://www.i-fare.org.tw/ifare",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/og-test-page",
+      "device": "crawler",
+      "status": 200,
+      "title": "OG dynamic page title",
+      "description": "OG dynamic page description",
+      "url": "https://www.i-fare.org.tw/og-test-page",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/og-test-page",
+      "device": "mobile",
+      "status": 200,
+      "title": "OG dynamic page title",
+      "description": "OG dynamic page description",
+      "url": "https://www.i-fare.org.tw/og-test-page",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/news?preview=20260903&utm_source=facebook&fbclid=test#top",
+      "device": "crawler",
+      "status": 200,
+      "title": "最新消息｜長穩社福慈善基金會",
+      "description": "掌握長穩社福慈善基金會的最新消息、活動公告與服務動態。",
+      "url": "https://www.i-fare.org.tw/news",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/news?preview=20260903&utm_source=facebook&fbclid=test#top",
+      "device": "mobile",
+      "status": 200,
+      "title": "最新消息｜長穩社福慈善基金會",
+      "description": "掌握長穩社福慈善基金會的最新消息、活動公告與服務動態。",
+      "url": "https://www.i-fare.org.tw/news",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/info?id=5170&preview=20260903&utm_source=facebook",
+      "device": "crawler",
+      "status": 200,
+      "title": "OG fixture policy",
+      "description": "查看福利政策的適用對象、申請資格與洽辦資訊，實際規定請以主管機關公告為準。",
+      "url": "https://www.i-fare.org.tw/ifare/info?id=5170",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    },
+    {
+      "route": "/ifare/info?id=5170&preview=20260903&utm_source=facebook",
+      "device": "mobile",
+      "status": 200,
+      "title": "OG fixture policy",
+      "description": "查看福利政策的適用對象、申請資格與洽辦資訊，實際規定請以主管機關公告為準。",
+      "url": "https://www.i-fare.org.tw/ifare/info?id=5170",
+      "image": "https://www.i-fare.org.tw/og-logo-safe-20260903.png"
+    }
+  ],
+  "status": "PASS"
+}

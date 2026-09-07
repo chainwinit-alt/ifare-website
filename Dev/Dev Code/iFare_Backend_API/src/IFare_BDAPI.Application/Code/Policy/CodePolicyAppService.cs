@@ -32,6 +32,7 @@ namespace IFare_BDAPI.Code.Policy
             return ObjectMapper.Map<CodeResultDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> InsertCodePolicy(CodeInsertDataDto insertData)
         {
@@ -42,6 +43,7 @@ namespace IFare_BDAPI.Code.Policy
             return ObjectMapper.Map<ErrorInfoBaseDto>(result);
         }
 
+        [TypeFilter(typeof(Filter.IsEditorCheckerFilter))]
         [HttpPost]
         public async Task<ErrorInfoBaseDto> UpdateCodePolicy(CodeEditorDataDto editorData)
         {

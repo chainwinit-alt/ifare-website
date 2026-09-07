@@ -48,8 +48,17 @@ h1, h2, h3, h4, h5, h6 {
   -ms-user-select: none;
   user-select: none;
 
+  // 滑鼠點擊時不要外框（這是原本的用意），但鍵盤 Tab 進來一定要看得見。
+  // 原本只寫 &:focus { outline: none !important }，把鍵盤焦點也一起消掉了：
+  // 「受助情境」與「戶籍地」兩個下拉都掛這個 class，實測聚焦前後畫面變動 0%、
+  // 焦點對比 1.00:1，鍵盤使用者按 Tab 會直接失去游標。WCAG 2.4.7（A）。
   &:focus {
     outline: none!important;
+  }
+
+  &:focus-visible {
+    outline: 3px solid $color-black!important;
+    outline-offset: 2px;
   }
 }
 

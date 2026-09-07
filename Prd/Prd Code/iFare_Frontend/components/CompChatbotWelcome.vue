@@ -116,40 +116,6 @@
             </div>
           </section>
 
-          <section class="contact-card">
-            <div class="contact-card-top">
-              <h5>需要真人協助？</h5>
-              <p>如果你的問題牽涉個案判斷或申請細節，建議直接聯絡基金會。</p>
-            </div>
-            <div class="contact-card-actions">
-              <a
-                href="tel:0227978383"
-                class="contact-pill"
-                data-island="撥打基金會電話"
-                data-island-style="button"
-              >
-                撥打電話
-              </a>
-              <a
-                href="https://lin.ee/eHw9VpL"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="contact-pill"
-                data-island="LINE 真人客服"
-                data-island-style="button"
-              >
-                LINE 客服
-              </a>
-              <NuxtLink
-                to="/collaborator"
-                class="contact-pill is-outline"
-                data-island="公益夥伴"
-                data-island-style="link"
-              >
-                公益夥伴
-              </NuxtLink>
-            </div>
-          </section>
         </template>
 
         <template v-else>
@@ -400,8 +366,8 @@ const quickActions: QuickAction[] = [
   },
   {
     key: 'contact',
-    label: '聯絡真人客服',
-    prompt: '我要怎麼聯絡基金會或真人客服？',
+    label: '聯絡基金會',
+    prompt: '我要怎麼聯絡基金會？',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
   },
   {
@@ -473,13 +439,6 @@ const actionGroups = computed<FollowUpGroup[]>(() => {
       actions: [
         { label: '重試剛剛的問題', type: 'message', prompt: lastPrompt.value, variant: 'button' },
         { label: '前往 i-Fare', type: 'route', to: '/ifare', variant: 'link' },
-        {
-          label: 'LINE 真人客服',
-          type: 'link',
-          href: 'https://lin.ee/eHw9VpL',
-          target: '_blank',
-          variant: 'button',
-        },
       ],
     });
   }
@@ -614,16 +573,7 @@ function buildKeywordActions(prompt: string): FollowUpAction[] {
   }
 
   if (/捐款|支持|donate|donation/.test(text)) {
-    actions.push(
-      { label: '前往關於長穩', type: 'route', to: '/about', variant: 'link' },
-      {
-        label: 'LINE 真人客服',
-        type: 'link',
-        href: 'https://lin.ee/eHw9VpL',
-        target: '_blank',
-        variant: 'button',
-      },
-    );
+    actions.push({ label: '前往關於長穩', type: 'route', to: '/about', variant: 'link' });
   }
 
   if (/聯絡|客服|電話|line|email/.test(text)) {
@@ -679,7 +629,7 @@ function getLocalKnowledgeReply(prompt: string) {
   }
 
   if (/聯絡|客服|電話|line|email/.test(text)) {
-    return '你可以用以下方式聯絡基金會：電話 02-2797-8383、Email ifaretw@gmail.com，或加入 LINE 客服。';
+    return '你可以用以下方式聯絡基金會：電話 02-2797-8383、Email ifaretw@gmail.com，或前往 i-Fare Facebook 粉絲團。';
   }
 
   if (/新聞|最新|活動/.test(text)) {
@@ -1086,16 +1036,14 @@ watch(isOpen, async (open, previousOpen) => {
 }
 
 .suggestion-chips,
-.follow-up-actions,
-.contact-card-actions {
+.follow-up-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
 .chip-suggestion,
-.follow-up-action,
-.contact-pill {
+.follow-up-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1115,37 +1063,6 @@ watch(isOpen, async (open, previousOpen) => {
   &:hover {
     transform: translateY(-1px);
     background: #ffffff;
-  }
-}
-
-.contact-card {
-  padding: 16px;
-  border-radius: 22px;
-  background: linear-gradient(145deg, rgba(23, 24, 24, 0.94), rgba(39, 39, 39, 0.88));
-  color: #ffffff;
-}
-
-.contact-card-top h5 {
-  margin: 0 0 8px;
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.contact-card-top p {
-  margin: 0 0 14px;
-  color: rgba(255, 255, 255, 0.74);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.contact-pill {
-  background: #ffffff;
-  color: #171818;
-
-  &.is-outline {
-    background: rgba(255, 255, 255, 0.08);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.18);
   }
 }
 
